@@ -175,7 +175,7 @@
     updateStats(res);
     el.verified.hidden = false;
 
-    if (window.DKUI && DKUI.recordBuild) {
+    if (window.DKUI && DKUI.toast) { DKUI.toast('Build finished'); } if (false) {
       DKUI.recordBuild({
         filename: lastFilename || 'protected.luau',
         date: new Date().toISOString(),

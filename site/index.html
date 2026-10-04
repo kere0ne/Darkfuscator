@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Darkfuscator</title>
-<meta name="description" content="Darkfuscator — a browser-side Luau obfuscator. Real Luau parser, bytecode VM, anti-env, anti-tamper, 100% client-side.">
+<meta name="description" content="Darkfuscator \u2014 a browser-side Luau obfuscator. Real Luau parser, bytecode VM, anti-env, anti-tamper, 100% client-side.">
 <meta name="color-scheme" content="dark">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
@@ -14,70 +14,29 @@
 <div class="sidebar-scrim" id="scrim"></div>
 <aside class="sidebar">
       <div class="brand-mark">DF</div>
-      <a class="side-btn active" data-page="home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
-      <a class="side-btn" data-page="obfuscate" title="Obfuscate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></a>
-      <a class="side-btn" data-page="files" title="My Files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></a>
-      <a class="side-btn" data-page="account" title="Account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
-      <a class="side-btn" data-page="docs" title="Docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></a>
-      <button class="side-btn danger" id="btn-reset" title="Clear local data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      <a class="side-btn active" data-page="obfuscate" title="Obfuscate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></a>
     </aside>
   <main class="content">
     <header class="topbar">
       <div class="greet">
-        <button class="icon-btn" id="btn-menu" title="Toggle sidebar" type="button">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
+        <button class="icon-btn" id="btn-menu" title="Toggle sidebar" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
         <div>
-          <div class="muted" style="font-size:.78rem">DARKFUSCATOR WORKSPACE</div>
-          <h1 id="page-title">Welcome</h1>
+          <div class="muted" style="font-size:.78rem">DARKFUSCATOR</div>
+          <h1>Obfuscate</h1>
         </div>
       </div>
-      <div class="top-right"><span class="pill" id="storage-pill">0 stored builds</span><button class="btn orange" id="btn-new">NEW OBFUSCATION +</button></div>
+      <div class="top-right"><span class="pill">v4.5 &middot; 100% client-side</span></div>
     </header>
-    <section class="page active" id="page-home">
-      <div class="grid">
-        <div class="panel panel-purple">
-          <small class="eyebrow">REAL LUAU PARSER &middot; BYTECODE VM &middot; NO SERVER</small>
-          <h2 style="margin-top:10px">Make your Luau <em>harder to read</em> without breaking it.</h2>
-          <p class="muted" style="margin-top:10px;line-height:1.6">Your script is compiled to register bytecode, packed into an encrypted payload and shipped inside a generated interpreter &mdash; then re-parsed before you ever see it, so what comes out still runs.</p>
-          <button class="btn orange" id="btn-start" style="margin-top:18px">GET STARTED &rarr;</button>
-        </div>
-        <div class="panel">
-          <h3>Protection stack</h3>
-          <div class="stat">10 <small>protection layers</small></div>
-          <div class="muted">Custom bytecode VM, layered string encoding, opaque predicates, execution locks, anti-env, anti-tamper and more.</div>
-          <div class="line"></div>
-          <div class="stat">v4.5 <small>hardened engine</small></div>
-          <div class="muted">Per-build VM variation, decoy opcodes and handler variants reshuffled from your seed on every build.</div>
-        </div>
-        <div class="panel">
-          <h3>Obfuscation</h3><span class="status-dot" id="job-status"><i></i><span>Not running</span></span>
-          <div class="orb"></div>
-          <div class="center muted" id="job-message">Paste a Lua/Luau file to start a new build.</div>
-        </div>
-      </div>
-      <div class="panel" style="margin-top:16px">
-        <div class="page-head"><h3>Recent Obfuscations</h3><button class="btn sm" id="btn-allfiles">ALL FILES</button></div>
-        <div class="table-wrap">
-          <table class="hist">
-            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Action</th></tr></thead>
-            <tbody id="recent-body"><tr><td colspan="5" class="empty">No stored builds yet.</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-    <section class="page" id="page-obfuscate">
+    <section class="page active" id="page-obfuscate">
       <div class="page-head">
         <div>
-          <h2>Obfuscation</h2>
-          <div class="muted" style="margin-top:4px">Source is processed entirely on this page; nothing is uploaded anywhere.</div>
+          <h2>Make your Luau harder to read without breaking it.</h2>
+          <div class="muted" style="margin-top:4px">Bytecode VM, layered encoding, anti-env and anti-tamper &mdash; everything runs right here in your browser, nothing is uploaded.</div>
         </div>
-        <span class="pill">engine v4.5 &middot; self-verifying output</span>
       </div>
       <div class="upload" id="drop-zone">
-        <h2>Drop a file to obfuscate</h2>
-        <p>.lua, .luau or .txt &middot; or paste it straight into the editor below</p>
-        <button class="btn purple" id="btn-zone">CHOOSE FILE</button>
+        <p>Drop a .lua / .luau file here, paste it below, or</p>
+        <button class="btn purple" id="btn-zone" style="margin-top:10px">CHOOSE FILE</button>
       </div>
 <section id="obfuscator" class="card">
     <div class="card-top">
@@ -141,76 +100,9 @@
     </div>
   </section>
     </section>
-    <section class="page" id="page-files">
-      <div class="page-head">
-        <div>
-          <h2>My Files</h2>
-          <div class="muted" style="margin-top:4px">Build history is kept in this browser only &mdash; no account, no server.</div>
-        </div>
-        <button class="btn orange" id="btn-new-files">NEW OBFUSCATION +</button>
-      </div>
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="hist">
-            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Actions</th></tr></thead>
-            <tbody id="files-body"><tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-    <section class="page" id="page-account">
-      <div class="page-head"><h2>Your Engine</h2></div>
-      <div class="panel account-card">
-        <div class="brand-mark big">DF</div>
-        <div>
-          <h2>Darkfuscator</h2>
-          <div class="muted">Luau obfuscator &middot; engine v4.5 &middot; hardened VM</div>
-          <div class="kv">
-            <div class="k">Pipeline</div><div class="v">Luau lexer &rarr; parser &rarr; register-bytecode compiler &rarr; encrypted VM emitter</div>
-            <div class="k">Runs</div><div class="v">100% in your browser &mdash; no API key, no network calls, no telemetry</div>
-            <div class="k">Stored data</div><div class="v">Options and build history live in this browser's local storage only</div>
-            <div class="k">Site</div><div class="v">darkfuscator.pages.dev</div>
-          </div>
-        </div>
-      </div>
-      <div class="panel" style="margin-top:16px">
-        <h3>Local data</h3>
-        <p class="muted" style="margin:8px 0 14px;line-height:1.6">Clear stored options and build history from this browser. Nothing is ever sent anywhere.</p>
-        <button class="btn danger" id="btn-reset-2">CLEAR LOCAL DATA</button>
-      </div>
-    </section>
-    <section class="page" id="page-docs">
-      <div class="page-head"><h2>Darkfuscator Guide</h2></div>
-      <div class="docs">
-        <div class="panel doc">
-          <h3>Build profiles</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Lean keeps output small. Normal adds decoy branches. Heavy adds decoy slots and the most handler variants &mdash; the same seed always produces the same build.</p>
-        </div>
-        <div class="panel doc">
-          <h3>Anti-environment</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Strict probes the environment (identity, services, data types, settings) and binds the unseal key to it. A tampered or simulated environment fails the audit before the payload decodes.</p>
-        </div>
-        <div class="panel doc">
-          <h3>Loader</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Full wraps the build in an encrypted chunk loader with runtime checks and a Heartbeat re-audit. Fast uses a plain loader. Off ships the bare build.</p>
-        </div>
-        <div class="panel doc">
-          <h3>Execution locks</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Bind a build to a place ID, a universe ID, or both. The check runs before the payload is decoded, so the build refuses to run anywhere else.</p>
-        </div>
-        <div class="panel doc">
-          <h3>Require genuine client</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Refuses to run outside a real Roblox client: fewer than three genuine service probes fail the audit. Use it for builds that must never run under a simulator.</p>
-        </div>
-        <div class="panel doc">
-          <h3>Honest limits</h3>
-          <p class="muted" style="margin-top:8px;line-height:1.6">Obfuscation raises the cost of reading code; it is not a security boundary. Determined analysis of client-side code can always eventually recover it.</p>
-        </div>
-      </div>
-    </section>
   </main>
 </div>
-  <div class="modal-root" id="modal">
+<div class="modal-root" id="modal">
     <div class="modal-backdrop" id="modal-backdrop"></div>
     <div class="modal">
       <div class="modal-header"><span>Darkfuscator Obfuscation</span><button id="modal-close">&times;</button></div>
@@ -281,8 +173,7 @@
       <div class="modal-foot"><button class="btn" id="modal-cancel">Cancel</button><button class="btn orange" id="modal-run">Obfuscate</button></div>
     </div>
   </div>
-  <div class="toast" id="toast"></div>
-
+<div class="toast" id="toast"></div>
 <footer><p>&copy; 2026 Darkfuscator &middot; Obfuscation raises the cost of reading code; it is not a security boundary.</p></footer>
 <noscript><p class="noscript">Darkfuscator needs JavaScript &mdash; it runs entirely in your browser.</p></noscript>
 
@@ -296,24 +187,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var TITLES = { home: 'Welcome', obfuscate: 'Obfuscate', files: 'My Files', account: 'Your Engine', docs: 'Guide' };
 
-  function go(id) {
-    document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
-    document.querySelectorAll('.side-btn[data-page]').forEach(function (b) { b.classList.remove('active'); });
-    var p = $('page-' + id);
-    if (p) p.classList.add('active');
-    var b = document.querySelector('.side-btn[data-page="' + id + '"]');
-    if (b) b.classList.add('active');
-    var t = $('page-title');
-    if (t && TITLES[id]) t.textContent = TITLES[id];
-    history.replaceState(null, '', '#' + id);
-  }
-  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
-    b.onclick = function () { go(b.dataset.page); };
-  });
-
-  // ------------------------------------------------------------- toast
   function toast(msg, error) {
     var t = $('toast');
     t.textContent = msg;
@@ -321,8 +195,23 @@
     clearTimeout(t._timer);
     t._timer = setTimeout(function () { t.className = 'toast'; }, 3600);
   }
+  window.DKUI = { toast: toast };
 
-  // ------------------------------------------------------------- modal
+  // ------------------------------------------------------- collapsible sidebar
+  function toggleSidebar() {
+    var shell = document.querySelector('.shell');
+    if (window.matchMedia('(max-width: 860px)').matches) {
+      shell.classList.toggle('sidebar-open');
+    } else {
+      shell.classList.toggle('sidebar-hidden');
+    }
+  }
+  $('btn-menu').onclick = toggleSidebar;
+  $('scrim').onclick = function () {
+    document.querySelector('.shell').classList.remove('sidebar-open');
+  };
+
+  // ------------------------------------------------------------------- modal
   var modal = $('modal');
   function openModal() { modal.classList.add('open'); }
   function closeModal() { modal.classList.remove('open'); }
@@ -330,94 +219,11 @@
   $('modal-close').onclick = $('modal-cancel').onclick = $('modal-backdrop').onclick = closeModal;
   $('modal-run').onclick = function () {
     closeModal();
-    go('obfuscate');
     var pr = $('protect');
     if (pr) pr.click();
   };
 
-  // ------------------------------------------------------- build history
-  var KEY = 'darkfuscator.builds.v1';
-  function load() {
-    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
-  }
-  function save(list) {
-    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* quota */ }
-  }
-  function fmtBytes(n) {
-    n = Number(n) || 0;
-    if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    return (n / 1048576).toFixed(1) + ' MB';
-  }
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>'"]/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c];
-    });
-  }
-  function row(f, actions) {
-    var dl = f.output
-      ? '<button class="btn sm" onclick="DKUI.download(\'' + esc(f.id) + '\')">Download</button>'
-      : '<span class="muted" style="font-size:.76rem">not stored</span>';
-    var del = actions ? '<button class="btn danger sm" onclick="DKUI.remove(\'' + esc(f.id) + '\')">Delete</button>' : '';
-    return '<tr><td>' + esc(new Date(f.date).toLocaleString()) + '</td><td class="name">' + esc(f.filename) +
-      '</td><td>' + esc(f.seed == null ? 'random' : f.seed) + '</td><td>' + esc(fmtBytes(f.size)) +
-      '</td><td><div class="actions-row">' + dl + del + '</div></td></tr>';
-  }
-  function render() {
-    var list = load();
-    $('build-count') && ($('build-count').textContent = list.length);
-    $('storage-pill').textContent = list.length + ' stored ' + (list.length === 1 ? 'build' : 'builds');
-    var rb = $('recent-body');
-    rb.innerHTML = list.length ? list.slice(0, 5).map(function (f) { return row(f, false); }).join('')
-      : '<tr><td colspan="5" class="empty">No stored builds yet.</td></tr>';
-    var fb = $('files-body');
-    fb.innerHTML = list.length ? list.map(function (f) { return row(f, true); }).join('')
-      : '<tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr>';
-  }
-  function recordBuild(b) {
-    var list = load();
-    b.id = 'b' + Date.now();
-    list.unshift(b);
-    if (list.length > 30) list = list.slice(0, 30);
-    save(list);
-    render();
-    var js = $('job-status');
-    if (js) {
-      js.className = 'status-dot done';
-      js.querySelector('span').textContent = 'Finished';
-    }
-    var jm = $('job-message');
-    if (jm) jm.textContent = b.filename + ' finished \u2014 ' + fmtBytes(b.size) + '.';
-  }
-  function download(id) {
-    var f = load().filter(function (x) { return x.id === id; })[0];
-    if (!f || !f.output) { toast('Output was too large to keep in browser storage', true); return; }
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([f.output], { type: 'text/plain' }));
-    a.download = f.filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  }
-  function remove(id) {
-    save(load().filter(function (x) { return x.id !== id; }));
-    render();
-    toast('Build removed');
-  }
-  function resetAll() {
-    if (!confirm('Clear all stored options and build history from this browser?')) return;
-    try { localStorage.removeItem(KEY); localStorage.removeItem('darkfuscator.opts.v2'); } catch (e) {}
-    render();
-    toast('Local data cleared');
-  }
-  window.DKUI = { recordBuild: recordBuild, download: download, remove: remove, resetAll: resetAll };
-
-  $('btn-reset').onclick = resetAll;
-  $('btn-reset-2').onclick = resetAll;
-  $('btn-new').onclick = $('btn-new-files').onclick = $('btn-start').onclick = function () { go('obfuscate'); };
-  $('btn-allfiles').onclick = function () { go('files'); };
-
-  // ------------------------------------------------------- upload zone
+  // -------------------------------------------------------------- upload zone
   var dz = $('drop-zone'), fileInput = $('file');
   $('btn-zone').onclick = function () { fileInput.click(); };
   ['dragenter', 'dragover'].forEach(function (e) {
@@ -439,29 +245,6 @@
     };
     r.readAsText(f);
   });
-
-  // -------------------------------------------------- collapsible sidebar
-  function toggleSidebar() {
-    var shell = document.querySelector('.shell');
-    if (window.matchMedia('(max-width: 860px)').matches) {
-      shell.classList.toggle('sidebar-open');
-    } else {
-      shell.classList.toggle('sidebar-hidden');
-    }
-  }
-  $('btn-menu').onclick = toggleSidebar;
-  $('scrim').onclick = function () {
-    document.querySelector('.shell').classList.remove('sidebar-open');
-  };
-  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      document.querySelector('.shell').classList.remove('sidebar-open');
-    });
-  });
-
-  render();
-  var hash = (location.hash || '#home').slice(1);
-  if ($('page-' + hash)) go(hash);
 })();
 </script>
 </body>
