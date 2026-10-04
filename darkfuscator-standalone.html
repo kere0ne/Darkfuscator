@@ -341,6 +341,119 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   .shell.sidebar-open .sidebar-scrim { display: block }
 }
 
+/* ------------------------------------------------------------ dashboard */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.dk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.dk-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #8b7d74;
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a1a12;
+  white-space: nowrap;
+}
+
+.dk-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #1c1210;
+  vertical-align: middle;
+}
+
+.dk-table b {
+  color: #ffb347;
+}
+
+.row-actions {
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: .72rem;
+}
+
+.chip-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.state-card {
+  border: 1px solid #2a1a12;
+  border-radius: 12px;
+  padding: 12px;
+  background: #140b10;
+}
+
+.state-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: .78rem;
+}
+
+.state-head select {
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: .72rem;
+}
+
+.state-card textarea {
+  width: 100%;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: .72rem;
+  resize: vertical;
+}
+
+#gate input[type="password"] {
+  flex: 1;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .85rem;
+}
+
+.actions input[type="text"] {
+  flex: 1;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .85rem;
+}
+
 </style>
 </head>
 
@@ -383,6 +496,29 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
 
         <line x1="1" y1="9" x2="4" y2="9"/>
         <line x1="1" y1="14" x2="4" y2="14"/>
+
+      </svg>
+
+    </a>
+
+    <a
+      class="side-btn"
+      href="dashboard.html"
+      title="Loader dashboard">
+
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+
+        <path d="M3 3v18h18"/>
+
+        <rect x="7" y="12" width="3" height="6"/>
+        <rect x="12" y="8" width="3" height="10"/>
+        <rect x="17" y="5" width="3" height="13"/>
 
       </svg>
 
@@ -735,6 +871,17 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
           <div class="bottom-buttons">
 
             <button
+              id="btn-publish"
+              class="btn purple"
+              type="button"
+              hidden>
+
+              Publish to dashboard
+
+            </button>
+
+
+            <button
               id="copy"
               class="btn"
               type="button">
@@ -909,6 +1056,31 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
 
           <option value="0">
             Off
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Connected loader
+        </label>
+
+        <select id="opt-loader">
+
+          <option
+            value="1"
+            selected>
+
+            Dashboard-connected — server-validated
+
+          </option>
+
+          <option value="0">
+            Off — self-contained build
           </option>
 
         </select>
@@ -4637,7 +4809,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     seed: $('#seed'),
     file: $('#file'),
     protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
-    copy: $('#copy'), download: $('#download'),
+    copy: $('#copy'), download: $('#download'), publish: $('#btn-publish'),
     paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
     advanced: $('#advanced')
   };
@@ -4647,9 +4819,12 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
     guard: '#opt-guard', watermark: '#opt-watermark',
     lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
-    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper'
+    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper',
+    loader: '#opt-loader'
   };
   var STORE_KEY = 'darkfuscator.opts.v2';
+  var API_BASE = 'https://darkfuscator.pages.dev';
+  var lastPayload = null;
 
   // ------------------------------------------------------------------ utils
   function fmt(n) { return Number(n).toLocaleString(); }
@@ -4786,6 +4961,10 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       el.stats.hidden = true;
       return;
     }
+
+    lastPayload = res.output;
+    el.publish.hidden = (String(opts.loader) !== '1');
+    if (String(opts.loader) === '1') { publishConnected(res.output); }
 
     el.output.value = res.output;
     updateMeta();
@@ -4929,6 +5108,47 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       runObfuscate();
     }
   });
+
+  // ------------------------------------------------- connected loader publish
+  function publishConnected(payload) {
+    var tok = localStorage.getItem('dk_admin_token') || '';
+    var attempt = function (t) {
+      return fetch(API_BASE + '/api/builds', {
+        method: 'POST',
+        headers: { 'x-admin-token': t, 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: payload })
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok) { var err = new Error((d && d.error) || ('HTTP ' + r.status)); err.status = r.status; throw err; }
+          return d;
+        });
+      });
+    };
+    var run = function (t) {
+      setStatus('Publishing to dashboard…');
+      attempt(t).then(function (d) {
+        el.output.value = d.loader;
+        updateMeta();
+        el.publish.hidden = true;
+        localStorage.setItem('dk_admin_token', t);
+        setStatus('Published as ' + d.id + '. The output is now the connected loader — share that, not the build.', 'ok');
+        if (window.DKUI && DKUI.toast) { DKUI.toast('Published ' + d.id); }
+      }).catch(function (e) {
+        if (e.status === 401) {
+          var asked = window.prompt('Darkfuscator admin token (ADMIN_TOKEN):', '');
+          if (asked && asked.trim()) { run(asked.trim()); return; }
+        }
+        el.publish.hidden = false;
+        setStatus('Publish failed: ' + e.message + '. The self-contained build is still in the output.', 'warn');
+      });
+    };
+    run(tok);
+  }
+
+  el.publish.onclick = function () {
+    if (lastPayload) { publishConnected(lastPayload); }
+    else { setStatus('Obfuscate something first, then publish.', 'warn'); }
+  };
 
   // ------------------------------------------------------------------- init
   loadOptions();

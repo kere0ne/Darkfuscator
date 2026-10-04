@@ -52,6 +52,7 @@ check('engine loaded', !!window.Darkfuscator);
 $('#input').value = SRC;
 $('#seed').value = '4242';
 if ($('#opt-envChecks')) $('#opt-envChecks').value = '0';
+if ($('#opt-loader')) $('#opt-loader').value = '0';
 if ($('#opt-antiTamper')) $('#opt-antiTamper').value = '0';
 if ($('#opt-envLock')) $('#opt-envLock').checked = false;
 if ($('#opt-guard')) $('#opt-guard').value = '1';
