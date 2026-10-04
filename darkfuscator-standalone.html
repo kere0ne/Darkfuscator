@@ -1,0 +1,4400 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Darkfuscator</title>
+<meta name="description" content="Darkfuscator — a browser-side Luau obfuscator. Real Luau parser, bytecode VM, anti-env, anti-tamper, 100% client-side.">
+<meta name="color-scheme" content="dark">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Darkfuscator — Halloween workspace theme */
+:root {
+  --bg: #0b0608;
+  --side: #130c10;
+  --panel: #161015;
+  --panel2: #1b1319;
+  --border: #35222c;
+  --text: #f6f0ea;
+  --muted: #a3929b;
+  --orange: #ff7a1a;
+  --orange2: #ffb347;
+  --purple: #7c3aed;
+  --green: #8ac926;
+  --red: #fb7185;
+  --yellow: #facc15
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body {
+  font-family: "DM Sans", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh
+}
+button, input, select, textarea { font: inherit }
+a { color: var(--orange2) }
+
+.shell { display: flex; min-height: 100vh }
+
+.sidebar {
+  position: fixed; left: 0; top: 0; bottom: 0; width: 78px;
+  background: var(--side);
+  border-right: 1px solid var(--border);
+  display: flex; align-items: center; flex-direction: column;
+  padding: 14px 10px; gap: 8px; z-index: 20
+}
+.brand-icon {
+  width: 52px; height: 52px; border-radius: 13px; object-fit: cover;
+  margin-bottom: 12px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 0 26px rgba(255,122,26,.28)
+}
+.side-btn {
+  width: 48px; height: 48px; border: 0; border-radius: 12px;
+  background: transparent; color: #8d7d86;
+  display: grid; place-items: center; cursor: pointer;
+  text-decoration: none; transition: .15s
+}
+.side-btn svg { width: 21px; height: 21px }
+.side-btn:hover, .side-btn.active { background: #241822; color: white }
+.side-btn.active { box-shadow: inset 3px 0 0 var(--orange) }
+
+.content { margin-left: 78px; width: calc(100% - 78px); padding: 0 30px 42px }
+
+.topbar {
+  height: 82px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,.045);
+  margin-bottom: 28px; gap: 14px
+}
+.greet { display: flex; align-items: center; gap: 12px }
+.greet h1 { font-size: 1.3rem }
+.top-right { display: flex; align-items: center; gap: 10px }
+
+.pill {
+  background: #1a1116; border: 1px solid var(--border); border-radius: 999px;
+  padding: .55rem .8rem; color: var(--muted); font-size: .83rem
+}
+
+.btn {
+  border: 1px solid var(--border); background: #201519; color: white;
+  border-radius: 11px; padding: .68rem .95rem; font-weight: 700;
+  cursor: pointer; transition: .15s; text-decoration: none; display: inline-flex
+}
+.btn:hover { transform: translateY(-1px); border-color: #5a3a48 }
+.btn.orange, .btn-primary {
+  background: linear-gradient(135deg, var(--orange), #e8590c);
+  border-color: var(--orange); color: #1c0d02
+}
+.btn.sm { padding: .42rem .65rem; font-size: .78rem }
+
+.page { display: none }
+.page.active { display: block }
+
+.grid { display: grid; grid-template-columns: 1.05fr 1fr .9fr; gap: 16px }
+
+.panel {
+  background: linear-gradient(180deg, #1a1116, #140d11);
+  border: 1px solid var(--border); border-radius: 17px; padding: 20px
+}
+.panel h3 { font-size: .95rem }
+.panel .muted, .muted { color: var(--muted) }
+.panel-purple {
+  background: radial-gradient(360px 230px at 50% -40px, rgba(124,58,237,.4), transparent 70%), linear-gradient(180deg, #1c1220, #140d11)
+}
+
+.stat { font-size: 2.25rem; font-weight: 700; margin: 22px 0 8px }
+.stat small { font-size: .85rem; color: var(--muted); font-weight: 500 }
+.line { height: 1px; background: var(--border); margin: 18px 0 }
+.center { text-align: center }
+.eyebrow {
+  font-size: .72rem; letter-spacing: .14em; color: var(--orange2); font-weight: 700
+}
+.steps { text-align: left; margin-top: 16px; display: grid; gap: 12px }
+.step { color: var(--muted); font-size: .9rem; line-height: 1.5 }
+.step b {
+  display: inline-grid; place-items: center; width: 24px; height: 24px;
+  border-radius: 8px; background: #2a1a22; color: var(--orange2);
+  margin-right: 8px; font-size: .8rem
+}
+.step code { background: #241822; border-radius: 6px; padding: .1rem .35rem; font-size: .82rem }
+
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px }
+.page-head h2 { font-size: 1.45rem }
+
+/* ---------------- obfuscator card ---------------- */
+.card {
+  background: linear-gradient(180deg, #1a1116, #140d11);
+  border: 1px solid var(--border); border-radius: 17px; padding: 22px
+}
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 18px }
+.card-top h2 { font-size: 1.3rem; margin-top: 4px }
+.preset-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end }
+.field > span {
+  display: block; font-size: .74rem; letter-spacing: .1em;
+  color: var(--muted); font-weight: 700; margin-bottom: 6px; text-transform: uppercase
+}
+.field select, .field input {
+  background: #1c1319; border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); padding: .55rem .7rem; min-width: 180px
+}
+.field select:focus, .field input:focus { outline: 1px solid var(--orange); outline-offset: 1px }
+.field-sm select, .field-sm input { min-width: 150px }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 6px 0 14px }
+.actions kbd {
+  background: rgba(0,0,0,.25); border-radius: 6px; padding: .05rem .35rem;
+  font-size: .75rem; font-family: inherit; margin-left: 4px
+}
+
+.advanced { margin-bottom: 16px; border: 1px solid var(--border); border-radius: 13px; background: #150e13 }
+.advanced summary {
+  cursor: pointer; padding: 12px 16px; font-weight: 600; color: var(--muted);
+  list-style: none; user-select: none
+}
+.advanced summary::-webkit-details-marker { display: none }
+.advanced[open] summary { border-bottom: 1px solid var(--border); color: var(--text) }
+.chev { display: inline-block; transition: .15s; margin-right: 6px }
+.advanced[open] .chev { transform: rotate(90deg) }
+.options { display: flex; gap: 14px 22px; flex-wrap: wrap; align-items: center; padding: 14px 16px }
+.opt { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: .88rem; cursor: pointer }
+.opt input { accent-color: var(--orange) }
+.opt-note { flex: 1 1 100%; color: var(--muted); font-size: .8rem; line-height: 1.6 }
+
+.editors { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 10px; align-items: stretch }
+.pane {
+  border: 1px solid var(--border); border-radius: 13px; overflow: hidden;
+  background: #120c10; display: flex; flex-direction: column
+}
+.pane.dragover { border-color: var(--orange); box-shadow: 0 0 24px rgba(255,122,26,.25) }
+.bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .5rem .8rem; border-bottom: 1px solid var(--border); background: #1a1116
+}
+.bar-name { font-size: .72rem; letter-spacing: .12em; color: var(--muted); font-weight: 700 }
+.bar-meta { font-size: .74rem; color: #7d6d76 }
+.pane textarea {
+  flex: 1; width: 100%; min-height: 380px; resize: vertical;
+  background: transparent; border: 0; color: var(--text);
+  padding: 12px; font: 500 .84rem/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace
+}
+.pane textarea:focus { outline: none }
+.arrow { display: grid; place-items: center; color: var(--orange); font-size: 1.2rem }
+.drop-hint {
+  text-align: center; padding: 4px; font-size: .78rem;
+  color: var(--muted); border-top: 1px solid var(--border); background: #1a1116
+}
+#verified-badge { color: var(--green) }
+
+.status { margin-top: 14px; color: var(--muted); font-size: .88rem }
+.status.err { color: var(--red) }
+.status.warn { color: var(--yellow) }
+.error {
+  margin-top: 12px; border: 1px solid #55202b; background: #2a151a;
+  color: #fecdd3; border-radius: 12px; padding: 12px 14px;
+  font-size: .85rem; line-height: 1.55; white-space: pre-wrap
+}
+
+.stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px }
+.chip {
+  background: #1c1319; border: 1px solid var(--border); border-radius: 999px;
+  padding: .4rem .75rem; font-size: .78rem; color: var(--muted)
+}
+.chip b { color: var(--text) }
+
+.bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; flex-wrap: wrap }
+.hint { color: var(--muted); font-size: .8rem }
+.bottom-buttons { display: flex; gap: 8px }
+
+footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
+.noscript { padding: 20px 30px; color: var(--red) }
+
+@media(max-width:1050px) {
+  .grid { grid-template-columns: 1fr 1fr }
+  .grid > .panel:last-child { grid-column: 1/-1 }
+  .editors { grid-template-columns: 1fr }
+  .arrow { display: none }
+}
+@media(max-width:720px) {
+  .sidebar { width: 64px; padding-left: 8px; padding-right: 8px }
+  .content { margin-left: 64px; width: calc(100% - 64px); padding: 0 15px 30px }
+  .brand-icon { width: 46px; height: 46px }
+  .side-btn { width: 44px; height: 44px }
+  .grid { grid-template-columns: 1fr }
+  .grid > .panel:last-child { grid-column: auto }
+  .topbar { height: auto; min-height: 78px; padding: 12px 0; align-items: flex-start; flex-wrap: wrap }
+  .top-right .pill { display: none }
+  .top-right { flex-wrap: wrap; justify-content: flex-end }
+  footer { padding-left: 94px }
+}
+
+/* ---------------- workspace pieces ---------------- */
+.brand-mark {
+  width: 52px; height: 52px; border-radius: 13px; margin-bottom: 12px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #ff7a1a, #7c3aed);
+  color: #140a08; font-weight: 700; font-size: 1.05rem; letter-spacing: .04em;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 0 30px rgba(255,122,26,.35)
+}
+.brand-mark.big { width: 96px; height: 96px; font-size: 1.7rem; border-radius: 20px }
+
+.upload {
+  border: 1px dashed #4a2c3a;
+  background: radial-gradient(500px 160px at 50% 0, rgba(124,58,237,.18), transparent), #140d11;
+  border-radius: 17px; padding: 44px 20px; text-align: center; margin-bottom: 16px
+}
+.upload h2 { font-size: 1.25rem; margin-bottom: 8px }
+.upload p { color: var(--muted); margin-bottom: 18px }
+
+.table-wrap { overflow: auto }
+.hist { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 640px }
+.hist th, .hist td { padding: .78rem .72rem; text-align: left; border-bottom: 1px solid var(--border) }
+.hist th { color: #c0aab4; font-weight: 600 }
+.hist td { color: var(--muted) }
+.hist .name { color: var(--text); font-weight: 600 }
+.empty { text-align: center !important; padding: 34px !important; color: #77616b !important }
+.actions-row { display: flex; gap: 6px }
+
+.account-card { display: grid; grid-template-columns: 110px 1fr; gap: 20px; align-items: center }
+.kv { display: grid; grid-template-columns: 130px 1fr; gap: 8px 16px; margin-top: 18px; font-size: .9rem }
+.kv .k { color: var(--muted) }
+.kv .v { word-break: break-word }
+
+.docs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px }
+.doc { min-height: 150px }
+
+.status-dot { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: .82rem }
+.status-dot i { width: 7px; height: 7px; border-radius: 50%; background: #6b5560 }
+.status-dot.running i { background: var(--yellow); box-shadow: 0 0 15px rgba(250,204,21,.5) }
+.status-dot.done i { background: var(--green) }
+
+.modal-root {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  align-items: center; justify-content: center; padding: 14px
+}
+.modal-root.open { display: flex }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.56); backdrop-filter: blur(8px) }
+.modal {
+  position: relative; width: min(520px, 100%); max-height: 90vh;
+  background: #171016; border: 1px solid #3a2531; border-radius: 17px;
+  overflow: hidden; display: flex; flex-direction: column;
+  box-shadow: 0 28px 90px rgba(0,0,0,.55)
+}
+.modal-header {
+  padding: 14px 17px; background: linear-gradient(90deg, #e8590c, #7c3aed);
+  display: flex; align-items: center; justify-content: space-between; font-weight: 700
+}
+.modal-header button { border: 0; background: none; color: #fff; font-size: 1.35rem; cursor: pointer }
+.modal-body { padding: 16px 18px; overflow: auto }
+.modal-body .field > label, .field > label { display: block; font-size: .88rem; font-weight: 600; margin-bottom: 6px }
+.modal-body .field select, .modal-body .field input { width: 100%; min-width: 0 }
+.desc { font-size: .76rem; color: var(--muted); line-height: 1.45; margin-top: 6px }
+.toggle-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+.modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px }
+
+.switch-row { display: flex; align-items: flex-start; gap: 12px }
+.switch-row input { display: none }
+.switch-row .switch {
+  position: relative; width: 44px; height: 24px; border-radius: 999px;
+  background: #35222c; cursor: pointer; flex: 0 0 auto; transition: .15s; margin-top: 2px
+}
+.switch-row .switch::after {
+  content: ""; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px;
+  border-radius: 50%; background: #fff; transition: .15s
+}
+.switch-row input:checked + .switch { background: var(--orange) }
+.switch-row input:checked + .switch::after { transform: translateX(20px) }
+
+.toast {
+  position: fixed; right: 20px; bottom: 20px; z-index: 200;
+  min-width: 240px; max-width: 420px; background: #1c1319;
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 15px 45px rgba(0,0,0,.35); display: none; font-size: .88rem
+}
+.toast.show { display: block }
+.toast.error { border-color: #7f1d1d; color: #fecaca }
+
+/* ---------------- collapsible sidebar ---------------- */
+.icon-btn {
+  border: 1px solid var(--border); background: #1c1319; color: var(--text);
+  width: 38px; height: 38px; border-radius: 11px; cursor: pointer;
+  display: grid; place-items: center; flex: 0 0 auto
+}
+.icon-btn:hover { border-color: var(--orange) }
+.icon-btn svg { width: 18px; height: 18px }
+.shell.sidebar-hidden .sidebar { display: none }
+.shell.sidebar-hidden .content { grid-column: 1 / -1 }
+.sidebar-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.55); display: none }
+@media (max-width: 860px) {
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 60;
+    transform: translateX(-100%); transition: transform .2s
+  }
+  .shell.sidebar-open .sidebar { transform: translateX(0) }
+  .shell.sidebar-open .sidebar-scrim { display: block }
+}
+
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="sidebar-scrim" id="scrim"></div>
+<aside class="sidebar">
+      <div class="brand-mark">DF</div>
+      <a class="side-btn active" data-page="home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
+      <a class="side-btn" data-page="obfuscate" title="Obfuscate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></a>
+      <a class="side-btn" data-page="files" title="My Files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></a>
+      <a class="side-btn" data-page="account" title="Account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
+      <a class="side-btn" data-page="docs" title="Docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></a>
+      <button class="side-btn danger" id="btn-reset" title="Clear local data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    </aside>
+  <main class="content">
+    <header class="topbar">
+      <div class="greet">
+        <button class="icon-btn" id="btn-menu" title="Toggle sidebar" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div>
+          <div class="muted" style="font-size:.78rem">DARKFUSCATOR WORKSPACE</div>
+          <h1 id="page-title">Welcome</h1>
+        </div>
+      </div>
+      <div class="top-right"><span class="pill" id="storage-pill">0 stored builds</span><button class="btn orange" id="btn-new">NEW OBFUSCATION +</button></div>
+    </header>
+    <section class="page active" id="page-home">
+      <div class="grid">
+        <div class="panel panel-purple">
+          <small class="eyebrow">REAL LUAU PARSER &middot; BYTECODE VM &middot; NO SERVER</small>
+          <h2 style="margin-top:10px">Make your Luau <em>harder to read</em> without breaking it.</h2>
+          <p class="muted" style="margin-top:10px;line-height:1.6">Your script is compiled to register bytecode, packed into an encrypted payload and shipped inside a generated interpreter &mdash; then re-parsed before you ever see it, so what comes out still runs.</p>
+          <button class="btn orange" id="btn-start" style="margin-top:18px">GET STARTED &rarr;</button>
+        </div>
+        <div class="panel">
+          <h3>Protection stack</h3>
+          <div class="stat">10 <small>protection layers</small></div>
+          <div class="muted">Custom bytecode VM, layered string encoding, opaque predicates, execution locks, anti-env, anti-tamper and more.</div>
+          <div class="line"></div>
+          <div class="stat">v4.5 <small>hardened engine</small></div>
+          <div class="muted">Per-build VM variation, decoy opcodes and handler variants reshuffled from your seed on every build.</div>
+        </div>
+        <div class="panel">
+          <h3>Obfuscation</h3><span class="status-dot" id="job-status"><i></i><span>Not running</span></span>
+          <div class="orb"></div>
+          <div class="center muted" id="job-message">Paste a Lua/Luau file to start a new build.</div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="page-head"><h3>Recent Obfuscations</h3><button class="btn sm" id="btn-allfiles">ALL FILES</button></div>
+        <div class="table-wrap">
+          <table class="hist">
+            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Action</th></tr></thead>
+            <tbody id="recent-body"><tr><td colspan="5" class="empty">No stored builds yet.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <section class="page" id="page-obfuscate">
+      <div class="page-head">
+        <div>
+          <h2>Obfuscation</h2>
+          <div class="muted" style="margin-top:4px">Source is processed entirely on this page; nothing is uploaded anywhere.</div>
+        </div>
+        <span class="pill">engine v4.5 &middot; self-verifying output</span>
+      </div>
+      <div class="upload" id="drop-zone">
+        <h2>Drop a file to obfuscate</h2>
+        <p>.lua, .luau or .txt &middot; or paste it straight into the editor below</p>
+        <button class="btn purple" id="btn-zone">CHOOSE FILE</button>
+      </div>
+<section id="obfuscator" class="card">
+    <div class="card-top">
+      <div>
+        <small class="eyebrow">OBFUSCATOR</small>
+        <h2>Protect your source</h2>
+      </div>
+      <button class="btn" id="btn-settings" type="button">SETTINGS &#9881;</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <label class="btn" for="file">Upload .luau</label>
+      <input id="file" type="file" accept=".lua,.luau,.txt,text/plain" hidden>
+      <button id="validate" class="btn" type="button" title="Check that the current text is valid Luau">Validate</button>
+      <button id="clear" class="btn" type="button">Clear</button>
+      <button id="protect" class="btn btn-primary" type="button">Obfuscate <kbd>⌘↵</kbd></button>
+    </div>
+
+    
+
+    <div class="editors">
+      <div class="pane" id="pane-in">
+        <div class="bar">
+          <span class="bar-name">INPUT.LUAU</span>
+          <span class="bar-meta" id="inmeta">0 chars · 0 lines</span>
+        </div>
+        <textarea id="input" spellcheck="false" placeholder="Paste your Luau here, drop a .luau file, or pick an example above…"></textarea>
+        <div class="drop-hint">Drop a .luau file anywhere here</div>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="pane" id="pane-out">
+        <div class="bar">
+          <span class="bar-name">OUTPUT.LUAU</span>
+          <span class="bar-meta" id="outmeta">0 chars · 0 lines</span>
+        </div>
+        <textarea id="output" spellcheck="false" readonly placeholder="Protected Luau appears here…"></textarea>
+        <div class="drop-hint" id="verified-badge" hidden>✓ re-parsed as valid Luau</div>
+      </div>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite">Ready. Nothing leaves your browser.</div>
+    <div id="error" class="error" hidden></div>
+
+    <div class="stats" id="stats" hidden>
+      <span class="chip"><b id="st-protos">—</b>functions compiled</span>
+      <span class="chip"><b id="st-opcodes">—</b>opcodes</span>
+      <span class="chip"><b id="st-bytes">—</b>bytes bytecode</span>
+      <span class="chip"><b id="st-payload">—</b>chars payload</span>
+      <span class="chip"><b id="st-size">—</b>size</span>
+      <span class="chip"><b id="st-time">—</b>ms</span>
+      <span class="chip"><b id="st-seed">—</b>seed</span>
+    </div>
+
+    <div class="bottom">
+      <span class="hint">Tip: the same seed always produces the same build.</span>
+      <div class="bottom-buttons">
+        <button id="copy" class="btn" type="button">Copy output</button>
+        <button id="download" class="btn" type="button">Download .luau</button>
+      </div>
+    </div>
+  </section>
+    </section>
+    <section class="page" id="page-files">
+      <div class="page-head">
+        <div>
+          <h2>My Files</h2>
+          <div class="muted" style="margin-top:4px">Build history is kept in this browser only &mdash; no account, no server.</div>
+        </div>
+        <button class="btn orange" id="btn-new-files">NEW OBFUSCATION +</button>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="hist">
+            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Actions</th></tr></thead>
+            <tbody id="files-body"><tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <section class="page" id="page-account">
+      <div class="page-head"><h2>Your Engine</h2></div>
+      <div class="panel account-card">
+        <div class="brand-mark big">DF</div>
+        <div>
+          <h2>Darkfuscator</h2>
+          <div class="muted">Luau obfuscator &middot; engine v4.5 &middot; hardened VM</div>
+          <div class="kv">
+            <div class="k">Pipeline</div><div class="v">Luau lexer &rarr; parser &rarr; register-bytecode compiler &rarr; encrypted VM emitter</div>
+            <div class="k">Runs</div><div class="v">100% in your browser &mdash; no API key, no network calls, no telemetry</div>
+            <div class="k">Stored data</div><div class="v">Options and build history live in this browser's local storage only</div>
+            <div class="k">Site</div><div class="v">darkfuscator.pages.dev</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h3>Local data</h3>
+        <p class="muted" style="margin:8px 0 14px;line-height:1.6">Clear stored options and build history from this browser. Nothing is ever sent anywhere.</p>
+        <button class="btn danger" id="btn-reset-2">CLEAR LOCAL DATA</button>
+      </div>
+    </section>
+    <section class="page" id="page-docs">
+      <div class="page-head"><h2>Darkfuscator Guide</h2></div>
+      <div class="docs">
+        <div class="panel doc">
+          <h3>Build profiles</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Lean keeps output small. Normal adds decoy branches. Heavy adds decoy slots and the most handler variants &mdash; the same seed always produces the same build.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Anti-environment</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Strict probes the environment (identity, services, data types, settings) and binds the unseal key to it. A tampered or simulated environment fails the audit before the payload decodes.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Loader</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Full wraps the build in an encrypted chunk loader with runtime checks and a Heartbeat re-audit. Fast uses a plain loader. Off ships the bare build.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Execution locks</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Bind a build to a place ID, a universe ID, or both. The check runs before the payload is decoded, so the build refuses to run anywhere else.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Require genuine client</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Refuses to run outside a real Roblox client: fewer than three genuine service probes fail the audit. Use it for builds that must never run under a simulator.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Honest limits</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Obfuscation raises the cost of reading code; it is not a security boundary. Determined analysis of client-side code can always eventually recover it.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+  <div class="modal-root" id="modal">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal">
+      <div class="modal-header"><span>Darkfuscator Obfuscation</span><button id="modal-close">&times;</button></div>
+      <div class="modal-body">
+        <div class="field"><label>Build profile</label>
+          <select id="opt-junk">
+            <option value="1" selected>Normal &mdash; decoy branches</option>
+            <option value="0">Lean &mdash; smallest output</option>
+            <option value="2">Heavy &mdash; decoys + decoy slots</option>
+          </select>
+        </div>
+        <div class="field"><label>Audit level</label>
+          <select id="opt-guard">
+            <option value="1" selected>Standard &mdash; builtins audit</option>
+            <option value="0">Off &mdash; no audit</option>
+            <option value="2">Strict &mdash; toolkit + timing audit</option>
+          </select>
+        </div>
+        <div class="field"><label>Anti-environment</label>
+          <select id="opt-envChecks">
+            <option value="2" selected>Strict &mdash; probe battery + bound seal</option>
+            <option value="1">Standard &mdash; bound seal</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+        <div class="field"><label>Loader</label>
+          <select id="opt-antiTamper">
+            <option value="2" selected>Full &mdash; encrypted chunk loader</option>
+            <option value="1">Fast &mdash; plain chunk loader</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+        <div class="field"><label>Identifiers</label>
+          <select id="opt-nameStyle">
+            <option value="random" selected>random (1&ndash;4 chars)</option>
+            <option value="short">short (1&ndash;2 chars)</option>
+            <option value="confuse">confusable glyphs</option>
+          </select>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-envLock" checked><span class="switch"></span>
+          <div><label for="opt-envLock">Require genuine Roblox client</label>
+            <div class="desc">The build refuses to run outside a real client environment.</div>
+          </div>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-minify" checked><span class="switch"></span>
+          <div><label for="opt-minify">One-line output</label>
+            <div class="desc">Ships the whole build as a single line.</div>
+          </div>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-watermark" checked><span class="switch"></span>
+          <div><label for="opt-watermark">Watermark header</label>
+            <div class="desc">Adds the Darkfuscator banner comment above the build.</div>
+          </div>
+        </div>
+        <div class="toggle-pair">
+          <div class="field"><label>Lock to place ID (optional)</label>
+            <input id="opt-lockPlace" type="text" inputmode="numeric" placeholder="e.g. 9876543210" autocomplete="off">
+          </div>
+          <div class="field"><label>Lock to universe ID (optional)</label>
+            <input id="opt-lockUniverse" type="text" inputmode="numeric" placeholder="e.g. 1234567890" autocomplete="off">
+          </div>
+        </div>
+        <div class="field"><label>Seed (optional)</label>
+          <input id="seed" type="text" inputmode="numeric" placeholder="random" autocomplete="off">
+          <div class="desc">The same seed always produces the same build.</div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn" id="modal-cancel">Cancel</button><button class="btn orange" id="modal-run">Obfuscate</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<footer><p>&copy; 2026 Darkfuscator &middot; Obfuscation raises the cost of reading code; it is not a security boundary.</p></footer>
+<noscript><p class="noscript">Darkfuscator needs JavaScript &mdash; it runs entirely in your browser.</p></noscript>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var TITLES = { home: 'Welcome', obfuscate: 'Obfuscate', files: 'My Files', account: 'Your Engine', docs: 'Guide' };
+
+  function go(id) {
+    document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+    document.querySelectorAll('.side-btn[data-page]').forEach(function (b) { b.classList.remove('active'); });
+    var p = $('page-' + id);
+    if (p) p.classList.add('active');
+    var b = document.querySelector('.side-btn[data-page="' + id + '"]');
+    if (b) b.classList.add('active');
+    var t = $('page-title');
+    if (t && TITLES[id]) t.textContent = TITLES[id];
+    history.replaceState(null, '', '#' + id);
+  }
+  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
+    b.onclick = function () { go(b.dataset.page); };
+  });
+
+  // ------------------------------------------------------------- toast
+  function toast(msg, error) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (error ? ' error' : '');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function () { t.className = 'toast'; }, 3600);
+  }
+
+  // ------------------------------------------------------------- modal
+  var modal = $('modal');
+  function openModal() { modal.classList.add('open'); }
+  function closeModal() { modal.classList.remove('open'); }
+  $('btn-settings').onclick = openModal;
+  $('modal-close').onclick = $('modal-cancel').onclick = $('modal-backdrop').onclick = closeModal;
+  $('modal-run').onclick = function () {
+    closeModal();
+    go('obfuscate');
+    var pr = $('protect');
+    if (pr) pr.click();
+  };
+
+  // ------------------------------------------------------- build history
+  var KEY = 'darkfuscator.builds.v1';
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* quota */ }
+  }
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>'"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c];
+    });
+  }
+  function row(f, actions) {
+    var dl = f.output
+      ? '<button class="btn sm" onclick="DKUI.download(\'' + esc(f.id) + '\')">Download</button>'
+      : '<span class="muted" style="font-size:.76rem">not stored</span>';
+    var del = actions ? '<button class="btn danger sm" onclick="DKUI.remove(\'' + esc(f.id) + '\')">Delete</button>' : '';
+    return '<tr><td>' + esc(new Date(f.date).toLocaleString()) + '</td><td class="name">' + esc(f.filename) +
+      '</td><td>' + esc(f.seed == null ? 'random' : f.seed) + '</td><td>' + esc(fmtBytes(f.size)) +
+      '</td><td><div class="actions-row">' + dl + del + '</div></td></tr>';
+  }
+  function render() {
+    var list = load();
+    $('build-count') && ($('build-count').textContent = list.length);
+    $('storage-pill').textContent = list.length + ' stored ' + (list.length === 1 ? 'build' : 'builds');
+    var rb = $('recent-body');
+    rb.innerHTML = list.length ? list.slice(0, 5).map(function (f) { return row(f, false); }).join('')
+      : '<tr><td colspan="5" class="empty">No stored builds yet.</td></tr>';
+    var fb = $('files-body');
+    fb.innerHTML = list.length ? list.map(function (f) { return row(f, true); }).join('')
+      : '<tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr>';
+  }
+  function recordBuild(b) {
+    var list = load();
+    b.id = 'b' + Date.now();
+    list.unshift(b);
+    if (list.length > 30) list = list.slice(0, 30);
+    save(list);
+    render();
+    var js = $('job-status');
+    if (js) {
+      js.className = 'status-dot done';
+      js.querySelector('span').textContent = 'Finished';
+    }
+    var jm = $('job-message');
+    if (jm) jm.textContent = b.filename + ' finished \u2014 ' + fmtBytes(b.size) + '.';
+  }
+  function download(id) {
+    var f = load().filter(function (x) { return x.id === id; })[0];
+    if (!f || !f.output) { toast('Output was too large to keep in browser storage', true); return; }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([f.output], { type: 'text/plain' }));
+    a.download = f.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function remove(id) {
+    save(load().filter(function (x) { return x.id !== id; }));
+    render();
+    toast('Build removed');
+  }
+  function resetAll() {
+    if (!confirm('Clear all stored options and build history from this browser?')) return;
+    try { localStorage.removeItem(KEY); localStorage.removeItem('darkfuscator.opts.v2'); } catch (e) {}
+    render();
+    toast('Local data cleared');
+  }
+  window.DKUI = { recordBuild: recordBuild, download: download, remove: remove, resetAll: resetAll };
+
+  $('btn-reset').onclick = resetAll;
+  $('btn-reset-2').onclick = resetAll;
+  $('btn-new').onclick = $('btn-new-files').onclick = $('btn-start').onclick = function () { go('obfuscate'); };
+  $('btn-allfiles').onclick = function () { go('files'); };
+
+  // ------------------------------------------------------- upload zone
+  var dz = $('drop-zone'), fileInput = $('file');
+  $('btn-zone').onclick = function () { fileInput.click(); };
+  ['dragenter', 'dragover'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = '#ff7a1a'; });
+  });
+  ['dragleave', 'drop'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = ''; });
+  });
+  dz.addEventListener('drop', function (e) {
+    var f = e.dataTransfer.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      fileInput.value = '';
+      var inp = $('input');
+      inp.value = String(r.result || '');
+      inp.dispatchEvent(new Event('input'));
+      toast('Loaded ' + f.name);
+    };
+    r.readAsText(f);
+  });
+
+  // -------------------------------------------------- collapsible sidebar
+  function toggleSidebar() {
+    var shell = document.querySelector('.shell');
+    if (window.matchMedia('(max-width: 860px)').matches) {
+      shell.classList.toggle('sidebar-open');
+    } else {
+      shell.classList.toggle('sidebar-hidden');
+    }
+  }
+  $('btn-menu').onclick = toggleSidebar;
+  $('scrim').onclick = function () {
+    document.querySelector('.shell').classList.remove('sidebar-open');
+  };
+  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelector('.shell').classList.remove('sidebar-open');
+    });
+  });
+
+  render();
+  var hash = (location.hash || '#home').slice(1);
+  if ($('page-' + hash)) go(hash);
+})();
+</script>
+<script>
+/* ===== js/luau-lexer.js ===== */
+/*!
+ * luau-lexer.js — a real Luau lexer (not a regex hack).
+ *
+ * Handles the full Luau token set: short/long strings, interpolated strings
+ * (`hi {name}`), long comments, `--!strict` directives, hex/binary/decimal
+ * numbers with digit separators, and every Luau operator.
+ *
+ * Load with a plain <script> tag (exposes window.LuauLexer) or require() it in Node.
+ */
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.LuauLexer = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var KEYWORDS = new Set([
+    'and', 'break', 'continue', 'do', 'else', 'elseif', 'end', 'false', 'for',
+    'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 'return',
+    'then', 'true', 'type', 'until', 'while'
+  ]);
+
+  // Contextual keywords: only special in specific grammar positions.
+  var CONTEXTUAL = new Set(['export', 'typeof']);
+
+  // Longest first — this order matters.
+  var OPERATORS = [
+    '...', '..=', '..', '==', '~=', '<=', '>=', '::', '->', '=>',
+    '+=', '-=', '*=', '/=', '%=', '^=', '//',
+    '#', '+', '-', '*', '/', '%', '^', '<', '>', '=', '(', ')', '{', '}',
+    '[', ']', ';', ':', ',', '.', '|', '&', '?', '~'
+  ];
+
+  var SIMPLE_ESCAPES = {
+    a: 7, b: 8, f: 12, n: 10, r: 13, t: 9, v: 11, '\\': 92, '"': 34, "'": 39, '\n': 10
+  };
+
+  function isDigit(c) { return c >= 48 && c <= 57; }
+  function isHex(c) {
+    return (c >= 48 && c <= 57) || (c >= 97 && c <= 102) || (c >= 65 && c <= 70);
+  }
+  function isAlpha(c) {
+    return (c >= 97 && c <= 122) || (c >= 65 && c <= 90) || c === 95;
+  }
+  function isAlnum(c) { return isAlpha(c) || isDigit(c); }
+  function isSpace(c) { return c === 32 || c === 9 || c === 13 || c === 10 || c === 11 || c === 12; }
+
+  function SyntaxError_(msg, line, col, index) {
+    var e = new Error(msg);
+    e.name = 'LuauSyntaxError';
+    e.line = line; e.col = col; e.index = index;
+    return e;
+  }
+
+  function Lexer(src) {
+    this.src = src;
+    this.i = 0;
+    this.line = 1;
+    this.col = 1;
+    this.toks = [];
+  }
+
+  Lexer.prototype.peek = function (o) { return this.src.charCodeAt(this.i + (o || 0)); };
+  Lexer.prototype.peekStr = function (o) { return this.src.substr(this.i + (o || 0), o === undefined ? 1 : 1); };
+  Lexer.prototype.at = function (s) { return this.src.startsWith(s, this.i); };
+
+  Lexer.prototype.advance = function (n) {
+    for (var k = 0; k < (n || 1); k++) {
+      var c = this.src.charAt(this.i);
+      if (c === '\n') { this.line++; this.col = 1; }
+      else if (c === '\r') { this.col = 1; }
+      else { this.col++; }
+      this.i++;
+    }
+  };
+
+  Lexer.prototype.push = function (k, v, start, line, col, extra) {
+    var t = { k: k, v: v, s: start, e: this.i, ln: line, col: col, i: this.toks.length };
+    if (extra) for (var key in extra) if (extra[key] !== undefined) t[key] = extra[key];
+    this.toks.push(t);
+    return t;
+  };
+
+  /** Read a long bracket `[==[ ... ]==]`. Returns the raw opening string or null. */
+  Lexer.prototype.longBracketOpen = function () {
+    if (this.peek() !== 91 /* [ */) return null;
+    var j = this.i + 1, eq = 0;
+    while (this.src.charCodeAt(j) === 61 /* = */) { eq++; j++; }
+    if (this.src.charCodeAt(j) !== 91 /* [ */) return null;
+    return { level: eq, len: eq + 2, close: ']' + new Array(eq + 1).join('=') + ']' };
+  };
+
+  Lexer.prototype.skipLongBracket = function (open) {
+    this.advance(open.len);
+    // Luau/Lua skip a newline immediately following the opening bracket.
+    if (this.peek() === 10) this.advance(1);
+    else if (this.peek() === 13 && this.peek(1) === 10) this.advance(2);
+    var closeIdx = this.src.indexOf(open.close, this.i);
+    if (closeIdx < 0) throw SyntaxError_('Unfinished long string/comment', this.line, this.col, this.i);
+    var raw = this.src.slice(this.i, closeIdx);
+    this.i = closeIdx;
+    this.advance(open.close.length);
+    return raw;
+  };
+
+  /** Append the UTF-8 bytes for the character at the cursor and advance past it. */
+  Lexer.prototype.consumeChar = function (bytes) {
+    var cu = this.peek();
+    if (cu >= 0xD800 && cu <= 0xDBFF) {
+      var lo = this.peek(1);
+      if (lo >= 0xDC00 && lo <= 0xDFFF) {
+        pushUtf8(bytes, 0x10000 + ((cu - 0xD800) << 10) + (lo - 0xDC00));
+        this.advance(2);
+        return;
+      }
+    }
+    if (cu !== cu) { this.advance(1); return; } // NaN => EOF
+    pushUtf8(bytes, cu);
+    this.advance(1);
+  };
+
+  /** Decode a Lua escape sequence into `bytes` (linear, no concat churn). */
+  Lexer.prototype.readEscapeInto = function (bytes, interp) {
+    // this.i points at the backslash
+    var startLine = this.line, startCol = this.col;
+    this.advance(1);
+    var c = this.src.charAt(this.i);
+    if (c === '') throw SyntaxError_('Unfinished string escape', startLine, startCol, this.i);
+
+    if (SIMPLE_ESCAPES[c] !== undefined) { this.advance(1); bytes.push(SIMPLE_ESCAPES[c]); return; }
+    if (c === '\r' || c === '\n') {
+      if (c === '\r' && this.src.charAt(this.i + 1) === '\n') this.advance(2); else this.advance(1);
+      bytes.push(10);
+      return;
+    }
+    if (c === 'z') { // skip following whitespace
+      this.advance(1);
+      while (isSpace(this.peek())) this.advance(1);
+      return;
+    }
+    if (c === 'x') {
+      this.advance(1);
+      var h = this.src.substr(this.i, 2);
+      if (h.length < 2 || !isHex(this.peek()) || !isHex(this.peek(1))) {
+        throw SyntaxError_("Hexadecimal digit expected in '\\x' escape", startLine, startCol, this.i);
+      }
+      this.advance(2);
+      bytes.push(parseInt(h, 16));
+      return;
+    }
+    if (c === 'u' && this.src.charAt(this.i + 1) === '{') {
+      this.advance(2);
+      var digits = '';
+      while (isHex(this.peek())) { digits += this.src.charAt(this.i); this.advance(1); }
+      if (this.peek() !== 125 /* } */ || digits === '') {
+        throw SyntaxError_("Malformed '\\u{...}' escape", startLine, startCol, this.i);
+      }
+      this.advance(1);
+      var cp = parseInt(digits, 16);
+      pushUtf8(bytes, cp > 0x10FFFF ? 0xFFFD : cp);
+      return;
+    }
+    if (isDigit(this.peek())) {
+      var d = '';
+      for (var n = 0; n < 3 && isDigit(this.peek()); n++) { d += this.src.charAt(this.i); this.advance(1); }
+      bytes.push(parseInt(d, 10) & 0xFF);
+      return;
+    }
+    if (interp && (c === '{' || c === '}')) { this.advance(1); bytes.push(c.charCodeAt(0)); return; }
+    // Stock Luau tolerates unknown escapes by keeping the character itself.
+    bytes.push(c.charCodeAt(0) & 0xFF);
+    this.advance(1);
+    return;
+  };
+
+  function pushUtf8(arr, cp) {
+    if (cp < 0x80) { arr.push(cp); return; }
+    if (cp < 0x800) { arr.push(0xC0 | (cp >> 6), 0x80 | (cp & 0x3F)); return; }
+    if (cp < 0x10000) { arr.push(0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F)); return; }
+    arr.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+  }
+  function utf8(cp) { var a = []; pushUtf8(a, cp); return a; }
+
+  /** Lex a short string ('...' or "...") into bytes. */
+  Lexer.prototype.lexShortString = function (type, line, col) {
+    var start = this.i;
+    var quote = this.peek();
+    this.advance(1);
+    var bytes = [];
+    while (true) {
+      var c = this.peek();
+      if (c !== c) throw SyntaxError_('Unfinished string', line, col, start); // NaN => EOF
+      if (c === 10 || c === 13) throw SyntaxError_('Unfinished string', line, col, start);
+      if (c === 92 /* \ */) { this.readEscapeInto(bytes, false); continue; }
+      if (c === quote) { this.advance(1); break; }
+      this.consumeChar(bytes);
+    }
+    return this.push('string', bytesToStr(bytes), start, line, col, { sub: type, bytes: bytes });
+  };
+
+  Lexer.prototype.lexLongString = function (open, line, col) {
+    var start = this.i;
+    var raw = this.skipLongBracket(open);
+    return this.push('string', raw, start, line, col, { sub: 'long', bytes: strToBytes(raw) });
+  };
+
+  /** Clone a token (interpolation parts own their own copies). */
+  function cloneTok(t) {
+    var c = {};
+    for (var k in t) c[k] = t[k];
+    return c;
+  }
+
+  // Tokens inside interpolations live outside the main token array, so they get
+  // their own (negative, collision-free) indices. The obfuscator keys every
+  // rewrite off `tok.i`, which is what makes renaming work inside `{}`.
+  var interpSeq = 0;
+  var interpGroupSeq = 0;
+  function renumber(list) {
+    var base = ++interpSeq;
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      if (t._ri) continue;
+      t._ri = 1;
+      t.i = -(base * 1000003 + i);
+      if (t.parts) {
+        for (var p = 0; p < t.parts.length; p++) {
+          if (t.parts[p].kind === 'expr') renumber(t.parts[p].toks);
+        }
+      }
+    }
+  }
+
+  /**
+   * Tokens pushed while any interpolation frame is open belong to the innermost
+   * enclosing `{ ... }` group — otherwise nested interpolated strings would leak
+   * into the top-level token stream.
+   */
+  Lexer.prototype.currentGroup = function (stack) {
+    for (var i = stack.length - 1; i >= 0; i--) {
+      if (stack[i].mode === 'expr') return stack[i].groupId;
+    }
+    return 0;
+  };
+
+  /** Literal-mode scan: consume text until `{` or the closing backtick. */
+  Lexer.prototype.lexInterpLiteral = function (frame) {
+    while (true) {
+      var c = this.peek();
+      if (c !== c) throw SyntaxError_('Unfinished interpolated string', frame.line, frame.col, frame.start);
+      if (c === 10 || c === 13) {
+        throw SyntaxError_('Malformed string: interpolated strings cannot span lines', frame.line, frame.col, frame.start);
+      }
+      if (c === 96 /* ` */) { // closing backtick
+        this.advance(1);
+        frame.pendingClose = true;
+        return;
+      }
+      if (c === 92 /* \ */) { this.readEscapeInto(frame.bytes, true); continue; }
+      if (c === 123 /* { */) { frame.mode = 'expr'; return; }
+      this.consumeChar(frame.bytes);
+    }
+  };
+
+  Lexer.prototype.lexComment = function (line, col, start) {
+    start = start === undefined ? this.i : start;
+    line = line === undefined ? this.line : line;
+    col = col === undefined ? this.col : col;
+    this.advance(2); // --
+    var open = this.longBracketOpen();
+    var text;
+    if (open) {
+      text = this.skipLongBracket(open);
+    } else {
+      var end = this.src.indexOf('\n', this.i);
+      text = end < 0 ? this.src.slice(this.i) : this.src.slice(this.i, end);
+      this.i = end < 0 ? this.src.length : end;
+    }
+    return this.push('comment', text, start, line, col, { raw: this.src.slice(start, this.i) });
+  };
+
+  Lexer.prototype.lexNumber = function (line, col) {
+    var start = this.i;
+    var c0 = this.src.charAt(this.i), c1 = this.src.charAt(this.i + 1);
+    var hexMode = false;
+    if (c0 === '0' && (c1 === 'x' || c1 === 'X')) {
+      hexMode = true;
+      this.advance(2);
+      if (!isHex(this.peek())) throw SyntaxError_('Malformed number', line, col, start);
+      while (isHex(this.peek()) || this.peek() === 95) this.advance(1);
+    } else if (c0 === '0' && (c1 === 'b' || c1 === 'B')) {
+      this.advance(2);
+      var any = false;
+      while (this.peek() === 48 || this.peek() === 49 || this.peek() === 95) { any = true; this.advance(1); }
+      if (!any) throw SyntaxError_('Malformed number', line, col, start);
+    } else {
+      while (isDigit(this.peek()) || this.peek() === 95) this.advance(1);
+      if (this.peek() === 46) { // .
+        this.advance(1);
+        while (isDigit(this.peek()) || this.peek() === 95) this.advance(1);
+      }
+      var ec = this.peek();
+      if (ec === 101 || ec === 69) { // e/E
+        this.advance(1);
+        if (this.peek() === 43 || this.peek() === 45) this.advance(1);
+        if (!isDigit(this.peek())) throw SyntaxError_('Malformed number', line, col, start);
+        while (isDigit(this.peek()) || this.peek() === 95) this.advance(1);
+      }
+    }
+    var raw = this.src.slice(start, this.i);
+    // Trailing alpha (e.g. `1abc`) is a malformed number, like real Luau.
+    if (isAlnum(this.peek())) throw SyntaxError_('Malformed number', line, col, start);
+    var value = hexMode ? parseInt(raw.replace(/_/g, '').slice(2), 16) : (raw.startsWith('0b') || raw.startsWith('0B')
+      ? parseInt(raw.replace(/_/g, '').slice(2), 2)
+      : parseFloat(raw.replace(/_/g, '')));
+    return this.push('number', value, start, line, col, { raw: raw, isInt: Number.isInteger(value) });
+  };
+
+  Lexer.prototype.run = function () {
+    var src = this.src;
+    var stack = []; // interpolation frames
+
+    while (this.i < src.length) {
+      var frame = stack.length ? stack[stack.length - 1] : null;
+
+      // ---- inside `...` literal text
+      if (frame && frame.mode === 'lit') {
+        this.lexInterpLiteral(frame);
+        if (frame.pendingClose) { this.closeInterp(stack); continue; }
+        if (frame.mode === 'expr') {
+          if (frame.bytes.length) { frame.parts.push({ kind: 'lit', bytes: frame.bytes }); frame.bytes = []; }
+          frame.depth = 1;
+          frame.startIdx = this.toks.length;
+          frame.groupId = ++interpGroupSeq;
+          this.advance(1); // consume '{'
+        }
+        continue;
+      }
+
+      var line = this.line, col = this.col, start = this.i;
+      var c = this.peek();
+
+      // ---- inside `{ ... }` of an interpolation
+      var group = this.currentGroup(stack);
+      if (frame && frame.mode === 'expr') {
+        if (c === 125 /* } */) {
+          frame.depth--;
+          if (frame.depth === 0) {
+            var sub = [];
+            for (var q = frame.startIdx; q < this.toks.length; q++) {
+              // skip tokens that belong to a nested interpolation expression
+              if (this.toks[q]._interp !== frame.groupId) continue;
+              var cl = cloneTok(this.toks[q]);
+              if (cl.raw === undefined) cl.raw = src.slice(cl.s, cl.e);
+              sub.push(cl);
+            }
+            renumber(sub);
+            if (!sub.length) throw SyntaxError_("Malformed interpolated string, expected expression inside '{}'", line, col, start);
+            frame.parts.push({ kind: 'expr', toks: sub });
+            frame.mode = 'lit';
+            this.advance(1);
+            continue;
+          }
+          this.advance(1);
+          this.push('op', '}', start, line, col, { _interp: group });
+          continue;
+        }
+        if (c === 123 /* { */) { frame.depth++; this.advance(1); this.push('op', '{', start, line, col, { _interp: group }); continue; }
+      }
+
+      // whitespace
+      if (isSpace(c)) {
+        while (isSpace(this.peek())) this.advance(1);
+        this.push('ws', src.slice(start, this.i), start, line, col, group ? { _interp: group } : null);
+        continue;
+      }
+      // comment
+      if (c === 45 && this.peek(1) === 45) {
+        var ct = this.lexComment(line, col, start);
+        if (group) ct._interp = group;
+        continue;
+      }
+      // long string
+      if (c === 91) {
+        var open = this.longBracketOpen();
+        if (open) { var lt = this.lexLongString(open, line, col); if (group) lt._interp = group; continue; }
+      }
+      // interpolated string (possibly nested)
+      if (c === 96) {
+        this.advance(1);
+        var it = this.push('string', '', start, line, col, group ? { sub: 'interp', parts: [], _interp: group } : { sub: 'interp', parts: [] });
+        stack.push({ token: it, parts: it.parts, bytes: [], mode: 'lit', depth: 0, startIdx: 0, line: line, col: col, start: start });
+        continue;
+      }
+      // short string
+      if (c === 34 || c === 39) { var st = this.lexShortString(c === 34 ? 'dquote' : 'squote', line, col); if (group) st._interp = group; continue; }
+      // number
+      if (isDigit(c) || (c === 46 && isDigit(this.peek(1)))) { var nt = this.lexNumber(line, col); if (group) nt._interp = group; continue; }
+      // identifier / keyword
+      if (isAlpha(c)) {
+        while (isAlnum(this.peek())) this.advance(1);
+        var word = src.slice(start, this.i);
+        var wt = this.push(KEYWORDS.has(word) ? 'keyword' : 'name', word, start, line, col,
+          { contextual: CONTEXTUAL.has(word) });
+        if (group) wt._interp = group;
+        continue;
+      }
+      // operator
+      var matched = null;
+      for (var k = 0; k < OPERATORS.length; k++) {
+        if (this.at(OPERATORS[k])) { matched = OPERATORS[k]; break; }
+      }
+      if (matched) {
+        this.advance(matched.length);
+        var ot = this.push('op', matched, start, line, col);
+        if (group) ot._interp = group;
+        continue;
+      }
+
+      throw SyntaxError_("Unexpected character '" + src.charAt(this.i) + "'", line, col, start);
+    }
+
+    if (stack.length) {
+      var f0 = stack[0];
+      throw SyntaxError_('Unfinished interpolated string', f0.line, f0.col, f0.start);
+    }
+
+    this.push('eof', '<eof>', this.i, this.line, this.col);
+    var all = this.toks;
+    var out = [];
+    for (var z = 0; z < all.length; z++) if (!all[z]._interp) out.push(all[z]);
+    return out;
+  };
+
+  Lexer.prototype.closeInterp = function (stack) {
+    var frame = stack.pop();
+    if (frame.bytes.length) { frame.parts.push({ kind: 'lit', bytes: frame.bytes }); frame.bytes = []; }
+    if (frame.mode === 'expr') {
+      throw SyntaxError_("Malformed interpolated string; did you forget to add a '}'?", frame.line, frame.col, frame.start);
+    }
+    frame.token.e = this.i;
+    frame.token.raw = this.src.slice(frame.token.s, this.i);
+    var self = this;
+    var preview = frame.parts.map(function (p) {
+      return p.kind === 'lit'
+        ? bytesToStr(p.bytes)
+        : '{' + p.toks.map(function (t) { return self.src.slice(t.s, t.e); }).join('') + '}';
+    }).join('');
+    frame.token.v = preview;
+  };
+
+  function bytesToStr(bytes) {
+    var out = [], i = 0;
+    while (i < bytes.length) {
+      var b = bytes[i];
+      if (b < 0x80) { out.push(b); i += 1; continue; }
+      var extra = b >= 0xF0 ? 3 : b >= 0xE0 ? 2 : b >= 0xC0 ? 1 : 0;
+      if (extra === 0 || i + extra >= bytes.length) { out.push(b); i += 1; continue; }
+      var cp = (b & (extra === 3 ? 0x07 : extra === 2 ? 0x0F : 0x1F));
+      for (var k = 1; k <= extra; k++) cp = (cp << 6) | (bytes[i + k] & 0x3F);
+      // encode back to UTF-16 (surrogate pair when needed)
+      if (cp > 0xFFFF) {
+        cp -= 0x10000;
+        out.push(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+      } else {
+        out.push(cp);
+      }
+      i += extra + 1;
+    }
+    var s = '';
+    for (var j = 0; j < out.length; j += 4096) s += String.fromCharCode.apply(null, out.slice(j, j + 4096));
+    return s;
+  }
+  function strToBytes(str) {
+    var b = [];
+    for (var i = 0; i < str.length; i++) {
+      var cu = str.charCodeAt(i);
+      if (cu >= 0xD800 && cu <= 0xDBFF && i + 1 < str.length) {
+        var lo = str.charCodeAt(i + 1);
+        if (lo >= 0xDC00 && lo <= 0xDFFF) {
+          pushUtf8(b, 0x10000 + ((cu - 0xD800) << 10) + (lo - 0xDC00));
+          i++;
+          continue;
+        }
+      }
+      pushUtf8(b, cu);
+    }
+    return b;
+  }
+
+  /** Public: tokenize(source) -> token[] (throws LuauSyntaxError) */
+  function tokenize(src) {
+    src = String(src);
+    var lx = new Lexer(src);
+    var toks = lx.run();
+    // attach raw text to every token (including interpolation bodies) so the
+    // printer can reproduce input verbatim
+    var all = lx.toks;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].raw === undefined) all[i].raw = src.slice(all[i].s, all[i].e);
+    }
+    toks.src = src;
+    return toks;
+  }
+
+  return {
+    tokenize: tokenize,
+    KEYWORDS: KEYWORDS,
+    OPERATORS: OPERATORS,
+    bytesToStr: bytesToStr,
+    strToBytes: strToBytes,
+    utf8: utf8,
+    SyntaxError: SyntaxError_
+  };
+});
+
+/* ===== js/luau-parser.js ===== */
+/*!
+ * luau-parser.js — recursive-descent Luau parser + scope resolver.
+ *
+ * It validates real Luau syntax (including types, generics, interpolation,
+ * if-expressions and compound assignment) and resolves every identifier to
+ * either a local symbol or a global. Output is the information the obfuscator
+ * needs: symbol table, references, safe statement-insertion points, global
+ * reads/assignments and warnings.
+ *
+ * Browser: window.LuauParser   Node: require('./luau-parser.js')
+ */
+(function (root, factory) {
+  var Lexer = (typeof module === 'object' && module.exports) ? require('./luau-lexer.js') : root.LuauLexer;
+  var api = factory(Lexer);
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.LuauParser = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer) {
+  'use strict';
+
+  var TRIVIA = { ws: 1, comment: 1 };
+  var BLOCK_END = { end: 1, else: 1, elseif: 1, until: 1 };
+  var UNARY_OPS = { '-': 1, not: 1, '#': 1 };
+  var COMPOUND_OPS = { '+=': 1, '-=': 1, '*=': 1, '/=': 1, '%=': 1, '^=': 1, '..=': 1 };
+
+  function err(msg, tok) {
+    var e = new Error(msg);
+    e.name = 'LuauSyntaxError';
+    if (tok) { e.line = tok.ln; e.col = tok.col; e.index = tok.s; }
+    return e;
+  }
+
+  // ---------------------------------------------------------------- scopes
+  function Scope(parent, kind) {
+    this.parent = parent;
+    this.kind = kind; // 'chunk' | 'block' | 'function' | 'loop'
+    this.names = Object.create(null);
+    this.children = [];
+    if (parent) parent.children.push(this);
+  }
+  Scope.prototype.lookup = function (name) {
+    var s = this;
+    while (s) { if (s.names[name]) return s.names[name]; s = s.parent; }
+    return null;
+  };
+
+  function Symbol(name, token, kind, scope) {
+    this.name = name;
+    this.token = token;      // declaration token
+    this.kind = kind;        // 'local' | 'param' | 'for' | 'funcname' | 'self'
+    this.scope = scope;
+    this.refs = [];          // token indices
+    this.newName = null;
+  }
+
+  // ---------------------------------------------------------------- parser
+  function Parser(src, toks) {
+    this.src = src;
+    this.toks = toks;                       // all tokens (incl. whitespace/comments)
+    this.code = [];                         // significant tokens only
+    for (var i = 0; i < toks.length; i++) if (!TRIVIA[toks[i].k]) this.code.push(toks[i]);
+    this.p = 0;
+    this.symbols = [];
+    this.refs = Object.create(null);        // token index -> symbol
+    this.globals = Object.create(null);     // name -> {reads:[tok], writes:[tok]}
+    this.junkPoints = [];                   // {at: codeIndex, kind:'stmt'|'end'}
+    this.loopDepth = 0;
+    this.callEnds = Object.create(null); // last token index of call statements
+    this.warnings = [];
+    this.usesEnv = false;
+    this.usesVararg = false;
+    this.hasStrictDirective = false;
+    this.chunkScope = new Scope(null, 'chunk');
+    this.scope = this.chunkScope;
+  }
+
+  Parser.prototype.cur = function () {
+    var t = this.code[this.p];
+    if (t) return t;
+    // sub-token lists (string interpolations) have no real <eof> token
+    if (!this._eofTok) {
+      this._eofTok = { k: 'eof', v: '<eof>', s: this.src.length, e: this.src.length, ln: 0, col: 0, i: -9999, raw: '<eof>' };
+    }
+    return this._eofTok;
+  };
+  Parser.prototype.next = function (o) { return this.code[this.p + (o || 0)] || null; };
+  Parser.prototype.advance = function () {
+    var t = this.code[this.p];
+    if (t && t.k !== 'eof') this.p++;
+    return t;
+  };
+  Parser.prototype.isKw = function (kw, o) {
+    var t = this.code[this.p + (o || 0)];
+    return !!t && t.k === 'keyword' && t.v === kw;
+  };
+  Parser.prototype.isOp = function (op, o) {
+    var t = this.code[this.p + (o || 0)];
+    return !!t && t.k === 'op' && t.v === op;
+  };
+  Parser.prototype.expectKw = function (kw) {
+    if (!this.isKw(kw)) throw err("Expected '" + kw + "'" + this.got(), this.cur());
+    return this.advance();
+  };
+  Parser.prototype.expectOp = function (op) {
+    if (!this.isOp(op)) throw err("Expected '" + op + "'" + this.got(), this.cur());
+    return this.advance();
+  };
+  Parser.prototype.got = function () {
+    var t = this.cur();
+    if (!t) return '';
+    return t.k === 'eof' ? ', got <eof>' : ", got '" + (t.raw !== undefined ? t.raw : t.v) + "'";
+  };
+
+  // ---- scope helpers
+  Parser.prototype.pushScope = function (kind) { this.scope = new Scope(this.scope, kind); return this.scope; };
+  Parser.prototype.popScope = function () { this.scope = this.scope.parent; };
+  Parser.prototype.declare = function (tok, kind) {
+    var sym = new Symbol(tok.v, tok, kind, this.scope);
+    this.scope.names[tok.v] = sym;
+    this.symbols.push(sym);
+    return sym;
+  };
+  Parser.prototype.resolve = function (tok) {
+    var sym = this.scope.lookup(tok.v);
+    if (sym) {
+      sym.refs.push(tok.i);
+      this.refs[tok.i] = sym;
+    } else {
+      var g = this.globals[tok.v] || (this.globals[tok.v] = { reads: [], writes: [] });
+      g.reads.push(tok);
+      if (tok.v === 'getfenv' || tok.v === 'setfenv' || tok.v === 'loadstring' || tok.v === '_G' || tok.v === '_ENV') {
+        this.usesEnv = true;
+      }
+    }
+    return sym;
+  };
+  Parser.prototype.markGlobalWrite = function (tok) {
+    var g = this.globals[tok.v] || (this.globals[tok.v] = { reads: [], writes: [] });
+    g.writes.push(tok);
+    if (tok.v === '_G' || tok.v === '_ENV') this.usesEnv = true;
+  };
+
+  // ------------------------------------------------------------ entry point
+  Parser.prototype.parseChunk = function () {
+    var block = this.parseBlock(true);
+    this.expectEof();
+    return block;
+  };
+  Parser.prototype.expectEof = function () {
+    if (this.cur().k !== 'eof') throw err("Expected <eof>" + this.got(), this.cur());
+  };
+
+  Parser.prototype.atBlockEnd = function (topLevel) {
+    var t = this.cur();
+    if (t.k === 'eof') return true;
+    if (t.k === 'keyword' && BLOCK_END[t.v]) return true;
+    return false;
+  };
+
+  Parser.prototype.parseBlock = function (topLevel) {
+    var stats = [];
+    var lastJump = false;
+    var fnScope = null;
+    while (!this.atBlockEnd(topLevel)) {
+      var t = this.cur();
+      // Luau has no empty statement: `;` may only terminate a statement
+      if (t.k === 'op' && t.v === ';') throw err('Expected statement' + this.got(), t);
+      if (fnScope === null) fnScope = this.scope;
+      if (!this.noJunk) this.junkPoints.push({ at: this.p, kind: 'stmt' });
+      var st = this.parseStatement();
+      stats.push(st);
+      // `f()` followed by `(g)()` is ambiguous without a separator
+      if (st.kind === 'call' || st.kind === 'methodcall') this.callEnds[this.code[this.p - 1].i] = 1;
+      lastJump = (st.kind === 'return' || st.kind === 'break' || st.kind === 'continue');
+      if (this.cur().k === 'op' && this.cur().v === ';') this.advance();
+      if (lastJump) break; // Luau requires return/break/continue to be last
+    }
+    if (!lastJump && !this.noJunk) this.junkPoints.push({ at: this.p, kind: 'end' });
+    return { kind: 'block', stats: stats };
+  };
+
+  Parser.prototype.parseStatement = function () {
+    var t = this.cur();
+
+    if (t.k === 'keyword') {
+      // `type X = ...` declares an alias, but `type(x)` is an ordinary call —
+      // `type` is contextual, so fall through to the expression statement below.
+      if (t.v === 'type' && this.next(1) && this.next(1).k === 'name' && !this.isOp('(', 1)) {
+        return this.parseTypeAlias(false);
+      }
+      if (t.v === 'export' && this.isKw('type', 1)) return this.parseTypeAlias(true);
+      switch (t.v) {
+        case 'local': return this.parseLocal();
+        case 'function': return this.parseFunctionStat();
+        case 'if': return this.parseIf();
+        case 'while': return this.parseWhile();
+        case 'do': return this.parseDo();
+        case 'for': return this.parseFor();
+        case 'repeat': return this.parseRepeat();
+        case 'return': return this.parseReturn();
+        case 'break':
+          if (!this.loopDepth) throw err("'break' statement must be inside a loop", t);
+          this.advance();
+          return { kind: 'break' };
+        case 'continue':
+          if (!this.loopDepth) throw err("'continue' statement must be inside a loop", t);
+          this.advance();
+          return { kind: 'continue' };
+        case 'end': case 'else': case 'elseif': case 'until':
+          throw err("Unexpected '" + t.v + "' when parsing statement", t);
+      }
+      // `type(x)`, `typeof(x)` and friends: parse as an expression statement
+      if (t.v !== 'type' && t.v !== 'typeof') {
+        throw err("Unexpected '" + t.v + "' when parsing statement", t);
+      }
+    }
+
+    // expression statement: either an assignment or a function/method call
+    var first = this.parseSuffixed();
+    var targets = [first];
+    while (this.isOp(',')) {           // a, b = b, a
+      this.advance();
+      targets.push(this.parseSuffixed());
+    }
+    var op = this.cur();
+    if (op.k === 'op' && (op.v === '=' || COMPOUND_OPS[op.v])) {
+      this.advance();
+      var values = this.parseExpList();
+      for (var i = 0; i < targets.length; i++) {
+        var tg = targets[i];
+        if (tg.kind === 'name') {
+          if (tg.sym) tg.sym.refs.push(tg.token.i);
+          else this.markGlobalWrite(tg.token);
+        } else if (op.v !== '=') {
+          // t.x += 1 desugars to a read + write of t.x — global capture must be careful
+        }
+      }
+      return { kind: 'assign', op: op.v, targets: targets, values: values };
+    }
+    if (first.kind === 'call' || first.kind === 'methodcall') {
+      return { kind: 'call', expr: first };
+    }
+    throw err('Incomplete statement: expected assignment or a function call', this.cur());
+  };
+
+  // ------------------------------------------------------------- statements
+  Parser.prototype.parseLocal = function () {
+    var kw = this.expectKw('local');
+    if (this.isKw('function')) {
+      this.advance();
+      var nameTok = this.cur();
+      if (nameTok.k !== 'name') throw err('Expected identifier when parsing local function name' + this.got(), nameTok);
+      this.advance();
+      this.skipGenerics();
+      var sym = this.declare(nameTok, 'local');
+      sym.refs.push(nameTok.i);
+      this.refs[nameTok.i] = sym;
+      var body = this.parseFunctionBody('method' === 'no' ? false : false);
+      return { kind: 'localfunc', sym: sym, body: body };
+    }
+    var names = [];
+    while (true) {
+      var t = this.cur();
+      if (t.k !== 'name') throw err('Expected identifier when parsing local variable name' + this.got(), t);
+      names.push(t);
+      this.advance();
+      if (this.isOp(':')) { // type annotation
+        this.advance();
+        this.parseType();
+      }
+      if (!this.isOp(',')) break;
+      this.advance();
+    }
+    var values = null;
+    if (this.isOp('=')) { this.advance(); values = this.parseExpList(); }
+    // declared only after the initializer expression is parsed (local x = x)
+    for (var i = 0; i < names.length; i++) {
+      var s = this.declare(names[i], 'local');
+      s.refs.push(names[i].i);
+      this.refs[names[i].i] = s;
+    }
+    return { kind: 'local', names: names, values: values };
+  };
+
+  Parser.prototype.parseFunctionStat = function () {
+    this.expectKw('function');
+    var parts = [];
+    var t = this.cur();
+    if (t.k !== 'name') throw err('Expected identifier when parsing function name' + this.got(), t);
+    parts.push(t);
+    this.advance();
+    var isMethod = false;
+    while (this.isOp('.') || this.isOp(':')) {
+      isMethod = this.isOp(':');
+      this.advance();
+      var nt = this.cur();
+      if (nt.k !== 'name') throw err('Expected identifier when parsing function name' + this.got(), nt);
+      parts.push(nt);
+      this.advance();
+    }
+    this.skipGenerics();
+    // `function a.b.c()` — only `a` is an expression; the rest are field keys.
+    // `function a:b()`  — same, `b` is a method key.
+    var fsym = this.resolve(parts[0]);
+    if (!fsym && parts.length === 1 && !isMethod) this.markGlobalWrite(parts[0]);
+    var body = this.parseFunctionBody(isMethod);
+    return { kind: 'funcstat', parts: parts, isMethod: isMethod, body: body };
+  };
+
+  Parser.prototype.parseFunctionBody = function (isMethod) {
+    var savedLoop = this.loopDepth;
+    this.loopDepth = 0;
+    this.callEnds = Object.create(null); // last token index of call statements
+    var sc = this.pushScope('function');
+    this.expectOp('(');
+    var params = this.parseParams();
+    this.expectOp(')');
+    if (isMethod) {
+      // `function a:b()` has an implicit `self` first parameter: expose it in
+      // `params` so the bytecode compiler reserves a register for it
+      var selfTok = { k: 'name', v: 'self', s: -1, e: -1, ln: 0, col: 0, i: -1, raw: 'self', synthetic: true };
+      var selfSym = this.declare(selfTok, 'self');
+      params.unshift({ v: 'self', i: -1, sym: selfSym, vararg: false });
+    }
+    if (this.isOp(':')) { this.advance(); this.parseReturnType(); }
+    var block = this.parseBlock(false);
+    this.expectKw('end');
+    this.popScope();
+    this.loopDepth = savedLoop;
+    return { kind: 'funcbody', scope: sc, params: params, block: block };
+  };
+
+  Parser.prototype.parseParams = function () {
+    var params = [];
+    if (this.isOp(')')) return params;
+    while (true) {
+      if (this.isOp('...')) {
+        this.advance();
+        this.usesVararg = true;
+        if (this.isOp(':')) { this.advance(); this.parseType(); }
+        params.push({ vararg: true });
+        break;
+      }
+      var t = this.cur();
+      if (t.k !== 'name') throw err('Expected identifier when parsing function parameter' + this.got(), t);
+      this.advance();
+      if (this.isOp(':')) { this.advance(); this.parseType(); }
+      var psym = this.declare(t, 'param');
+      psym.refs.push(t.i);
+      this.refs[t.i] = psym;
+      params.push({ name: t, sym: psym });
+      if (this.isOp(',')) { this.advance(); continue; }
+      break;
+    }
+    return params;
+  };
+
+  Parser.prototype.parseTypeAlias = function (exported) {
+    if (exported) this.expectKw('export');
+    this.expectKw('type');
+    var t = this.cur();
+    if (t.k !== 'name') throw err('Expected identifier when parsing type alias' + this.got(), t);
+    this.advance();
+    this.skipGenerics();
+    this.expectOp('=');
+    this.parseType();
+    return { kind: 'typealias', name: t, exported: exported };
+  };
+
+  Parser.prototype.parseIf = function () {
+    this.expectKw('if');
+    var clauses = [];
+    var cond = this.parseExp();
+    this.expectKw('then');
+    // every branch is its own scope: `if x then local y = 1 end print(y)` must
+    // print nil, so the branch block cannot declare into the enclosing scope
+    this.pushScope('block');
+    clauses.push({ cond: cond, block: this.parseBlock(false) });
+    this.popScope();
+    while (this.isKw('elseif')) {
+      this.advance();
+      var c = this.parseExp();
+      this.expectKw('then');
+      this.pushScope('block');
+      clauses.push({ cond: c, block: this.parseBlock(false) });
+      this.popScope();
+    }
+    var elseBlock = null;
+    if (this.isKw('else')) {
+      this.advance();
+      this.pushScope('block');
+      elseBlock = this.parseBlock(false);
+      this.popScope();
+    }
+    this.expectKw('end');
+    return { kind: 'if', clauses: clauses, elseBlock: elseBlock };
+  };
+
+  Parser.prototype.parseWhile = function () {
+    this.expectKw('while');
+    var cond = this.parseExp();
+    this.expectKw('do');
+    this.pushScope('loop');
+    this.loopDepth++;
+    var block = this.parseBlock(false);
+    this.loopDepth--;
+    this.popScope();
+    this.expectKw('end');
+    return { kind: 'while', cond: cond, block: block };
+  };
+
+  Parser.prototype.parseDo = function () {
+    this.expectKw('do');
+    this.pushScope('block');
+    var block = this.parseBlock(false);
+    this.popScope();
+    this.expectKw('end');
+    return { kind: 'do', block: block };
+  };
+
+  Parser.prototype.parseFor = function () {
+    this.expectKw('for');
+    var names = [];
+    var t = this.cur();
+    if (t.k !== 'name') throw err('Expected identifier when parsing for-loop variable' + this.got(), t);
+    names.push(t);
+    this.advance();
+    var sc = this.pushScope('loop');
+    if (this.isOp(':')) { this.advance(); this.parseType(); } // `for i: number = 1, 10`
+    if (this.isOp('=')) { // numeric for
+      this.advance();
+      var start = this.parseExp();
+      this.expectOp(',');
+      var limit = this.parseExp();
+      var step = null;
+      if (this.isOp(',')) { this.advance(); step = this.parseExp(); }
+      this.expectKw('do');
+      var sym = this.declare(names[0], 'for');
+      sym.refs.push(names[0].i);
+      this.refs[names[0].i] = sym;
+      this.loopDepth++;
+      var block = this.parseBlock(false);
+      this.loopDepth--;
+      this.popScope();
+      this.expectKw('end');
+      return { kind: 'numfor', sym: sym, start: start, limit: limit, step: step, block: block };
+    }
+    // generic for
+    while (this.isOp(',')) {
+      this.advance();
+      var nt = this.cur();
+      if (nt.k !== 'name') throw err('Expected identifier when parsing for-loop variable' + this.got(), nt);
+      names.push(nt);
+      this.advance();
+      if (this.isOp(':')) { this.advance(); this.parseType(); }
+    }
+    this.expectKw('in');
+    var exps = this.parseExpList();
+    this.expectKw('do');
+    for (var i = 0; i < names.length; i++) {
+      var s = this.declare(names[i], 'for');
+      s.refs.push(names[i].i);
+      this.refs[names[i].i] = s;
+    }
+    this.loopDepth++;
+    var blk = this.parseBlock(false);
+    this.loopDepth--;
+    this.popScope();
+    this.expectKw('end');
+    return { kind: 'genfor', names: names, exps: exps, block: blk };
+  };
+
+  Parser.prototype.parseRepeat = function () {
+    this.expectKw('repeat');
+    this.pushScope('loop');
+    this.loopDepth++;
+    var block = this.parseBlock(false);
+    this.expectKw('until');
+    var cond = this.parseExp(); // evaluated inside the loop scope
+    this.loopDepth--;
+    this.popScope();
+    return { kind: 'repeat', block: block, cond: cond };
+  };
+
+  Parser.prototype.parseReturn = function () {
+    this.expectKw('return');
+    var values = null;
+    var t = this.cur();
+    var endsBlock = this.isOp(';') || this.isKw('end') || this.isKw('else') || this.isKw('elseif') ||
+      this.isKw('until') || t.k === 'eof';
+    if (!endsBlock) values = this.parseExpList();
+    return { kind: 'return', values: values };
+  };
+
+  // ------------------------------------------------------------ expressions
+  Parser.prototype.parseExpList = function () {
+    var exps = [];
+    do { exps.push(this.parseExp()); } while (this.isOp(',') && (this.advance(), true));
+    return exps;
+  };
+
+  Parser.prototype.parseExp = function () { return this.parseOr(); };
+
+  Parser.prototype.parseOr = function () {
+    var l = this.parseAnd();
+    while (this.isKw('or')) { this.advance(); l = { kind: 'bin', op: 'or', l: l, r: this.parseAnd() }; }
+    return l;
+  };
+  Parser.prototype.parseAnd = function () {
+    var l = this.parseCompare();
+    while (this.isKw('and')) { this.advance(); l = { kind: 'bin', op: 'and', l: l, r: this.parseCompare() }; }
+    return l;
+  };
+  Parser.prototype.parseCompare = function () {
+    var l = this.parseConcat();
+    while (true) {
+      var t = this.cur();
+      if (t.k === 'op' && (t.v === '<' || t.v === '>' || t.v === '<=' || t.v === '>=' || t.v === '~=' || t.v === '==')) {
+        this.advance();
+        l = { kind: 'bin', op: t.v, l: l, r: this.parseConcat() };
+        continue;
+      }
+      return l;
+    }
+  };
+  Parser.prototype.parseConcat = function () {
+    var parts = [this.parseAdd()];
+    while (this.isOp('..')) { this.advance(); parts.push(this.parseAdd()); }
+    if (parts.length === 1) return parts[0];
+    // right associative
+    var node = parts[parts.length - 1];
+    for (var i = parts.length - 2; i >= 0; i--) node = { kind: 'bin', op: '..', l: parts[i], r: node };
+    return node;
+  };
+  Parser.prototype.parseAdd = function () {
+    var l = this.parseMul();
+    while (this.isOp('+') || this.isOp('-')) {
+      var op = this.advance().v;
+      l = { kind: 'bin', op: op, l: l, r: this.parseMul() };
+    }
+    return l;
+  };
+  Parser.prototype.parseMul = function () {
+    var l = this.parseUnary();
+    while (this.isOp('*') || this.isOp('/') || this.isOp('//') || this.isOp('%')) {
+      var op = this.advance().v;
+      l = { kind: 'bin', op: op, l: l, r: this.parseUnary() };
+    }
+    return l;
+  };
+  Parser.prototype.parseUnary = function () {
+    var t = this.cur();
+    if (t.k === 'op' && (t.v === '-' || t.v === '#')) {
+      this.advance();
+      return { kind: 'un', op: t.v, e: this.parseUnary() };
+    }
+    if (t.k === 'keyword' && t.v === 'not') {
+      this.advance();
+      return { kind: 'un', op: 'not', e: this.parseUnary() };
+    }
+    return this.parsePow();
+  };
+  Parser.prototype.parsePow = function () {
+    var base = this.parseSuffixed();
+    if (this.isOp('^')) { this.advance(); return { kind: 'bin', op: '^', l: base, r: this.parseUnary() }; }
+    return base;
+  };
+
+  Parser.prototype.parseSuffixed = function () {
+    var e = this.parsePrimary();
+    while (true) {
+      var t = this.cur();
+      if (t.k === 'op' && t.v === '.') {
+        this.advance();
+        var n = this.cur();
+        if (n.k !== 'name' && n.k !== 'keyword') throw err('Expected identifier when parsing field name' + this.got(), n);
+        this.advance();
+        e = { kind: 'index', obj: e, key: n };
+        continue;
+      }
+      if (t.k === 'op' && t.v === '[') {
+        this.advance();
+        var k = this.parseExp();
+        this.expectOp(']');
+        e = { kind: 'indexb', obj: e, key: k };
+        continue;
+      }
+      if (t.k === 'op' && t.v === ':') {
+        this.advance();
+        var m = this.cur();
+        if (m.k !== 'name' && m.k !== 'keyword') throw err('Expected identifier when parsing method name' + this.got(), m);
+        this.advance();
+        e = { kind: 'methodcall', obj: e, name: m, args: this.parseArgs() };
+        continue;
+      }
+      if (t.k === 'op' && t.v === '(') { e = { kind: 'call', fn: e, args: this.parseArgs() }; continue; }
+      if (t.k === 'string') { var s = this.advance(); e = { kind: 'call', fn: e, args: [s] }; continue; }
+      if (t.k === 'op' && t.v === '{') { e = { kind: 'call', fn: e, args: [this.parseTable()] }; continue; }
+      if (t.k === 'op' && t.v === '::') { this.advance(); this.parseType(); e = { kind: 'cast', e: e }; continue; }
+      return e;
+    }
+  };
+
+  Parser.prototype.parseArgs = function () {
+    var t = this.cur();
+    if (t.k === 'string') { var s2 = this.advance(); if (s2.parts) this.parseInterpParts(s2); return [s2]; }
+    if (t.k === 'op' && t.v === '{') return [this.parseTable()];
+    this.expectOp('(');
+    var args = [];
+    if (!this.isOp(')')) {
+      do { args.push(this.parseExp()); } while (this.isOp(',') && (this.advance(), true));
+    }
+    this.expectOp(')');
+    return args;
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    var t = this.cur();
+
+    if (t.k === 'op' && t.v === '(') {
+      this.advance();
+      var e = this.parseExp();
+      this.expectOp(')');
+      return { kind: 'paren', e: e };
+    }
+    if (t.k === 'name') {
+      this.advance();
+      var sym = this.resolve(t);
+      return { kind: 'name', token: t, sym: sym };
+    }
+    if (t.k === 'keyword') {
+      if (t.v === 'function') { return this.parseFunctionExpr(); }
+      if (t.v === 'nil' || t.v === 'true' || t.v === 'false') { this.advance(); return { kind: 'const', token: t }; }
+      if (t.v === 'if') return this.parseIfExpr();
+      // contextual keywords that are ordinary globals in expression position
+      if (t.v === 'type' || t.v === 'typeof') {
+        this.advance();
+        var csym = this.resolve(t);
+        return { kind: 'name', token: t, sym: csym };
+      }
+      if (t.v === 'export') throw err("Unexpected '" + t.v + "' in expression", t);
+      throw err("Unexpected '" + t.v + "' when parsing expression", t);
+    }
+    if (t.k === 'number') { this.advance(); return { kind: 'const', token: t }; }
+    if (t.k === 'string') {
+      this.advance();
+      if (t.parts) this.parseInterpParts(t);
+      return { kind: 'const', token: t };
+    }
+    if (t.k === 'op' && t.v === '{') return this.parseTable();
+    if (t.k === 'op' && t.v === '...') {
+      this.advance();
+      this.usesVararg = true;
+      return { kind: 'vararg', token: t };
+    }
+    if (t.k === 'op' && t.v === '=>') throw err('Unexpected \'=>\': arrow functions are not supported by stock Luau', t);
+    throw err('Expected identifier when parsing expression' + this.got(), t);
+  };
+
+  /**
+   * Resolve identifiers inside `hi {name}` interpolations against the scope the
+   * interpolated string actually appears in, so renaming stays correct.
+   */
+  Parser.prototype.parseInterpParts = function (tok) {
+    for (var i = 0; i < tok.parts.length; i++) {
+      var part = tok.parts[i];
+      if (part.kind !== 'expr') continue;
+      if (!part.toks || !part.toks.length) {
+        throw err('Empty expression inside string interpolation', tok);
+      }
+      var sub = new Parser(this.src, part.toks);
+      sub.p = 0;
+      sub.noJunk = true;
+      sub.scope = this.scope;
+      sub.refs = this.refs;
+      sub.globals = this.globals;
+      sub.symbols = this.symbols;
+      sub.warnings = this.warnings;
+      part.ast = sub.parseExp(); // kept so the VM backend can compile the interpolation
+      if (sub.cur().k !== 'eof') throw err('Unexpected token in string interpolation', sub.cur());
+      this.usesEnv = this.usesEnv || sub.usesEnv;
+      this.usesVararg = this.usesVararg || sub.usesVararg;
+    }
+  };
+
+  Parser.prototype.parseFunctionExpr = function () {
+    this.expectKw('function');
+    this.skipGenerics();   // `function<T>(v: T): T … end` is legal Luau
+    var body = this.parseFunctionBody(false);
+    return { kind: 'funcexpr', body: body };
+  };
+
+  Parser.prototype.parseIfExpr = function () {
+    this.expectKw('if');
+    var cond = this.parseExp();
+    this.expectKw('then');
+    var thenExp = this.parseExp();
+    var clauses = [{ cond: cond, exp: thenExp }];
+    while (this.isKw('elseif')) {
+      this.advance();
+      var c = this.parseExp();
+      this.expectKw('then');
+      clauses.push({ cond: c, exp: this.parseExp() });
+    }
+    this.expectKw('else');
+    var elseExp = this.parseExp();
+    return { kind: 'ifexpr', clauses: clauses, elseExp: elseExp };
+  };
+
+  Parser.prototype.parseTable = function () {
+    this.expectOp('{');
+    var fields = [];
+    while (!this.isOp('}')) {
+      if (this.isOp('[')) {
+        this.advance();
+        var k = this.parseExp();
+        this.expectOp(']');
+        this.expectOp('=');
+        fields.push({ kind: 'kv', key: k, value: this.parseExp() });
+      } else {
+        var t = this.cur();
+        if (t.k === 'name' && this.isOp('=', 1)) {
+          this.advance();
+          this.advance();
+          fields.push({ kind: 'name', key: t, value: this.parseExp() });
+        } else {
+          fields.push({ kind: 'item', value: this.parseExp() });
+        }
+      }
+      if (this.isOp(',') || this.isOp(';')) { this.advance(); continue; }
+      break;
+    }
+    this.expectOp('}');
+    return { kind: 'table', fields: fields };
+  };
+
+  // ------------------------------------------------------------------ types
+  // Types are parsed for validation only; identifiers inside are never renamed.
+  Parser.prototype.skipGenerics = function () {
+    if (!this.isOp('<')) return;
+    this.advance();
+    var depth = 1;
+    while (depth > 0) {
+      var t = this.cur();
+      if (t.k === 'eof') throw err('Unfinished generic parameter list', t);
+      if (t.k === 'op') {
+        if (t.v === '<') depth++;
+        else if (t.v === '>') { depth--; this.advance(); continue; }
+        else if (t.v === '(' || t.v === '{' || t.v === '[') {
+          this.skipBalanced(t.v);
+          continue;
+        }
+      }
+      this.advance();
+    }
+  };
+
+  Parser.prototype.skipBalanced = function (open) {
+    var close = { '(': ')', '{': '}', '[': ']' }[open];
+    this.advance();
+    var depth = 1;
+    while (depth > 0) {
+      var t = this.cur();
+      if (t.k === 'eof') throw err('Unfinished type', t);
+      if (t.k === 'op') {
+        if (t.v === open) depth++;
+        else if (t.v === close) { depth--; if (!depth) { this.advance(); return; } }
+        else if (t.v === '(' || t.v === '{' || t.v === '[') { this.skipBalanced(t.v); continue; }
+      }
+      this.advance();
+    }
+  };
+
+  Parser.prototype.parseType = function () {
+    this.parseUnionType();
+  };
+  Parser.prototype.parseUnionType = function () {
+    this.parseIntersectionType();
+    while (true) {
+      var t = this.cur();
+      if (t.k === 'op' && (t.v === '|' || t.v === '&')) { this.advance(); this.parseIntersectionType(); continue; }
+      return;
+    }
+  };
+  Parser.prototype.parseIntersectionType = function () {
+    this.parseSimpleType();
+  };
+  Parser.prototype.parseSimpleType = function () {
+    var t = this.cur();
+    if (t.k === 'op' && t.v === '...') { this.advance(); this.parseSimpleType(); return; }
+    if (t.k === 'op' && t.v === '(') { this.parseFunctionType(); return; }
+    if (t.k === 'op' && t.v === '{') { this.parseTableType(); return; }
+    if (t.k === 'op' && t.v === '<') {
+      this.skipGenerics();
+      if (this.isOp('(')) { this.parseFunctionType(); return; }  // <A>(A) -> A
+      while (this.isOp('?')) this.advance();
+      return;
+    }
+    if (t.k === 'string') { this.advance(); return; }
+    if (t.k === 'number') { this.advance(); return; }
+    if (t.k === 'keyword' && (t.v === 'nil' || t.v === 'true' || t.v === 'false')) { this.advance(); return; }
+    if (t.k === 'name' || (t.k === 'keyword' && t.v === 'typeof')) {
+      this.advance();
+      if (t.k === 'keyword' && t.v === 'typeof' && this.isOp('(')) this.skipBalanced('(');
+      else if (this.isOp('<')) this.parseGenericArgs();
+      // optional marker
+      while (this.isOp('?')) { this.advance(); }
+      return;
+    }
+    throw err('Expected type' + this.got(), t);
+  };
+  Parser.prototype.parseGenericArgs = function () {
+    this.expectOp('<');
+    var depth = 1;
+    while (depth > 0) {
+      var t = this.cur();
+      if (t.k === 'eof') throw err('Unfinished generic type arguments', t);
+      if (t.k === 'op') {
+        if (t.v === '<') depth++;
+        else if (t.v === '>') { depth--; if (!depth) { this.advance(); return; } }
+        else if (t.v === '(' || t.v === '{' || t.v === '[') { this.skipBalanced(t.v); continue; }
+        else if (t.v === ',' && depth === 1) { this.advance(); continue; }
+      }
+      if (t.k === 'name' || (t.k === 'keyword' && t.v === 'typeof')) { this.parseSimpleType(); continue; }
+      if (t.k === 'op' && t.v === '...') { this.advance(); continue; }
+      this.advance();
+    }
+  };
+  Parser.prototype.parseTableType = function () {
+    this.expectOp('{');
+    while (!this.isOp('}')) {
+      var t = this.cur();
+      if (t.k === 'op' && t.v === '[') { this.advance(); this.parseType(); this.expectOp(']'); this.expectOp(':'); this.parseType(); }
+      else if (t.k === 'name' && this.isOp(':', 1)) { this.advance(); this.advance(); this.parseType(); }
+      else if (t.k === 'op' && t.v === '...') { this.advance(); this.parseType(); }
+      else this.parseType();
+      if (this.isOp(',') || this.isOp(';')) { this.advance(); continue; }
+      break;
+    }
+    this.expectOp('}');
+    while (this.isOp('?')) this.advance();
+  };
+  Parser.prototype.parseFunctionType = function () {
+    this.expectOp('(');
+    if (!this.isOp(')')) {
+      do {
+        if (this.isOp('...')) { this.advance(); if (this.isOp(':')) { this.advance(); this.parseType(); } }
+        else if (this.cur().k === 'name' && this.isOp(':', 1)) { this.advance(); this.advance(); this.parseType(); }
+        else this.parseType();
+        while (this.isOp('?')) this.advance();
+      } while (this.isOp(',') && (this.advance(), true));
+    }
+    this.expectOp(')');
+    this.expectOp('->');
+    this.parseReturnType();
+  };
+  Parser.prototype.parseReturnType = function () {
+    if (this.isOp('(')) {
+      this.advance();
+      if (!this.isOp(')')) {
+        do {
+          if (this.isOp('...')) { this.advance(); this.parseType(); } else this.parseType();
+        } while (this.isOp(',') && (this.advance(), true));
+      }
+      this.expectOp(')');
+      // `() -> number` is a function return type, not an empty tuple
+      if (this.isOp('->')) { this.advance(); this.parseReturnType(); }
+      return;
+    }
+    this.parseType();
+    while (this.isOp('?')) this.advance();
+  };
+
+  // ------------------------------------------------------------------ public
+  function parse(src, opts) {
+    var toks = Lexer.tokenize(src);
+    var pr = new Parser(String(src), toks);
+    // preserve `--!strict` style directives: they must stay at the top of the file
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i];
+      if (t.k === 'ws') { if (/\n/.test(t.v)) break; continue; }
+      if (t.k === 'comment' && /^--!/.test(t.raw)) pr.hasStrictDirective = true;
+      break;
+    }
+    var rootBlock = pr.parseChunk();
+    if (pr.usesEnv) pr.warnings.push('Script touches _G/_ENV/getfenv/setfenv/loadstring — global capture skipped for safety.');
+    return {
+      ok: true,
+      src: String(src),
+      toks: toks,
+      code: pr.code,
+      symbols: pr.symbols,
+      refs: pr.refs,
+      globals: pr.globals,
+      junkPoints: pr.junkPoints,
+      warnings: pr.warnings,
+      callEnds: pr.callEnds,
+      usesEnv: pr.usesEnv,
+      hasStrictDirective: pr.hasStrictDirective,
+      ast: rootBlock
+    };
+  }
+
+  return { parse: parse, Scope: Scope, Symbol: Symbol };
+});
+
+/* ===== js/vm-compile.js ===== */
+/*
+ * Darkfuscator — VM backend.
+ *
+ * Compiles a Luau AST (as produced by luau-parser.js) into register bytecode:
+ * one proto per source function, each a flat list of [op, A, B, C] instructions
+ * with a constant pool, upvalue descriptors and nested protos.
+ *
+ * The bytecode is executed by the interpreter that vm-emit.js writes out. Every
+ * arithmetic, comparison, index and call operation is performed by a *native*
+ * Luau operator inside the interpreter, so metamethods, coercion, integer
+ * semantics, coroutines and pcall all keep their real behaviour.
+ */
+;(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.DarkfuscatorVMCompile = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var OPS = [
+    'LOADK', 'LOADNIL', 'LOADBOOL', 'MOVE', 'BOX',
+    'NEWTABLE', 'GETTABLE', 'SETTABLE', 'SETLISTM',
+    'GETUPVAL', 'SETUPVAL', 'GETGLOBAL', 'SETGLOBAL',
+    'ADD', 'SUB', 'MUL', 'DIV', 'IDIV', 'MOD', 'POW',
+    'UNM', 'NOT', 'LEN', 'CONCAT',
+    'EQ', 'LT', 'LE', 'TEST', 'JMP',
+    'FORPREP', 'FORLOOP', 'TFORCALL',
+    'CALL', 'CALLM', 'RETURN', 'RETURNT', 'RETURNV',
+    'CLOSURE', 'VARARG', 'VARARGN', 'SELF', 'RETURNM'
+  ];
+  var OP = {};
+  for (var oi = 0; oi < OPS.length; oi++) OP[OPS[oi]] = oi;
+
+  // operands below RKBASE are register numbers, above it constant indices
+  var RKBASE = 100000;
+
+  var ARITH = { '+': 'ADD', '-': 'SUB', '*': 'MUL', '/': 'DIV', '//': 'IDIV', '%': 'MOD', '^': 'POW' };
+  var COMPOUND = { '+=': 'ADD', '-=': 'SUB', '*=': 'MUL', '/=': 'DIV', '//=': 'IDIV', '%=': 'MOD', '^=': 'POW', '..=': 'CONCAT' };
+  var CMP = { '==': 'EQ', '<': 'LT', '<=': 'LE', '~=': 'EQ', '>': 'LT', '>=': 'LE' };
+
+  /** Decode UTF-8 bytes (used for the literal chunks of interpolated strings). */
+  function utf8Decode(bytes) {
+    var out = '', i = 0, b, c;
+    while (i < bytes.length) {
+      b = bytes[i++];
+      if (b < 0x80) { out += String.fromCharCode(b); continue; }
+      if (b < 0xE0) { c = ((b & 0x1F) << 6) | (bytes[i++] & 0x3F); out += String.fromCharCode(c); continue; }
+      if (b < 0xF0) {
+        c = ((b & 0x0F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F);
+        out += String.fromCharCode(c);
+        continue;
+      }
+      var cp = ((b & 0x07) << 18) | ((bytes[i++] & 0x3F) << 12) | ((bytes[i++] & 0x3F) << 6) | (bytes[i++] & 0x3F);
+      cp -= 0x10000;
+      out += String.fromCharCode(0xD800 + (cp >> 10), 0xDC00 + (cp & 0x3FF));
+    }
+    return out;
+  }
+
+  /** the literal text of one interpolated-string chunk */
+  function partText(p) {
+    if (p.bytes) return utf8Decode(p.bytes);
+    return p.text === undefined ? String(p.v === undefined ? '' : p.v) : p.text;
+  }
+
+  function isMulti(e) {
+    return e.kind === 'call' || e.kind === 'methodcall' || e.kind === 'vararg';
+  }
+
+  // ------------------------------------------------------------------- proto
+  function Fn(parent) {
+    this.parent = parent || null;
+    this.code = [];          // [op, A, B, C]  (+ optional .x for CLOSURE upvalues)
+    this.k = [];             // constants: {t:'n'|'s'|'b'|'z', v}
+    this.kmap = Object.create(null);
+    this.kids = [];          // nested protos
+    this.locals = new Map(); // symbol -> register
+    this.boxed = new Map();  // symbol -> true once it lives in an upvalue box
+    this.ups = [];           // [{p:1|0, i:int, sym}] p=1 → parent register (a box)
+    this.upmap = new Map();  // symbol -> upvalue index
+    this.nreg = 0;
+    this.maxreg = 0;
+    this.nparams = 0;
+    this.isvararg = false;
+    this.loops = [];
+    this.name = null;
+    this.dry = false;         // probing pass: don't emit boxes, just record them
+    this.dryBox = [];
+    this.preBox = null;       // locals a probe found: boxed at their declaration
+    this.inProbe = parent ? !!parent.inProbe : false;  // stops probe recursion
+  }
+
+  Fn.prototype.alloc = function () {
+    var r = this.nreg++;
+    if (r > this.maxreg) this.maxreg = r;
+    return r;
+  };
+  Fn.prototype.allocN = function (n) {
+    var r = this.nreg;
+    this.nreg += n;
+    if (this.nreg - 1 > this.maxreg) this.maxreg = this.nreg - 1;
+    return r;
+  };
+  Fn.prototype.free = function (n) { this.nreg -= n; };
+
+  Fn.prototype.emit = function (op, A, B, C, x) {
+    var ins = [OP[op], A || 0, B || 0, C || 0];
+    if (x !== undefined) ins.x = x;
+    this.code.push(ins);
+    return this.code.length - 1;
+  };
+  /** point a relative jump at an absolute instruction index */
+  Fn.prototype.patch = function (idx, target, operand) {
+    this.code[idx][operand === undefined ? 1 : operand] = target - idx;
+    return idx;
+  };
+  Fn.prototype.here = function () { return this.code.length; };
+
+  // --------------------------------------------------------------- constants
+  Fn.prototype.kNum = function (v) { return this.konst('n', v); };
+  Fn.prototype.kStr = function (v) { return this.konst('s', v); };
+  Fn.prototype.kBool = function (v) { return this.konst('b', v); };
+  Fn.prototype.kNil = function () { return this.konst('z', null); };
+  Fn.prototype.konst = function (t, v) {
+    var key = t + ' ' + v;
+    var i = this.kmap[key];
+    if (i !== undefined) return i;
+    i = this.k.length;
+    this.k.push({ t: t, v: v });
+    this.kmap[key] = i;
+    return i;
+  };
+
+  // ------------------------------------------------------------------ scopes
+  Fn.prototype.symOf = function (tok, refs) {
+    return refs[tok.i] || null;
+  };
+
+  /** where does this symbol live? {t:'reg'|'boxreg'|'up'|'global', ...} */
+  Fn.prototype.addr = function (sym) {
+    if (sym && this.locals.has(sym)) {
+      var r = this.locals.get(sym);
+      return this.boxed.get(sym) ? { t: 'boxreg', r: r } : { t: 'reg', r: r };
+    }
+    if (sym) {
+      var u = this.up(sym);
+      if (u >= 0) return { t: 'up', u: u, sym: sym };
+    }
+    return null; // global
+  };
+
+  Fn.prototype.up = function (sym) {
+    if (this.upmap.has(sym)) return this.upmap.get(sym);
+    if (!this.parent) return -1;
+    var desc, idx;
+    if (this.parent.locals.has(sym)) {
+      var pr = this.parent.locals.get(sym);
+      if (!this.parent.boxed.get(sym)) {
+        // the local has to become a shared box from here on
+        if (this.parent.dry) this.parent.dryBox.push({ sym: sym, r: pr });
+        else { this.parent.boxed.set(sym, true); this.parent.emit('BOX', pr); }
+      }
+      desc = { p: 1, i: pr, sym: sym };
+    } else {
+      var pu = this.parent.up(sym);
+      if (pu < 0) return -1;
+      desc = { p: 0, i: pu, sym: sym };
+    }
+    idx = this.ups.length;
+    this.ups.push(desc);
+    this.upmap.set(sym, idx);
+    return idx;
+  };
+
+  // -------------------------------------------------------- rk encoded values
+  /** encode an operand: registers < 256 are registers, otherwise constants */
+  Fn.prototype.rk = function (v) {
+    return v.k === 'c' ? RKBASE + v.i : v.r;
+  };
+  Fn.prototype.release = function (v) {
+    if (v.k === 'r' && !v.borrowed) this.free(1);
+  };
+  /** a constant operand encoded as an rk value */
+  Fn.prototype.rkc = function (i) { return RKBASE + i; };
+
+  /** evaluate into a fresh temporary: {k:'r', r} or {k:'c', i} */
+  Fn.prototype.tmp = function (e) {
+    var self = this;
+    if (e.kind === 'const' && !(e.token.parts)) {
+      return { k: 'c', i: this.constOf(e.token) };
+    }
+    if (e.kind === 'name') {
+      var a = this.addr(e.sym);
+      if (a) {
+        if (a.t === 'reg') return { k: 'r', r: a.r, borrowed: true };
+        if (a.t === 'boxreg') {
+          var r1 = this.alloc();
+          this.emit('GETTABLE', r1, a.r, this.rkc(this.kNum(1)));
+          return { k: 'r', r: r1 };
+        }
+        if (a.t === 'up') { var r2 = this.alloc(); this.emit('GETUPVAL', r2, a.u); return { k: 'r', r: r2 }; }
+      }
+      var r3 = this.alloc();
+      this.emit('GETGLOBAL', r3, this.kStr(e.token.v));
+      return { k: 'r', r: r3 };
+    }
+    var r = this.alloc();
+    this.expToReg(e, r);
+    return { k: 'r', r: r };
+  };
+
+  /** a string constant kept as the exact source bytes (\255 must stay one byte) */
+  Fn.prototype.kBytes = function (bytes) {
+    var key = 's\u0000\u0001' + bytes.join(',');
+    var i = this.kmap[key];
+    if (i !== undefined) return i;
+    i = this.k.length;
+    this.k.push({ t: 's', v: bytes.map(function (b) { return String.fromCharCode(b); }).join(''), b: bytes });
+    this.kmap[key] = i;
+    return i;
+  };
+
+  Fn.prototype.constOf = function (tok) {
+    if (tok.k === 'number') return this.kNum(tok.v);
+    if (tok.k === 'string') return tok.bytes ? this.kBytes(tok.bytes) : this.kStr(tok.v);
+    if (tok.v === 'nil') return this.kNil();
+    if (tok.v === 'true') return this.kBool(true);
+    if (tok.v === 'false') return this.kBool(false);
+    return this.kNil();
+  };
+
+  // ------------------------------------------------------------- expressions
+  Fn.prototype.exp = function (e) {
+    switch (e.kind) {
+      case 'const': return this.expConst(e);
+      case 'name': return this.tmp(e);
+      case 'vararg': {
+        var r = this.alloc();
+        this.emit('VARARG', r, 2);
+        return { k: 'r', r: r };
+      }
+      case 'paren': return this.expTrunc(e.e);
+      case 'cast': return this.exp(e.e);
+      case 'bin': return this.expBin(e);
+      case 'un': return this.expUn(e);
+      case 'table': return this.expTable(e);
+      case 'index': case 'indexb': return this.expIndex(e);
+      case 'call': case 'methodcall': {
+        var rc = this.alloc();
+        this.callInto(e, rc, 1);
+        return { k: 'r', r: rc };
+      }
+      case 'funcexpr': {
+        var rf = this.alloc();
+        this.closure(e.body, rf);
+        return { k: 'r', r: rf };
+      }
+      case 'ifexpr': return this.expIf(e);
+    }
+    throw new Error('vm: unhandled expression ' + e.kind);
+  };
+
+  /** `f()` in a one-value context truncates to a single result */
+  Fn.prototype.expTrunc = function (e) {
+    if (e.kind === 'paren') return this.expTrunc(e.e);
+    if (e.kind === 'cast') return this.expTrunc(e.e);
+    var v = this.exp(e);
+    return v;
+  };
+
+  Fn.prototype.expConst = function (e) {
+    var tok = e.token;
+    if (tok.k === 'string' && tok.parts) return this.expInterp(tok);
+    return { k: 'c', i: this.constOf(tok) };
+  };
+
+  Fn.prototype.expInterp = function (tok) {
+    var parts = tok.parts, i, j;
+    var allLit = true;
+    for (i = 0; i < parts.length; i++) if (parts[i].kind !== 'lit') allLit = false;
+    if (allLit) {
+      var s = '';
+      for (i = 0; i < parts.length; i++) s += partText(parts[i]);
+      return { k: 'c', i: this.kStr(s) };
+    }
+    var dest = this.alloc();
+    var first = this.nreg;
+    var regs = [];
+    for (i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.kind === 'lit') {
+        var rl = this.alloc();
+        this.emit('LOADK', rl, this.kStr(partText(p)));
+        regs.push(rl);
+      } else {
+        var re = this.alloc();
+        this.expToReg(p.ast, re);
+        regs.push(re);
+      }
+    }
+    this.emit('CONCAT', dest, regs[0], regs[regs.length - 1]);
+    this.free(regs.length);
+    return { k: 'r', r: dest };
+  };
+
+  Fn.prototype.expBin = function (e) {
+    if (e.op === 'and' || e.op === 'or') {
+      var r = this.alloc();
+      this.expToReg(e.l, r);
+      var j = this.emit('TEST', r, e.op === 'and' ? 1 : 0);
+      var jmp = this.emit('JMP');
+      this.expToReg(e.r, r);
+      this.patch(jmp, this.here());
+      void j;
+      return { k: 'r', r: r };
+    }
+    if (ARITH[e.op]) {
+      var a = this.tmp(e.l), b = this.tmp(e.r);
+      var d = this.alloc();
+      this.emit(ARITH[e.op], d, this.rk(a), this.rk(b));
+      this.release(a); this.release(b);
+      return { k: 'r', r: d };
+    }
+    if (CMP[e.op]) {
+      var d2 = this.alloc();
+      var jf = this.testJump(e, null);
+      this.emit('LOADBOOL', d2, 1);
+      var jend = this.emit('JMP');
+      this.patch(jf, this.here());
+      this.emit('LOADBOOL', d2, 0);
+      this.patch(jend, this.here());
+      return { k: 'r', r: d2 };
+    }
+    if (e.op === '..') {
+      var d3 = this.alloc();
+      var l = this.alloc(); this.expToReg(e.l, l);
+      var r2 = this.alloc(); this.expToReg(e.r, r2);
+      this.emit('CONCAT', d3, l, r2);
+      this.free(2);
+      return { k: 'r', r: d3 };
+    }
+    throw new Error('vm: unhandled binary op ' + e.op);
+  };
+
+  Fn.prototype.expUn = function (e) {
+    var v = this.tmp(e.e);
+    var d = this.alloc();
+    if (e.op === '-') this.emit('UNM', d, this.rk(v));
+    else if (e.op === 'not') this.emit('NOT', d, this.rk(v));
+    else if (e.op === '#') this.emit('LEN', d, this.rk(v));
+    else throw new Error('vm: unhandled unary op ' + e.op);
+    this.release(v);
+    return { k: 'r', r: d };
+  };
+
+  Fn.prototype.expIndex = function (e) {
+    var o = this.tmp(e.obj);
+    var k;
+    if (e.kind === 'index') k = { k: 'c', i: this.kStr(e.key.v) };
+    else k = this.tmp(e.key);
+    var d = this.alloc();
+    this.emit('GETTABLE', d, this.rk(o), this.rk(k));
+    this.release(k); this.release(o);
+    return { k: 'r', r: d };
+  };
+
+  Fn.prototype.expTable = function (e) {
+    var t = this.alloc();
+    this.emit('NEWTABLE', t);
+    var fields = e.fields, i;
+    for (i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      var last = (i === fields.length - 1);
+      if (f.kind === 'kv') {
+        var k = this.tmp(f.key), v = this.tmp(f.value);
+        this.emit('SETTABLE', this.rk({ k: 'r', r: t }), this.rk(k), this.rk(v));
+        this.release(v); this.release(k);
+      } else if (f.kind === 'name') {
+        var v2 = this.tmp(f.value);
+        this.emit('SETTABLE', t, this.rkc(this.kStr(f.key.v)), this.rk(v2));
+        this.release(v2);
+      } else {
+        // array item — the final one may expand to several values
+        if (last && isMulti(f.value)) {
+          var vm2 = this.alloc();
+          this.multiToReg(f.value, vm2);
+          this.emit('SETLISTM', t, this.arrayIndex(e, i), this.rk({ k: 'r', r: vm2 }));
+          this.free(1);
+        } else {
+          var v3 = this.tmp(f.value);
+          this.emit('SETTABLE', t, this.rkc(this.kNum(this.arrayIndex(e, i))), this.rk(v3));
+          this.release(v3);
+        }
+      }
+    }
+    return { k: 'r', r: t };
+  };
+
+  Fn.prototype.arrayIndex = function (e, upto) {
+    var n = 1;
+    for (var i = 0; i < upto; i++) if (e.fields[i].kind === 'item') n++;
+    return n;
+  };
+
+  Fn.prototype.expIf = function (e) {
+    var d = this.alloc();
+    var jmps = [];
+    var i;
+    for (i = 0; i < e.clauses.length; i++) {
+      var c = e.clauses[i];
+      var jf = this.testJump(c.cond, null);
+      this.expToReg(c.exp, d);
+      jmps.push(this.emit('JMP'));
+      this.patch(jf, this.here());
+    }
+    this.expToReg(e.elseExp, d);
+    for (i = 0; i < jmps.length; i++) this.patch(jmps[i], this.here());
+    return { k: 'r', r: d };
+  };
+
+  /**
+   * Emit `cond` followed by `TEST/JMP` and return the index of that JMP; the
+   * caller patches it with the "false" destination. When `reg` is given the
+   * condition is first materialised there.
+   */
+  Fn.prototype.testJump = function (cond, reg, inv) {
+    if (cond.kind === 'bin' && CMP[cond.op]) {
+      var a = this.tmp(cond.l), b = this.tmp(cond.r);
+      var A = 1, x = a, y = b;
+      if (cond.op === '~=') A = 0;
+      if (inv) A = 1 - A;                    // jump when the test *holds*
+      if (cond.op === '>' || cond.op === '>=') { x = b; y = a; }
+      this.emit(CMP[cond.op], A, this.rk(x), this.rk(y));
+      this.release(a); this.release(b);
+      return this.emit('JMP');
+    }
+    if (cond.kind === 'un' && cond.op === 'not') {
+      var rn = reg === null || reg === undefined ? this.alloc() : reg;
+      this.expToReg(cond.e, rn);
+      this.emit('TEST', rn, 0);
+      if (reg === null || reg === undefined) this.free(1);
+      return this.emit('JMP');
+    }
+    var r = reg === null || reg === undefined ? this.alloc() : reg;
+    this.expToReg(cond, r);
+    var j = this.emit('TEST', r, inv ? 0 : 1);
+    if (reg === null || reg === undefined) this.free(1);
+    return this.emit('JMP');
+  };
+
+  // -------------------------------------------------------------- call sites
+  Fn.prototype.multiToReg = function (e, r) {
+    if (e.kind === 'vararg') { this.emit('VARARG', r, 0); return; }
+    this.callInto(e, r, 0);
+  };
+
+  /**
+   * Compile a call so its results start at `dest`.
+   * nres: number of results (0 = keep all of them as a multi-value tuple).
+   */
+  /** `f"str"` / `f{...}` hand back raw tokens instead of expression nodes */
+  function asExp(a) {
+    return (a && typeof a === 'object' && !a.kind && a.k) ? { kind: 'const', token: a } : a;
+  }
+
+  Fn.prototype.callInto = function (e, dest, nres) {
+    var start = this.nreg;
+    var args = e.args, nargs = args.length, i;
+    for (i = 0; i < nargs; i++) args[i] = asExp(args[i]);
+    var lastMulti = nargs > 0 && isMulti(args[nargs - 1]);
+    var base;
+    if (e.kind === 'methodcall') {
+      var o = this.alloc();
+      this.expToReg(e.obj, o);
+      base = this.allocN(2);
+      this.emit('SELF', base, o, this.rkc(this.kStr(e.name.v)));
+    } else {
+      base = this.allocN(1);
+      this.expToReg(e.fn, base);
+    }
+    for (i = 0; i < nargs; i++) {
+      var r = this.alloc();
+      if (lastMulti && i === nargs - 1) this.multiToReg(args[i], r);
+      else this.expToReg(args[i], r);
+    }
+    // B = "number of argument slots + 1": the function sits at `base`, its
+    // arguments follow, and a method call also passes `self`
+    var nregs = (e.kind === 'methodcall' ? 2 : 1) + nargs;
+    // C = 0 means "keep every result as a multi-value tuple", otherwise C-1
+    var res = nres === 0 ? 0 : nres + 1;
+    if (lastMulti) this.emit('CALLM', base, nregs, res);
+    else this.emit('CALL', base, nregs, res);
+    if (dest !== base) this.emit('MOVE', dest, base);
+    this.free(this.nreg - start);
+  };
+
+  // ---------------------------------------------------------------- closures
+  Fn.prototype.closure = function (body, dest, sym) {
+    var i;
+    // pass 1: probe the body to learn which enclosing locals it captures. The
+    // boxes have to be built *before* the closure, because CLOSURE snapshots
+    // the register contents into the new closure's upvalue table.
+    this.dryBox = [];
+    this.dry = true;
+    var probe = new Fn(this);
+    probe.compileBody(body, this.refs);
+    this.dry = false;
+    var pend = this.dryBox; this.dryBox = [];
+    var selfRef = false;
+    for (i = 0; i < pend.length; i++) {
+      if (sym && pend[i].sym === sym) selfRef = true;
+      else { this.boxed.set(pend[i].sym, true); this.emit('BOX', pend[i].r); }
+    }
+    // pass 2: the real thing
+    var proto = new Fn(this);
+    var idx = this.kids.length;
+    this.kids.push(proto);
+    var at, tmp = -1;
+    if (selfRef) {
+      // `local function f` is in scope inside its own body, so the box must
+      // exist before the closure does; the function is published through it
+      this.emit('BOX', dest);
+      this.boxed.set(sym, true);
+      tmp = this.alloc();
+      at = this.emit('CLOSURE', tmp, idx, 0, []);
+    } else {
+      at = this.emit('CLOSURE', dest, idx, 0, []);
+    }
+    proto.compileBody(body, this.refs);
+    var x = [];
+    for (i = 0; i < proto.ups.length; i++) {
+      var u = proto.ups[i];
+      x.push(u.p, u.i);
+    }
+    this.code[at].x = x;
+    if (selfRef) {
+      this.emit('SETTABLE', dest, this.rkc(this.kNum(1)), tmp);
+      this.free(1);
+    }
+  };
+
+  /**
+   * Probe the whole body first (no output is kept) to learn which of this
+   * function's locals some nested closure captures. declBox() then boxes them
+   * where they are declared — see the comment there for why. The probe is not
+   * recursive: inProbe is inherited by every Fn created below it.
+   */
+  Fn.prototype.prepass = function (body, refs) {
+    if (this.dry || this.inProbe) return;
+    this.inProbe = true;
+    this.dryBox = [];
+    this.dry = true;              // a capture that reaches our own parent must
+    var probe = new Fn(this);     // be recorded, never emitted into real code
+    probe.compileBody(body, refs);
+    this.dry = false;
+    this.dryBox = [];
+    // the probe boxed exactly the locals of this function that closures want
+    this.preBox = new Set();
+    probe.boxed.forEach(function (v, sym) { this.preBox.add(sym); }, this);
+  };
+
+  Fn.prototype.compileBody = function (body, refs) {
+    this.refs = refs;
+    this.isvararg = false;
+    var params = body.params || [], i;
+    // Probe the whole body first (cheap: no output is kept) to learn which of
+    // this function's locals any nested closure captures. Those are boxed where
+    // they are declared — see declBox above. The probe itself must not recurse.
+    this.prepass(body, refs);
+    for (i = 0; i < params.length; i++) {
+      if (params[i].vararg) { this.isvararg = true; break; }
+    }
+    this.nparams = this.isvararg ? params.length - 1 : params.length;
+    for (i = 0; i < this.nparams; i++) {
+      var r = this.alloc();
+      this.locals.set(params[i].sym, r);
+      this.declBox(params[i].sym, r);
+    }
+    this.block(body.block);
+    this.emit('RETURN', 0, 1);
+  };
+
+  // ------------------------------------------------------------------- loads
+  Fn.prototype.expToReg = function (e, reg) {
+    var v = this.exp(e);
+    if (v.k === 'c') { this.emit('LOADK', reg, v.i); return; }
+    if (v.r !== reg) {
+      this.emit('MOVE', reg, v.r);
+      if (!v.borrowed) this.free(1);   // a register borrowed from a local is not ours
+    }
+  };
+
+  Fn.prototype.expList = function (exps, want, base) {
+    var i = 0;
+    for (; i < exps.length && i < want; i++) {
+      var last = (i === exps.length - 1);
+      if (last && want - i > 1 && isMulti(exps[i])) {
+        var saved = this.nreg;
+        this.nreg = base + i;
+        if (exps[i].kind === 'vararg') this.emit('VARARG', base + i, want - i + 1);
+        else this.callInto(exps[i], base + i, want - i);
+        this.nreg = saved;
+        return;
+      }
+      this.expToReg(exps[i], base + i);
+    }
+    if (i < want) this.emit('LOADNIL', base + i, base + want - 1);
+  };
+
+  // --------------------------------------------------------------- addressing
+  Fn.prototype.targetAddr = function (t, refs) {
+    if (t.kind === 'name') {
+      var sym = t.sym || refs[t.token.i] || null;
+      var a = this.addr(sym);
+      if (a) return a;
+      return { t: 'global', name: t.token.v };
+    }
+    if (t.kind === 'index' || t.kind === 'indexb') {
+      var o = this.alloc();
+      this.expToReg(t.obj, o);
+      var k;
+      if (t.kind === 'index') k = { k: 'c', i: this.kStr(t.key.v) };
+      else k = this.tmp(t.key);
+      // a borrowed register (a plain local) must not be freed back
+      return { t: 'table', o: o, k: k, keyReg: k.k === 'r' && !k.borrowed };
+    }
+    throw new Error('vm: bad assignment target ' + t.kind);
+  };
+
+  /**
+   * Box a local at the point it is declared, instead of at the point some
+   * closure captures it. A capture site can sit inside a loop that never runs
+   * (`for i = 1, 0 do local f = function() return x end end`) — the variable is
+   * then never boxed, yet every later read of it goes through the box and
+   * crashes on the raw value. Declaration sites dominate every use.
+   */
+  Fn.prototype.declBox = function (sym, r) {
+    if (!sym || !this.preBox) return;
+    if (!this.preBox.has(sym)) return;
+    this.preBox.delete(sym);
+    if (this.boxed.get(sym)) return;      // `local function f` may have boxed it
+    this.emit('BOX', r);
+    this.boxed.set(sym, true);
+  };
+
+  Fn.prototype.addrLoad = function (a) {
+    var d = this.alloc();
+    if (a.t === 'reg') this.emit('MOVE', d, a.r);
+    else if (a.t === 'boxreg') this.emit('GETTABLE', d, a.r, this.rkc(this.kNum(1)));
+    else if (a.t === 'up') this.emit('GETUPVAL', d, a.u);
+    else if (a.t === 'global') this.emit('GETGLOBAL', d, this.kStr(a.name));
+    else this.emit('GETTABLE', d, this.rk({ k: 'r', r: a.o }), this.rk(a.k));
+    return d;
+  };
+
+  Fn.prototype.addrStore = function (a, srcReg) {
+    if (a.t === 'reg') this.emit('MOVE', a.r, srcReg);
+    else if (a.t === 'boxreg') this.emit('SETTABLE', a.r, this.rkc(this.kNum(1)), srcReg);
+    // operand order matches the emitter: A = source register, B = upvalue index
+    else if (a.t === 'up') this.emit('SETUPVAL', srcReg, a.u);
+    else if (a.t === 'global') this.emit('SETGLOBAL', srcReg, this.kStr(a.name));
+    else this.emit('SETTABLE', this.rk({ k: 'r', r: a.o }), this.rk(a.k), srcReg);
+  };
+
+  Fn.prototype.addrFree = function (a) {
+    if (a.t === 'table') {
+      if (a.keyReg) this.free(1);
+      this.free(1);
+    }
+  };
+
+  // ---------------------------------------------------------------- statements
+  Fn.prototype.block = function (b) {
+    var base = this.nreg;
+    for (var i = 0; i < b.stats.length; i++) this.stmt(b.stats[i]);
+    this.nreg = base;
+  };
+
+  Fn.prototype.stmt = function (s) {
+    switch (s.kind) {
+      case 'local': return this.stLocal(s);
+      case 'localfunc': {
+        var r = this.alloc();
+        this.locals.set(s.sym, r);
+        // `local function f` puts f in scope inside its own body (unlike
+        // `local f = function`), so the body may capture f's own slot
+        this.closure(s.body, r, s.sym);
+        this.declBox(s.sym, r);
+        return;
+      }
+      case 'funcstat': return this.stFunc(s);
+      case 'assign': return this.stAssign(s);
+      case 'call': {
+        var rc = this.alloc();
+        this.callInto(s.expr, rc, 0);
+        this.free(1);
+        return;
+      }
+      case 'if': return this.stIf(s);
+      case 'while': return this.stWhile(s);
+      case 'do': return this.stDo(s);
+      case 'numfor': return this.stNumFor(s);
+      case 'genfor': return this.stGenFor(s);
+      case 'repeat': return this.stRepeat(s);
+      case 'return': return this.stReturn(s);
+      case 'break': {
+        var jb = this.emit('JMP');
+        this.loops[this.loops.length - 1].breaks.push(jb);
+        return;
+      }
+      case 'continue': {
+        var jc = this.emit('JMP');
+        this.loops[this.loops.length - 1].continues.push(jc);
+        return;
+      }
+      case 'typealias': return;    // type information is erased at runtime
+      case 'block': return this.block(s);
+    }
+    throw new Error('vm: unhandled statement ' + s.kind);
+  };
+
+  Fn.prototype.stDo = function (s) { this.block(s.block); };
+
+  Fn.prototype.stLocal = function (s) {
+    var n = s.names.length, i;
+    var base = this.allocN(n);
+    if (s.values) this.expList(s.values, n, base);
+    else this.emit('LOADNIL', base, base + n - 1);
+    for (i = 0; i < n; i++) {
+      var sym = this.refs[s.names[i].i];
+      if (sym) { this.locals.set(sym, base + i); this.declBox(sym, base + i); }
+    }
+  };
+
+  Fn.prototype.stFunc = function (s) {
+    var parts = s.parts, i;
+    var r = this.alloc();
+    this.closure(s.body, r);
+    if (parts.length === 1 && !s.isMethod) {
+      var sym = this.refs[parts[0].i] || null;
+      var a = this.addr(sym);
+      if (a) this.addrStore(a, r);
+      else this.emit('SETGLOBAL', r, this.kStr(parts[0].v));
+    } else {
+      var o = this.alloc();
+      var a0 = this.addr(this.refs[parts[0].i] || null);
+      if (a0) this.addrLoadInto(a0, o);
+      else this.emit('GETGLOBAL', o, this.kStr(parts[0].v));
+      for (i = 1; i < parts.length - 1; i++) {
+        var nxt = this.alloc();
+        this.emit('GETTABLE', nxt, o, this.rkc(this.kStr(parts[i].v)));
+        this.free(1); o = nxt;   // hmm: keep it simple, chain with one extra register
+      }
+      this.emit('SETTABLE', o, this.rkc(this.kStr(parts[parts.length - 1].v)), r);
+      this.free(1);
+    }
+    this.free(1);
+  };
+
+  Fn.prototype.addrLoadInto = function (a, reg) {
+    if (a.t === 'reg') this.emit('MOVE', reg, a.r);
+    else if (a.t === 'boxreg') this.emit('GETTABLE', reg, a.r, this.rkc(this.kNum(1)));
+    else if (a.t === 'up') this.emit('GETUPVAL', reg, a.u);
+    else this.emit('GETGLOBAL', reg, this.kStr(a.name));
+  };
+
+  Fn.prototype.stAssign = function (s) {
+    var tg = s.targets, vals = s.values, n = tg.length, i;
+    if (s.op !== '=') {
+      // compound assignment: read the target once, apply the operator, write back
+      var t = tg[0];
+      var a = this.targetAddr(t, this.refs);
+      var vr = this.addrLoad(a);
+      var rhs = this.alloc();
+      this.expToReg(vals[0], rhs);
+      var d = this.alloc();
+      var cop = COMPOUND[s.op];
+      if (cop === 'CONCAT') this.emit('CONCAT', d, vr, rhs);
+      else this.emit(cop || 'ADD', d, vr, rhs);
+      this.addrStore(a, d);
+      this.free(3);
+      this.addrFree(a);
+      return;
+    }
+    var base = this.allocN(n);
+    this.expList(vals, n, base);
+    for (i = 0; i < n; i++) {
+      var ta = this.targetAddr(tg[i], this.refs);
+      this.addrStore(ta, base + i);
+      this.addrFree(ta);
+    }
+    this.free(n);
+  };
+
+  Fn.prototype.stIf = function (s) {
+    var jmps = [], i;
+    for (i = 0; i < s.clauses.length; i++) {
+      var c = s.clauses[i];
+      var jf = this.testJump(c.cond, null);
+      this.block(c.block);
+      jmps.push(this.emit('JMP'));
+      this.patch(jf, this.here());
+    }
+    if (s.elseBlock) this.block(s.elseBlock);
+    var end = this.here();
+    for (i = 0; i < jmps.length; i++) this.patch(jmps[i], end);
+  };
+
+  Fn.prototype.stWhile = function (s) {
+    var top = this.here();
+    var ctx = { breaks: [], continues: [] };
+    this.loops.push(ctx);
+    var jf = this.testJump(s.cond, null);
+    this.block(s.block);
+    var back = this.emit('JMP');
+    this.patch(back, top);
+    this.loops.pop();
+    var end = this.here();
+    this.patch(jf, end);
+    for (var i = 0; i < ctx.breaks.length; i++) this.patch(ctx.breaks[i], end);
+    for (var j = 0; j < ctx.continues.length; j++) this.patch(ctx.continues[j], top);
+  };
+
+  Fn.prototype.stRepeat = function (s) {
+    var top = this.here();
+    var ctx = { breaks: [], continues: [] };
+    this.loops.push(ctx);
+    this.block(s.block);
+    var test = this.here();
+    var jt = this.testJump(s.cond, null, true);  // `until`: leave when it holds
+    var back = this.emit('JMP');                 // otherwise run the body again
+    this.patch(back, top);
+    this.loops.pop();
+    var end = this.here();
+    this.patch(jt, end);
+    for (var i = 0; i < ctx.breaks.length; i++) this.patch(ctx.breaks[i], end);
+    for (var j = 0; j < ctx.continues.length; j++) this.patch(ctx.continues[j], test);
+  };
+
+  Fn.prototype.stNumFor = function (s) {
+    var base = this.allocN(4);              // init, limit, step, counter
+    this.expToReg(s.start, base);
+    this.expToReg(s.limit, base + 1);
+    if (s.step) this.expToReg(s.step, base + 2);
+    else this.emit('LOADK', base + 2, this.kNum(1));
+    var prep = this.emit('FORPREP', base, 0);
+    var bodyStart = this.here();
+    var ctx = { breaks: [], continues: [] };
+    this.loops.push(ctx);
+    var vis = this.alloc();
+    this.locals.set(s.sym, vis);
+    this.emit('MOVE', vis, base + 3);
+    this.block(s.block);
+    this.loops.pop();
+    this.nreg = base + 4;
+    var loopIdx = this.emit('FORLOOP', base, 0);
+    this.patch(loopIdx, bodyStart, 2);
+    var end = this.here();
+    this.patch(prep, end, 2);
+    for (var i = 0; i < ctx.breaks.length; i++) this.patch(ctx.breaks[i], end);
+    for (var j = 0; j < ctx.continues.length; j++) this.patch(ctx.continues[j], loopIdx);
+  };
+
+  Fn.prototype.stGenFor = function (s) {
+    var nv = s.names.length, i;
+    var base = this.allocN(3 + nv);         // f, state, control, then the names
+    this.expList(s.exps, 3, base);
+    var callIdx = this.emit('TFORCALL', base, 0, nv);
+    var ctx = { breaks: [], continues: [] };
+    this.loops.push(ctx);
+    for (i = 0; i < nv; i++) {
+      var sym = this.refs[s.names[i].i];
+      if (sym) this.locals.set(sym, base + 3 + i);
+    }
+    // reserve the loop variables: without this the body's temporaries are
+    // handed the very registers the loop variables live in
+    this.nreg = base + 3 + nv;
+    this.block(s.block);
+    this.loops.pop();
+    this.nreg = base + 3 + nv;
+    var back = this.emit('JMP');
+    this.patch(back, callIdx);
+    var end = this.here();
+    this.patch(callIdx, end, 2);
+    for (i = 0; i < ctx.breaks.length; i++) this.patch(ctx.breaks[i], end);
+    for (i = 0; i < ctx.continues.length; i++) this.patch(ctx.continues[i], callIdx);
+    this.nreg = base;
+  };
+
+  Fn.prototype.stReturn = function (s) {
+    var vals = s.values;
+    if (!vals || !vals.length) { this.emit('RETURN', 0, 1); return; }
+    var last = vals[vals.length - 1];
+    if (vals.length === 1 && last.kind === 'vararg') { this.emit('RETURNV'); return; }
+    if (vals.length === 1 && (last.kind === 'call' || last.kind === 'methodcall')) {
+      var r = this.alloc();
+      this.callInto(last, r, 0);
+      this.emit('RETURNT', r);
+      this.free(1);
+      return;
+    }
+    // a trailing multi-value expression expands to *all* of its results, so
+    // `return 1, ...` with no varargs returns one value, not `1, nil`
+    if (vals.length > 1 && isMulti(last)) {
+      var baseM = this.allocN(vals.length);
+      if (vals.length > 1) this.expList(vals.slice(0, -1), vals.length - 1, baseM);
+      var rt = baseM + vals.length - 1;
+      if (last.kind === 'vararg') this.emit('VARARG', rt, 0);
+      else this.callInto(last, rt, 0);
+      this.emit('RETURNM', baseM, vals.length);
+      this.free(vals.length);
+      return;
+    }
+    var base = this.allocN(vals.length);
+    this.expList(vals, vals.length, base);
+    this.emit('RETURN', base, vals.length + 1);
+    this.free(vals.length);
+  };
+
+  // ------------------------------------------------------------------ driver
+  function compile(ast, refs) {
+    var root = new Fn(null);
+    root.refs = refs || Object.create(null);
+    root.prepass({ params: [{ vararg: true }], block: ast }, refs);
+    root.isvararg = true;
+    root.block(ast);
+    root.emit('RETURN', 0, 1);
+    return root;
+  }
+
+  return { compile: compile, OPS: OPS, OP: OP, Fn: Fn };
+});
+
+/* ===== js/vm-emit.js ===== */
+/*
+ * Darkfuscator — VM emitter.
+ *
+ * Turns the bytecode produced by vm-compile.js into a self-contained Luau
+ * program shaped like a Luraph/Brander build:
+ *
+ *   -- This file is protected by Darkfuscator
+ *   return ({["aB"]=(function(S,B)…end), … ["pAy"]="<encrypted blob>"}):entry(env)
+ *
+ * The program is serialised to bytes, encrypted with a per-build key stream and
+ * packed six bits to the character. One table slot holds one opcode handler, so
+ * there is no single interpreter function to read: control flow only exists in
+ * the dispatch chain and inside the handlers.
+ *
+ * Every operation is carried out by a native Luau operator, so metamethods,
+ * coercion, integer semantics, coroutines, pcall and error messages behave
+ * exactly as they do in the original script.
+ */
+;(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.DarkfuscatorVMEmit = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var OPS = ['LOADK', 'LOADNIL', 'LOADBOOL', 'MOVE', 'BOX',
+    'NEWTABLE', 'GETTABLE', 'SETTABLE', 'SETLISTM',
+    'GETUPVAL', 'SETUPVAL', 'GETGLOBAL', 'SETGLOBAL',
+    'ADD', 'SUB', 'MUL', 'DIV', 'IDIV', 'MOD', 'POW',
+    'UNM', 'NOT', 'LEN', 'CONCAT',
+    'EQ', 'LT', 'LE', 'TEST', 'JMP',
+    'FORPREP', 'FORLOOP', 'TFORCALL',
+    'CALL', 'CALLM', 'RETURN', 'RETURNT', 'RETURNV',
+    'CLOSURE', 'VARARG', 'VARARGN', 'SELF', 'RETURNM'];
+
+  var KEYWORDS = ('and break continue do else elseif end false for function if in local nil not or ' +
+    'repeat return then true until while type typeof export').split(' ');
+  var KW = {};
+  for (var ki = 0; ki < KEYWORDS.length; ki++) KW[KEYWORDS[ki]] = 1;
+
+  // ------------------------------------------------------------------ helpers
+  // 'short' keeps names to one or two characters, 'random' is the default mix,
+  // 'confuse' draws from glyphs that are easy to mix up when reading the file
+  // `first` never contains a digit: a generated name has to start with a letter
+  var NAME_STYLES = {
+    short:   { first: 'abcdefghijklmnopqrstuvwxyz', rest: 'abcdefghijklmnopqrstuvwxyz0123456789', max: 2 },
+    random:  { first: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+               rest: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', max: 4 },
+    confuse: { first: 'ilILoOuvVwWxXyY', rest: 'ilIL1oO0uvVwWxXyYsS5zZ2', max: 4 }
+  };
+
+  // Identifiers the emitter hard-codes inside the interpreter bodies (locals,
+  // loop variables, handler parameters). A generated name that matched one of
+  // these would be shadowed by that local — e.g. a program table called `I`
+  // disappears behind `local I=code[F.ip]`, and every handler call turns into
+  // "attempt to call a nil value". Reserve them, plus every one-letter name.
+  var RESERVED = ('a b c d e f g h i j k l m n o p q r s t u v w x y z ' +
+    'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' +
+    'acc args by ip it len li ms mt na nb nc nk np nr nu nv nx nz q res st tn va value vr ' +
+    'OPC _ENV _G __iter').split(' ');
+
+  function nameGen(rng, taken, style) {
+    var used = Object.create(null);
+    for (var r0 = 0; r0 < RESERVED.length; r0++) used[RESERVED[r0]] = 1;
+    if (taken) for (var k0 in taken) used[k0] = 1;
+    var st = NAME_STYLES[style] || NAME_STYLES.random;
+    var first = st.first, rest = st.rest, max = st.max;
+    var n = 0;
+    return function () {
+      for (var t = 0; t < 500; t++) {
+        var len = 2 + Math.floor(rng() * Math.max(1, max - 1));
+        if (max > 2 && rng() < 0.35) len = Math.min(max, len + 1);
+        if (len < 2) len = 2;
+        var s = first.charAt(Math.floor(rng() * first.length));
+        for (var i = 1; i < len; i++) s += rest.charAt(Math.floor(rng() * rest.length));
+        if (KW[s] || used[s]) continue;
+        used[s] = 1;
+        return s;
+      }
+      return 'x' + (++n);
+    };
+  }
+
+  function utf8Bytes(s) {
+    var out = [], i, c;
+    for (i = 0; i < s.length; i++) {
+      c = s.charCodeAt(i);
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xC0 | (c >> 6), 0x80 | (c & 0x3F));
+      else if (c >= 0xD800 && c <= 0xDBFF && i + 1 < s.length) {
+        var c2 = s.charCodeAt(i + 1);
+        if (c2 >= 0xDC00 && c2 <= 0xDFFF) {
+          var cp = 0x10000 + ((c - 0xD800) << 10) + (c2 - 0xDC00);
+          out.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+          i++;
+          continue;
+        }
+        out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
+      } else out.push(0xE0 | (c >> 12), 0x80 | ((c >> 6) & 0x3F), 0x80 | (c & 0x3F));
+    }
+    return out;
+  }
+
+  function numText(v) {
+    if (Object.is(v, -0)) return '-0';
+    if (v === Infinity) return '1e999';
+    if (v === -Infinity) return '-1e999';
+    if (Number.isNaN(v)) return '0/0';
+    if (Number.isInteger(v) && Math.abs(v) < 1e15) return String(v);
+    return String(v.toPrecision(17));
+  }
+
+  // --------------------------------------------------------------- serialiser
+  function serialize(root, rng) {
+    var bytes = [];
+    // zigzag varint: operands are signed (jump offsets are negative when the
+    // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
+    function vi(v) {
+      v = v < 0 ? -2 * Math.ceil(v) - 1 : 2 * Math.floor(v);
+      while (v >= 128) { bytes.push((v % 128) | 128); v = Math.floor(v / 128); }
+      bytes.push(v);
+    }
+    function b(v) { bytes.push(v & 255); }
+    function str(s) { var a = utf8Bytes(s); vi(a.length); for (var i = 0; i < a.length; i++) b(a[i]); }
+    function proto(p) {
+      vi(p.nparams); b(p.isvararg ? 1 : 0); vi(p.maxreg + 1); vi(p.ups.length);
+      vi(p.k.length);
+      for (var i = 0; i < p.k.length; i++) {
+        var k = p.k[i];
+        if (k.t === 'z') b(0);
+        else if (k.t === 'b') { b(1); b(k.v ? 1 : 0); }
+        else if (k.t === 'n') { b(2); str(numText(k.v)); }
+        else if (k.b) { b(3); vi(k.b.length); for (var qb = 0; qb < k.b.length; qb++) b(k.b[qb]); }
+        else { b(3); str(k.v); }
+      }
+      vi(p.code.length);
+      for (var j = 0; j < p.code.length; j++) {
+        var ins = p.code[j];
+        vi(ins[0]); vi(ins[1]); vi(ins[2]); vi(ins[3]);
+        if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vi(ins.x[q]); }
+        else vi(0);
+      }
+      vi(p.kids.length);
+      for (var m = 0; m < p.kids.length; m++) proto(p.kids[m]);
+    }
+    proto(root);
+
+    // build-time rolling checksums over the *decrypted* bytes; the generated
+    // decoder recomputes both after decryption and refuses a tampered payload
+    var c1 = 0, c2 = 0;
+    for (var ci = 0; ci < bytes.length; ci++) {
+      c1 = (c1 + bytes[ci] * (ci + 1)) % 65521;
+      c2 = (c2 + (((bytes[ci] + ((ci + 1) * 17)) % 256) * (ci + 3))) % 65519;
+    }
+
+    var key = 1 + Math.floor(rng() * 254);
+    // the audit seal: the decoder cannot unseal the payload without this
+    // value, and it is handed over only by the passing environment audit, so
+    // a build with the audit stripped out never decrypts (fail closed)
+    var seal = 100 + Math.floor(rng() * 65000);
+    for (var i = 0; i < bytes.length; i++) bytes[i] = (bytes[i] + key + (i + 1) * 13 + seal) % 256;
+
+    // second layer: a per-build XOR stream, applied after the add-cipher
+    // (the decoder un-XORs first, then un-adds)
+    var xk = 1 + Math.floor(rng() * 254);
+    for (i = 0; i < bytes.length; i++) bytes[i] = bytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
+
+    var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
+    for (var s = alpha.length - 1; s > 0; s--) {           // per-build alphabet shuffle
+      var r = Math.floor(rng() * (s + 1));
+      var t = alpha[s]; alpha[s] = alpha[r]; alpha[r] = t;
+    }
+    var acc = 0, nb = 0, out = [];
+    for (i = 0; i < bytes.length; i++) {
+      acc += bytes[i] * Math.pow(2, nb);
+      nb += 8;
+      while (nb >= 6) {
+        out.push(alpha[acc % 64]);
+        acc = (acc - (acc % 64)) / 64;
+        nb -= 6;
+      }
+    }
+    if (nb > 0) out.push(alpha[acc % 64]);
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2 };
+  }
+
+  // ----------------------------------------------------------------- handlers
+  // must match RKBASE in vm-compile.js
+  var RKBASE = 100000;
+  function rk(v, pos) {
+    return 'local ' + v + '=I[' + pos + ']; if ' + v + '>=' + RKBASE + ' then ' + v + '=K[' + v + '-' + (RKBASE - 1) +
+      '] else ' + v + '=R[' + v + '] end';
+  }
+  function arith(op) {
+    return 'do ' + rk('b', 3) + ' ' + rk('c', 4) + ' R[I[2]]=b' + op + 'c end';
+  }
+  function cmp(op) {
+    return 'do ' + rk('b', 3) + ' ' + rk('c', 4) + ' if (b' + op + 'c)==(I[2]==1) then return F.ip+2 end end';
+  }
+  function numerr(what, reg) {
+    return 'if type(' + reg + ')~="number" then ' + reg + '=tonumber(' + reg + ') or ' +
+      'error("invalid \'for\' ' + what + ' (number expected, got "..type(' + reg + ')..")") end';
+  }
+
+  var HANDLERS = {
+    LOADK: 'R[I[2]]=K[I[3]+1]',
+    LOADNIL: 'for i=I[2],I[3] do R[i]=nil end',
+    LOADBOOL: 'R[I[2]]=I[3]==1',
+    MOVE: 'R[I[2]]=R[I[3]]',
+    // idempotent: `local f = function() ... end` inside a loop emits BOX on
+    // every pass, but an already-boxed slot must not be boxed again
+    BOX: 'do local v=R[I[2]]; if getmetatable(v)~=S.BOX then R[I[2]]=setmetatable({[1]=v},S.BOX) end end',
+    NEWTABLE: 'R[I[2]]={}',
+    GETTABLE: 'do ' + rk('b', 3) + ' ' + rk('c', 4) + ' R[I[2]]=b[c] end',
+    SETTABLE: 'do ' + rk('b', 3) + ' ' + rk('c', 4) + ' R[I[2]][b]=c end',
+    // table.move pre-sizes the array part, which matters when the list has
+    // holes: `#{ ... }` has to agree with what Luau's own SETLIST produces
+    SETLISTM: 'do ' + rk('c', 4) + ' local t=R[I[2]]; local n=I[3]; local cn=c.n or #c; ' +
+      'if cn>0 then table.move(c, 1, cn, n, t) end end',
+    GETUPVAL: 'R[I[2]]=U[I[3]+1][1]',
+    SETUPVAL: 'U[I[3]+1][1]=R[I[2]]',
+    GETGLOBAL: 'R[I[2]]=S.E[K[I[3]+1]]',
+    SETGLOBAL: 'S.E[K[I[3]+1]]=R[I[2]]',
+    ADD: arith('+'), SUB: arith('-'), MUL: arith('*'), DIV: arith('/'),
+    IDIV: arith('//'), MOD: arith('%'), POW: arith('^'),
+    UNM: 'do ' + rk('c', 3) + ' R[I[2]]=-c end',
+    NOT: 'do ' + rk('c', 3) + ' R[I[2]]=not c end',
+    LEN: 'do ' + rk('c', 3) + ' R[I[2]]=#c end',
+    CONCAT: 'do local s=R[I[3]]; for i=I[3]+1,I[4] do s=s..R[i] end; R[I[2]]=s end',
+    EQ: cmp('=='), LT: cmp('<'), LE: cmp('<='),
+    TEST: 'if (R[I[2]] and true or false)==(I[3]==1) then return F.ip+2 end',
+    JMP: 'return F.ip+I[2]',
+    FORPREP: 'do local a=I[2]; local i,li,st=R[a],R[a+1],R[a+2]; ' +
+      numerr('initial value', 'i') + ' ' + numerr('limit', 'li') + ' ' + numerr('step', 'st') +
+      ' R[a],R[a+1],R[a+2],R[a+3]=i,li,st,i; ' +
+      'if not ((st>=0) and (i<=li) or (st<0) and (i>=li)) then return F.ip+I[3] end end',
+    FORLOOP: 'do local a=I[2]; local i=R[a+3]+R[a+2]; local li,st=R[a+1],R[a+2]; ' +
+      'if (st>=0) and (i<=li) or (st<0) and (i>=li) then R[a+3]=i; return F.ip+I[3] end end',
+    TFORCALL: 'do local a=I[2]; local nv=I[4]; local f,s,v=R[a],R[a+1],R[a+2]; ' +
+      'if type(f)~="function" then local mt=getmetatable(f); local it=mt and mt.__iter; ' +
+      'if it then f,s,v=it(f); R[a],R[a+1],R[a+2]=f,s,v end end; ' +
+      'local t=table.pack(f(s,v)); if t[1]==nil then return F.ip+I[3] end; R[a+2]=t[1]; ' +
+      'for i=1,nv do R[a+3+i-1]=t[i] end end',
+    CALL: 'do local a,nr,nc=I[2],I[3],I[4]; local na=nr-1; local args={}; ' +
+      'for i=1,na do args[i]=R[a+i] end; local res=table.pack(R[a](unpack(args,1,na))); ' +
+      'if nc==0 then R[a]=setmetatable(res,S.MT) else for i=1,nc-1 do R[a+i-1]=res[i] end end end',
+    CALLM: 'do local a,nr,nc=I[2],I[3],I[4]; local na=nr-2; local args={}; ' +
+      'for i=1,na do args[i]=R[a+i] end; local t=R[a+nr-1]; local tn=t.n; ' +
+      'for i=1,tn do args[na+i]=t[i] end; ' +
+      'local res=table.pack(R[a](unpack(args,1,na+tn))); ' +
+      'if nc==0 then R[a]=setmetatable(res,S.MT) else for i=1,nc-1 do R[a+i-1]=res[i] end end end',
+    // RETURN A B: results are R[A] .. R[A+B-2] (B is nresults+1); F.o is the
+    // index *before* the first result, which is what the loop's unpack uses
+    RETURN: 'F.d=true;F.r=R;F.o=I[2]-1;F.n=I[3]-1',
+    RETURNT: 'do local t=R[I[2]]; F.d=true; F.r=t; F.o=0; F.n=t.n end',
+    // RETURN A B: R[A]..R[A+B-2] plus the multi-value tuple in R[A+B-1] —
+    // `return x, ...` and `return x, f()` keep every result of the expansion
+    RETURNM: 'do local a,b=I[2],I[3]; local t={}; local k=0; ' +
+      'for i=0,b-2 do t[k+1]=R[a+i]; k=k+1 end; ' +
+      'local last=R[a+b-1]; ' +
+      'if getmetatable(last)==S.MT then for i=1,last.n do t[k+i]=last[i] end; k=k+last.n ' +
+      'else t[k+1]=last; k=k+1 end; ' +
+      't.n=k; F.d=true; F.r=t; F.o=0; F.n=k end',
+    RETURNV: 'do local v=F.V; F.d=true; F.r=v; F.o=0; F.n=v.n end',
+    CLOSURE: 'do local a=I[2]; local p=F.P[6][I[3]+1]; local x=I[5]; local u={}; ' +
+      'if x then for i=1,#x,2 do if x[i]==1 then u[(i+1)/2]=R[x[i+1]] else u[(i+1)/2]=U[x[i+1]+1] end end end; ' +
+      'R[a]=S.mk(S,p,u) end',
+    VARARG: 'do local a,b=I[2],I[3]; local v=F.V; if b==0 then local t={}; ' +
+      'for i=1,v.n do t[i]=v[i] end; t.n=v.n; R[a]=setmetatable(t,S.MT) ' +
+      'else for i=1,b-1 do R[a+i-1]=v[i] end end end',
+    VARARGN: 'R[I[2]]=F.V.n',
+    SELF: 'do ' + rk('c', 4) + ' R[I[2]+1]=R[I[3]]; R[I[2]]=R[I[3]][c] end'
+  };
+
+  // -------------------------------------------------------------------- emit
+  function emit(program, opts) {
+    opts = opts || {};
+    var rng = opts.rng || Math.random;
+    // 0 = off, 1 = standard sanity audit, 2 = strict (adds injector-toolkit
+    // detection, an environment write-trap and runtime bytecode checksums)
+    var glevel = opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1;
+    // anti-environment level: 0 = off, 1 = environment-derived seal,
+    // 2 = full probe battery (identity contradictions + service signatures)
+    var elevel = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
+    if (opts.envLock && elevel < 2) elevel = 2;
+    var ng = nameGen(rng, null, opts.nameStyle);
+    var usedOps = Object.create(null);
+    (function walk(p) {
+      for (var i = 0; i < p.code.length; i++) usedOps[p.code[i][0]] = 1;
+      for (var j = 0; j < p.kids.length; j++) walk(p.kids[j]);
+    })(program);
+
+    // decoy game logic: realistic Roblox strings are woven into an unreachable
+    // part of the constant pool; real bytecode never references them, so with
+    // the lazy-string layer they are never even decoded, but anyone lifting the
+    // program sees genuine-looking game calls mixed into the real ones
+    if (opts.junk >= 1) {
+      var DECOY_POOL = [
+        'leaderstats', 'RemoteEvent', 'FireServer', 'DataStoreService',
+        'GetDataStore', 'SetAsync', 'TouchEnded', 'RunService',
+        'Heartbeat', 'Humanoid', 'WalkSpeed', 'LoadCharacter',
+        'ReplicatedStorage', 'Players', 'RequestLoadData', 'Value'
+      ];
+      var ndec = 6 + Math.floor(rng() * 5);
+      var usedD = {};
+      for (var di = 0; di < ndec; di++) {
+        var dp;
+        do { dp = DECOY_POOL[Math.floor(rng() * DECOY_POOL.length)]; } while (usedD[dp]);
+        usedD[dp] = 1;
+        program.k.push({ t: 's', v: dp });
+      }
+    }
+    var blob = serialize(program, rng);
+    // per-build mask for the lazy string-constant layer
+    var strMask = 1 + Math.floor(rng() * 254);
+    var vtl = ng();
+
+    // random 16-bit opcode ids, one per opcode, unique
+    var ids = [], seen = Object.create(null), i;
+    for (i = 0; i < OPS.length; i++) {
+      var v;
+      do { v = 1 + Math.floor(rng() * 0xFFFE); } while (seen[v]);
+      seen[v] = 1;
+      ids.push(v);
+    }
+    var deadIds = [];
+    for (i = 0; i < (opts.junk === 2 ? 30 : opts.junk === 1 ? 12 : 0); i++) {
+      var dv;
+      do { dv = 1 + Math.floor(rng() * 0xFFFE); } while (seen[dv]);
+      seen[dv] = 1;
+      deadIds.push(dv);
+    }
+
+    var N = {
+      blob: ng(), alpha: ng(), dec: ng(), mk: ng(), run: ng(), entry: ng(),
+      env: ng(), mt: ng(), box: ng(),
+      check1: ng(), check2: ng(), guard: ng(), seal: ng(), strmark: ng()
+    };
+    var H = {};
+    for (i = 0; i < OPS.length; i++) H[OPS[i]] = ng();
+
+    var P = { s: ng(), b: ng(), p: ng(), u: ng(), f: ng(), i: ng() };
+    var L = { r: ng(), k: ng(), c: ng(), ip: ng(), i: ng(), t: ng(), n: ng(), a: ng(), o: ng(), m: ng(), e: ng(), g: ng() };
+
+    var out = [];
+    function line(s) { out.push(s); }
+
+    // a comment must end with a newline even when the rest is minified
+    if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator\n');
+    line('return ({');
+
+    // ---------------------------------------------------------- payload slots
+    line('["' + N.blob + '"]=' + JSON.stringify(blob.payload) + ',');
+    line('["' + N.check1 + '"]=' + blob.check1 + ',');
+    line('["' + N.check2 + '"]=' + blob.check2 + ',');
+    line('["' + N.alpha + '"]="' + blob.alphabet + '",');
+
+    // ---------------------------------------------------------------- decoder
+    line('["' + N.dec + '"]=(function(' + P.s + ',' + P.b + ')');
+    line('local ' + L.a + '=' + P.s + '["' + N.alpha + '"]');
+    line('local ' + L.m + '={}');
+    line('for ' + L.i + '=1,#' + L.a + ' do ' + L.m + '[' + L.a + ':sub(' + L.i + ',' + L.i + ')]=' + L.i + '-1 end');
+    line('local ' + L.o + '={}');
+    line('local ' + L.n + ',acc,nb=0,0,0');
+    line('for ' + L.i + '=1,#' + P.b + ' do');
+    line('acc=acc+' + L.m + '[' + P.b + ':sub(' + L.i + ',' + L.i + ')]*(2^nb)');
+    line('nb=nb+6');
+    line('while nb>=8 do ' + L.n + '=' + L.n + '+1; ' + L.o + '[' + L.n + ']=acc%256; acc=(acc-acc%256)/256; nb=nb-8 end');
+    line('end');
+        line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=math.floor(' + L.o + '[' + L.i + ']) end');
+    line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
+    line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
+    line('local c1,c2=0,0');
+    line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
+    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
+
+    line('local ' + L.c + '=' + L.o);
+    line('local p=1');
+    line('local function by() local v=' + L.c + '[p]; p=p+1; return v end');
+    // reads are zigzag encoded (see `vi`) so that jump offsets can go backwards
+    line('local function vr() local v,s=0,1 while true do local b=' + L.c + '[p]; p=p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
+    line('local function st() local n=vr(); if n==0 then return "" end; local t={}; local q=1; while q<=n do');
+    line('local len=n-q+1; if len>2000 then len=2000 end; local u={}');
+    line('for j=1,len do u[j]=' + L.c + '[p+j-1] end; p=p+len; t[#t+1]=string.char(unpack(u)); q=q+len end');
+    line('return table.concat(t) end');
+    line('local OPC={' + ids.join(',') + '}');
+    // string constants are stored encoded inside the payload and are only
+    // decoded through a metatable the first time a handler actually reads
+    // them: a dump of the decoded program no longer reveals string literals
+    line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end return string.char(unpack(t)) end');
+    line('local function proto()');
+    line('local np=vr(); local va=by()==1; local ms=vr(); local nu=vr()');
+    line('local nk=vr(); local k={}');
+    line('for i=1,nk do local t=by()');
+    line('if t==0 then k[i]=nil elseif t==1 then k[i]=by()==1 elseif t==2 then k[i]=tonumber(st()) else local sv=st(); local eb={} for j=1,#sv do eb[j]=bit32.bxor(sv:byte(j),(' + strMask + '+j*29)%256) end k[i]={["' + N.strmark + '"]=true,b=eb} end end');
+    line('local nc=vr(); local c={}');
+    line('for i=1,nc do local o=OPC[vr()+1]; local A=vr(); local B=vr(); local C=vr(); local nx=vr()');
+    line('if nx>0 then local x={} for j=1,nx do x[j]=vr() end c[i]={o,A,B,C,x} else c[i]={o,A,B,C} end end');
+    line('local nz=vr(); local z={}');
+    line('for i=1,nz do z[i]=proto() end');
+    line('local cs=0 for i=1,#c do cs=(cs+c[i][1]*(i+13))%65521 end');
+    line('local kr=k; k={}; setmetatable(k,{__index=function(t,i) local v=rawget(t,i) if v~=nil then return v end local e=kr[i] if e==nil then return nil end if type(e)=="table" and e["' + N.strmark + '"] then v=sdec(e) else v=e end rawset(t,i,v) kr[i]=nil return v end}) return {np,va,nu,k,c,z,ms,cs} end');
+    line('return proto()');
+    line('end),');
+
+    // --------------------------------------------------------------- handlers
+    // each used opcode gets several *different* bodies (the same semantics,
+    // wrapped in provably-dead opaque predicates) and dispatch picks one per
+    // call, so a lifted interpreter can never be matched against one body
+    var nVariants = opts.junk === 2 ? 4 : opts.junk === 1 ? 3 : 1;
+    var JUNKS = [
+      'if I[1]>65535 then return 0 end',
+      'if F.ip<0 then F.d=true end',
+      'if F.o<-1 then return 0 end',
+      'if #I>6 then return 0 end',
+      'do local jz=bit32.bxor(I[1],F.ip%64); if jz>131071 then return 0 end end',
+      'do local jz=(I[2]*2654435761+F.ip)%4294967296; if jz>4294967295 then F.d=true end end',
+      'if I[1]%2==2 then return 0 end',
+      'if I[2]~=I[2] then return 0 end',
+      'do local jz=I[2]*I[2]; if jz<0 then return 0 end end',
+      'do local jz=F.ip*2; if jz<0 then return 0 end end'
+    ];
+    var VT = {};
+    for (i = 0; i < OPS.length; i++) {
+      var op = OPS[i];
+      if (!usedOps[i]) continue;
+      // the bodies are written against fixed local names; the parameters keep
+      // their per-build random names and are aliased on entry
+      var body = HANDLERS[op]
+        .replace(/S\.mk/g, 'S["' + N.mk + '"]')
+        .replace(/S\.E\b/g, 'S["' + N.env + '"]')
+        .replace(/S\.MT\b/g, 'S["' + N.mt + '"]')
+        .replace(/S\.BOX\b/g, 'S["' + N.box + '"]');
+      var names = [];
+      for (var vj = 0; vj < nVariants; vj++) {
+        var nm = vj === 0 ? H[op] : ng();
+        names.push(nm);
+        line('["' + nm + '"]=(function(' + P.s + ',' + P.f + ',' + P.i + ')');
+        line('local S,F,I=' + P.s + ',' + P.f + ',' + P.i);
+        line('local R=F.R; local K=F.P[4]; local U=F.U');
+        if (nVariants > 1) {
+          // two opaque predicates, a different pair per variant: always false
+          // by construction (opcode ids stay under 65535, ip under 1, F.o
+          // never below -1, an instruction never has more than 5 fields)
+          var nj = 2 + (Math.floor(rng() * 2));
+          for (var jk = 0; jk < nj; jk++) {
+            var pick = Math.floor(rng() * JUNKS.length);
+            line(JUNKS[pick]);
+          }
+        }
+        line(body);
+        line('end),');
+      }
+      VT[i] = names;
+    }
+
+    var canary = '_dk' + Math.floor(rng() * 0xFFFFFFF).toString(36) + Math.floor(rng() * 0xFFFFFFF).toString(36);
+
+    // ------------------------------------------------ environment-derived seal
+    // At anti-env level >= 1 the unseal key is no longer a constant in the
+    // file: the audit computes it from environment probes (genuine Luau
+    // builtins, a persistent environment, a genuine DataModel, service
+    // behaviour signatures only a live client reproduces). A static extractor
+    // or a replay environment that fakes any probe derives the wrong key and
+    // unseals the payload into garbage, with no signal about which probe
+    // disagreed. Contradiction probes respond the same way: the seal is
+    // quietly scrambled and decode produces junk, instead of a loud error a
+    // cracker could patch out.
+    function sealBinding(push, G, noGameStmt) {
+      // Delta binding: the guard sets the seal to (encodeSeal - expected + sum)
+      // % 256, where sum is rebuilt from the same probes the file just ran. A
+      // clean environment reproduces expected exactly and decode succeeds; any
+      // hooked or faked probe shifts the key and the payload unseals to junk.
+      // expected mirrors the sum a clean target produces: structural bits only
+      // (tostring identity 4, write persistence 2, getfenv identity 8, string
+      // ops 16) when the build is not locked; when envLock is on the build is
+      // only ever decoded in a genuine client, so the DataModel bit (1) and
+      // the five service-signature weights are part of the expected sum too.
+      var expected = opts.envLock ? 68 : 30;
+      var scr = String((blob.seal + 91 + (blob.key % 89)) % 256);
+      var b1 = ng(), b2 = ng(), b3 = ng(), b4 = ng(), b5 = ng();
+      var okw = ng(), okc = ng();
+      var n6 = ng(), n7 = ng(), n8 = ng(), n9 = ng(), n10 = ng();
+      var hv = ng(), jn = ng(), spv = ng(), ptv = ng();
+      var struct = b2 + '*2+' + b3 + '*4+' + b4 + '*8+' + b5 + '*16';
+      push('local ' + b1 + ',' + b2 + ',' + b3 + ',' + b4 + ',' + b5 + '=0,0,0,0,0');
+      push('pcall(function() if typeof(game)=="Instance" and game.ClassName=="DataModel" then ' + b1 + '=1 end end)');
+      push('pcall(function() ' + G + '["' + N.env + '"]["' + canary + '"]=1187 if ' + G + '["' + N.env + '"]["' + canary + '"]==1187 then ' + b2 + '=1 end ' + G + '["' + N.env + '"]["' + canary + '"]=nil end)');
+      push('if tostring({})~=tostring({}) then ' + b3 + '=1 end');
+      push('local ' + b4 + '=1 if getfenv then pcall(function() if getfenv(0)~=getfenv(0) then ' + b4 + '=0 end end) end');
+      push('local ' + b5 + '=1 pcall(function() if #tostring("ab")~=2 or ("abc"):sub(2,2)~="b" or table.concat({"a","b"})~="ab" then ' + b5 + '=0 end end)');
+      push('if ' + b1 + '==1 then');
+      push('local ' + okc + '=true');
+      push('pcall(function() if game.Close~=game.Close then ' + okc + '=false end if typeof(game:GetService("Lighting"))~="Instance" then ' + okc + '=false end if game:GetService("Lighting").ClockTime~=game:GetService("Lighting").ClockTime then ' + okc + '=false end end)');
+      push('if ' + okc + ' then');
+      if (elevel >= 2) {
+        push('local ' + n6 + ',' + n7 + ',' + n8 + ',' + n9 + ',' + n10 + '=0,0,0,0,0');
+        push('pcall(function() local ' + hv + '=game:GetService("HapticService") if typeof(' + hv + ':IsVibrationSupported(Enum.UserInputType.Gamepad1))=="boolean" then ' + n6 + '=1 end end)');
+        push('pcall(function() local ' + jn + '=game:GetService("HttpService") if typeof(' + jn + ':JSONEncode({}))=="string" then ' + n7 + '=1 end end)');
+        push('pcall(function() local ' + spv + '=game:GetService("StarterPlayer") if ' + spv + ':FindFirstChild("StarterPlayerScripts") then ' + n8 + '=1 end end)');
+        push('pcall(function() local ' + ptv + '=Instance.new("Part") if typeof(' + ptv + '.Position)=="Vector3" then ' + n9 + '=1 end end)');
+        push('pcall(function() if settings~=nil and settings().Physics~=nil then ' + n10 + '=1 end end)');
+      }
+      if (opts.envLock) {
+        push('if (' + n6 + '+' + n7 + '+' + n8 + '+' + n9 + '+' + n10 + ')<3 then ' + G + '["' + N.seal + '"]=' + scr + ' else ' + G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + b1 + '+' + struct + '+' + n6 + '*64+' + n7 + '*128+' + n8 + '*173+' + n9 + '*211+' + n10 + '*229)%256 end');
+      } else {
+        push(G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + struct + ')%256');
+      }
+      push('else');
+      push(G + '["' + N.seal + '"]=' + scr);
+      push('end');
+      push('else');
+      if (opts.envLock) push(noGameStmt);
+      else push(G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + struct + ')%256');
+      push('end');
+    }
+
+    // ----------------------------------------------------- anti-tamper loader
+    // Wraps the finished build in a chunked loader: the source is split, each
+    // chunk stored as a numeric byte table (encrypted with a per-chunk key at
+    // full strength), and a wrapper verifies the client (instances, DataModel
+    // properties, LocalPlayer, services, engine data types, environment
+    // identity) before decrypting, loading and running it. RunService's
+    // Heartbeat re-runs the battery every half second afterwards, so a hook
+    // installed mid-run is caught too. Detection prints the notice; runtime
+    // detection hangs the thread.
+    function wrapAntiTamper(inner, rng) {
+      var fast = opts.antiTamper === 1;
+      var nchunks = fast ? 2 : 3 + Math.floor(rng() * 3);
+      var chunkSize = Math.max(1, Math.ceil(inner.length / nchunks));
+      var chunks = [], keys = [];
+      for (var ci = 0; ci < inner.length; ci += chunkSize) {
+        var part = inner.substr(ci, chunkSize);
+        var key = fast ? 0 : 50 + Math.floor(rng() * 101);
+        var enc = [];
+        for (var bi = 1; bi <= part.length; bi++) {
+          var v = (part.charCodeAt(bi - 1) + key + bi) % 256;
+          v = v ^ ((key + bi) % 256);
+          enc.push(v);
+        }
+        chunks.push('{' + enc.join(',') + '}');
+        keys.push(String(key));
+      }
+      var banner = 'Protected using Darkfuscator | https://darkfuscator.pages.dev';
+      var w = [];
+      function wl(x) { w.push(x); }
+      wl('do');
+      wl('local t0=os.clock()');
+      wl('local MSG=' + JSON.stringify(banner));
+      wl('local detected=false');
+      wl('local checks={}');
+      wl('local function fail() print(MSG) while true do end end');
+      wl('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
+      wl('checks[1]={name="game_instance",run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
+      wl('checks[2]={name="script_valid",run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
+      wl('checks[3]={name="game_props",run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
+      wl('checks[4]={name="local_player",run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
+      wl('checks[5]={name="character",run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
+      wl('checks[6]={name="services",run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
+      wl('checks[7]={name="data_types",run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
+      wl('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
+      wl('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
+      wl('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
+      wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end return true end');
+      wl('runChecks()');
+      wl('if detected then print(MSG) return end');
+      wl('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
+      wl('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then warnf("[DARK AntiTamper] Chat probe inconclusive") end end)');
+      wl('local RS=game:GetService("RunService") local last=(tick~=nil and tick() or os.clock())');
+      wl('RS.Heartbeat:Connect(function() local now=(tick~=nil and tick() or os.clock()) if now-last>=0.5 then last=now runChecks() if detected then fail() end end end)');
+      wl('do local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then print(MSG) return end end');
+      wl('local chunks={');
+      for (var fi = 0; fi < chunks.length; fi++) wl(chunks[fi] + (fi < chunks.length - 1 ? ',' : ''));
+      wl('}');
+      wl('local keys={');
+      wl(keys.join(',') + '}');
+      wl('local function decrypt(data,key) local o={} for i=1,#data do local d=bit32.bxor(data[i],(key+i)%256) o[i]=(d-key-i)%256 end return o end');
+      wl('local parts={} for i=1,#chunks do local b=decrypt(chunks[i],keys[i]) local cs={} for k=1,#b do cs[k]=string.char(b[k]) end parts[i]=table.concat(cs) end');
+      wl('local original_source=table.concat(parts)');
+      wl('chunks=nil keys=nil parts=nil');
+      wl('local loadfunc=load or loadstring');
+      wl('if not loadfunc then fail() end');
+      wl('local chunk,err=loadfunc(original_source,"=AntiTamper")');
+      wl('original_source=nil');
+      wl('if not chunk then fail() end');
+      wl('chunk()');
+      wl('local lp=game:GetService("Players").LocalPlayer');
+      wl('warnf("Authenticated in "..string.format("%.2f",os.clock()-t0).." seconds! Welcome, "..tostring(lp and lp.Name or "player"))');
+      wl('end');
+      return w.join('\n') + '\n';
+    }
+
+    // ----------------------------------------------------------------- guard
+    // The audit runs before the payload is decoded: if the environment is
+    // tampered with (stubbed builtins, a proxy environment that does not
+    // persist writes, an injector toolkit over a fake DataModel), the program
+    // refuses to run and nothing is ever decrypted.
+    if (glevel >= 1) {
+      var ga = ng(), gb = ng(), gc = ng(), gd = ng(), ge = ng();
+      line('["' + N.guard + '"]=(function(G)');
+      line('local ' + ga + ',live1={},{}; local ' + gb + ',live2={},{}');
+      line('local ' + gc + ',tostr=' + ga + ',tostring');
+      line('if tostr(live1)==tostr(live2) then return 1 end');
+      line('if #tostring("ab")~=2 or string.rep("ab",3)~="ababab" or table.concat({"a","b"})~="ab" or ("abc"):sub(2,2)~="b" then return 2 end');
+      line('local ' + gd + ',' + gc + '=pcall(error,"Dk")');
+      line('if ' + gd + '~=false or ' + gc + '~="Dk" then return 3 end');
+      line('if math.floor(1.5)~=1 or tonumber("10")~=10 or math.max(3,7)~=7 then return 4 end');
+      line('if not pcall(function() return true end) then return 5 end');
+      line('if getfenv then local ' + gd + '=getfenv(0); local ' + gc + '=getfenv(0); if ' + gd + '~=' + gc + ' then return 6 end end');
+      // write-trap: a proxy environment that records but does not persist writes
+      line('local ok=false');
+      line('pcall(function() G["' + N.env + '"]["' + canary + '"]=1187; if G["' + N.env + '"]["' + canary + '"]~=1187 then ok=true end; G["' + N.env + '"]["' + canary + '"]=nil end)');
+      line('if ok then return 7 end');
+      line('local ' + ge + '=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") or rawget(_G,"getgenv") or rawget(_G,"getrenv") or rawget(_G,"readfile") or rawget(_G,"writefile")');
+      if (glevel === 2) {
+        line('if ' + ge + ' then local g=game; if g==nil or typeof(g)~="Instance" or g.ClassName~="DataModel" then return 8 end; if game.Close~=game.Close then return 9 end end');
+        line('if game ~= nil and typeof(game)=="Instance" and (typeof(workspace)~="Instance" or typeof(game.GetService)~="function") then return 10 end');
+        // anti-debug timing: a step-debugger or a hook that throttles every
+        // operation makes even a small loop take absurd wall time; the threshold
+        // keeps ~100x headroom over a normal Luau VM so clean runs never trip it
+        line('do local t0=os.clock() local s=0 for i=1,120000 do s=(s+i*7)%1000003 end if os.clock()-t0>0.4 then return 11 end end');
+      }
+      if (elevel >= 1) {
+        sealBinding(line, 'G', 'return 12');
+      } else {
+        line('G["' + N.seal + '"]=' + blob.seal + ';');
+      }
+      line('return false');
+      line('end),');
+    }
+
+    // ------------------------------------------------------------ interpreter
+    line('["' + N.run + '"]=(function(' + P.s + ',' + P.p + ',' + P.u + ',...)');
+    line('local ' + L.r + '={}');
+    line('local np=' + P.p + '[1]');
+    line('if np>0 or ' + P.p + '[2] then local a={...}');
+    line('for i=1,np do ' + L.r + '[i-1]=a[i] end');
+    line('if ' + P.p + '[2] then a.n=select("#",...); end end');
+    line('local ' + L.u + '=' + P.u);
+    line('local F={R=' + L.r + ',U=' + L.u + ',P=' + P.p + ',ip=1,d=false,r=nil,o=0,n=0}');
+    // the vararg vector holds only the arguments *past* the declared params
+    line('if ' + P.p + '[2] then local np=' + P.p + '[1]; local na=select("#",...); ' +
+      'local v={select(np+1,...)} v.n=(na>np) and na-np or 0 F.V=v end');
+    line('local ' + L.c + '=' + P.p + '[5]');
+    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then error("Darkfuscator integrity check failed",0) end end');
+    var vtEntries = [];
+    for (i = 0; i < OPS.length; i++) {
+      if (usedOps[i]) vtEntries.push('[' + i + ']={'+ VT[i].map(function(n) { return P.s + '["' + n + '"]'; }).join(',') + '}');
+    }
+    line('local ' + vtl + '={' + vtEntries.join(',') + '}');
+    line('while true do');
+    line('local I=' + L.c + '[F.ip]');
+    line('local o=I[1]');
+    line('local nx');
+    var branches = [];
+    for (i = 0; i < OPS.length; i++) {
+      if (usedOps[i]) branches.push({ id: ids[i], fn: H[OPS[i]], opidx: i });
+    }
+    for (i = 0; i < deadIds.length; i++) branches.push({ id: deadIds[i], fn: H[OPS[Math.floor(rng() * OPS.length)]], dead: true });
+    // shuffled dispatch order
+    for (i = branches.length - 1; i > 0; i--) {
+      var j2 = Math.floor(rng() * (i + 1));
+      var tmp = branches[i]; branches[i] = branches[j2]; branches[j2] = tmp;
+    }
+    var chain = '';
+    for (i = 0; i < branches.length; i++) {
+      var b2 = branches[i];
+      if (b2.dead) {
+        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
+      } else {
+        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local vs=' + vtl + '[' + b2.opidx + ']; nx=vs[((F.ip+F.o)%#vs)+1](' + P.s + ',F,I)';
+      }
+    }
+    line(chain + ' end');
+    line('if F.d then return unpack(F.r,F.o+1,F.o+F.n) end');
+    line('F.ip=nx or F.ip+1');
+    line('end');
+    line('end),');
+
+    // ---------------------------------------------------------- closure maker
+    line('["' + N.mk + '"]=(function(' + P.s + ',' + P.p + ',' + P.u + ')');
+    line('return function(...) return ' + P.s + '["' + N.run + '"](' + P.s + ',' + P.p + ',' + P.u + ',...) end');
+    line('end),');
+
+    // ------------------------------------------------------------------ entry
+    line('["' + N.entry + '"]=(function(' + P.s + ',' + L.e + ')');
+    line(P.s + '["' + N.env + '"]=' + L.e + ' or _G');
+    line(P.s + '["' + N.mt + '"]=setmetatable({},{})');
+    line(P.s + '["' + N.box + '"]=setmetatable({},{})');
+    // ------------------------------------------------------- execution locks
+    // when a place and/or universe id is set, the payload only decodes inside
+    // that Roblox experience: another game, an empty environment or a plain
+    // luau CLI run refuses before a single byte is decrypted
+    var lockP = String(opts.lockPlace == null ? '' : opts.lockPlace).trim();
+    var lockU = String(opts.lockUniverse == null ? '' : opts.lockUniverse).trim();
+    if (/^\d+$/.test(lockP) || /^\d+$/.test(lockU)) {
+      var gl = ng();
+      var lockConds = [];
+      if (/^\d+$/.test(lockP)) lockConds.push(gl + '.PlaceId==' + lockP);
+      if (/^\d+$/.test(lockU)) lockConds.push(gl + '.GameId==' + lockU);
+      line('do local ' + gl + '=game');
+      line('if ' + gl + '~=nil and (' + lockConds.join(' or ') + ') then else error("Darkfuscator protected program: execution locked",0) end');
+      line('end');
+    }
+    if (glevel === 0) {
+      if (elevel >= 1) {
+        line('do');
+        sealBinding(line, P.s, 'error("Darkfuscator protected program: environment audit failed",0)');
+        line('end');
+      } else {
+        line(P.s + '["' + N.seal + '"]=' + blob.seal + ';');
+      }
+    }
+    if (glevel >= 1) {
+      line('local ' + ge + '=' + P.s + '["' + N.guard + '"](' + P.s + ')');
+      line('if ' + ge + ' then error("Darkfuscator protected program: environment audit failed",0) end');
+    }
+    line('local P=' + P.s + '["' + N.dec + '"](' + P.s + ',' + P.s + '["' + N.blob + '"])');
+    line(P.s + '["' + N.blob + '"]=nil; ' + P.s + '["' + N.alpha + '"]=nil; ' + P.s + '["' + N.check1 + '"]=nil; ' + P.s + '["' + N.check2 + '"]=nil; ' + P.s + '["' + N.dec + '"]=nil; ' + P.s + '["' + N.seal + '"]=nil');
+
+    line('local f=' + P.s + '["' + N.mk + '"](' + P.s + ',P,{})');
+    // anti-dump re-audit: the battery runs again one scheduler step after the
+    // payload starts; a hook installed mid-run (a dumper that grabs the
+    // decoded program table) trips it and the interpreter material is
+    // destroyed. Legit runs never touch the wipe branch.
+    if (elevel >= 1) {
+      line('if task~=nil and typeof(task)=="table" and task.defer~=nil then task.defer(function() local bad=false pcall(function() if game~=nil and typeof(game)=="Instance" and (game.Close~=game.Close or typeof(game:GetService("Lighting"))~="Instance") then bad=true end end) if bad then ' + P.s + '["' + N.run + '"]=nil ' + P.s + '["' + N.mk + '"]=nil end end) end');
+    }
+    line('return f()');
+    line('end)');
+
+    // decoy slots, as in the reference build
+    var decoys = opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
+    for (i = 0; i < decoys; i++) {
+      line(',["' + ng() + '"]=(function(' + ng() + ',' + ng() + ',' + ng() + ')end)');
+    }
+
+    var envExpr = opts.captureGlobals === false ? '_ENV or _G' : 'getfenv and getfenv() or _ENV or _G';
+    line('}):' + N.entry + '(' + envExpr + ');');
+
+    // statements must stay separated even when minified — a space is enough
+    var src = out.join(opts.minify === false ? '\n' : ' ');
+    if (opts.antiTamper) src = wrapAntiTamper(src, rng);
+    return {
+      source: src,
+      ids: ids,
+      stats: { bytes: blob.bytes, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+    };
+  }
+
+  function hex(v) { return '0x' + v.toString(16).toUpperCase(); }
+
+  return { emit: emit, OPS: OPS };
+});
+
+/* ===== js/obfuscate.js ===== */
+/*!
+ * obfuscate.js — the Darkfuscator transformation engine.
+ *
+ * Everything here is semantics-preserving: the tool parses the source, resolves
+ * scopes, then rewrites tokens. After generating output it re-parses the result
+ * with the real Luau parser and refuses to return anything that is not valid,
+ * runnable Luau.
+ *
+ * Browser: window.Darkfuscator   Node: require('./obfuscate.js')
+ */
+(function (root, factory) {
+  var isNode = typeof module === 'object' && module.exports;
+  var Lexer = isNode ? require('./luau-lexer.js') : root.LuauLexer;
+  var Parser = isNode ? require('./luau-parser.js') : root.LuauParser;
+  var VMCompile = isNode ? require('./vm-compile.js') : root.DarkfuscatorVMCompile;
+  var VMEmit = isNode ? require('./vm-emit.js') : root.DarkfuscatorVMEmit;
+  var api = factory(Lexer, Parser, VMCompile, VMEmit);
+  if (isNode) module.exports = api;
+  if (root) root.Darkfuscator = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit) {
+  'use strict';
+
+  var bytesToStr = Lexer.bytesToStr;
+  var strToBytes = Lexer.strToBytes;
+
+  // ------------------------------------------------------------------ config
+  // Every build is a bytecode VM build, so these are intensity knobs for that
+  // pipeline rather than separate obfuscation modes.
+  var DEFAULTS = {
+    nameStyle: 'random',        // short | random | confuse — generated identifiers
+    minify: true,               // one-line output (off = one slot per line)
+    junk: 1,                    // 0 | 1 | 2 — decoy dispatch branches and slots
+    guard: 1,                   // 0 | 1 | 2 — anti-environment audit strength
+    captureGlobals: true,       // grab the caller's environment with getfenv()
+    watermark: true,            // leading "protected by" comment
+    lockPlace: '',              // optional Roblox place id the build is bound to
+    lockUniverse: '',           // optional Roblox universe id the build is bound to
+    envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
+    envLock: false,             // refuse to decode outside a genuine Roblox client
+    antiTamper: 0               // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
+  };
+
+
+  // Globals that must never be hoisted into locals (environment / late binding).
+
+  var LUA_KEYWORDS = Lexer.KEYWORDS;
+
+  // --------------------------------------------------------------------- rng
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      var t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function makeRng(seed) {
+    if (seed === null || seed === undefined || seed === '') seed = (Math.random() * 0xFFFFFFFF) >>> 0;
+    var rnd = mulberry32(seed >>> 0);
+    rnd.seed = seed >>> 0;
+    return rnd;
+  }
+
+  /** Syntax check only — used by the UI "Validate" button. */
+  function validate(src) {
+    try {
+      Parser.parse(src);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: e.message, line: e.line, col: e.col };
+    }
+  }
+
+  function obfuscate(src, options) {
+    var t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    var T = {}, _last = t0;
+    function mark(name) {
+      var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      T[name] = Math.round(now - _last); _last = now;
+    }
+    var opts = {};
+    for (var k in DEFAULTS) opts[k] = DEFAULTS[k];
+    for (var ok in (options || {})) if (options[ok] !== undefined) opts[ok] = options[ok];
+
+    var result = {
+      ok: false, output: '', error: null, stats: {}, warnings: [], options: opts
+    };
+
+    // ---------------------------------------------------------- 1. parse
+    var parsed;
+    try {
+      parsed = Parser.parse(src);
+    } catch (e) {
+      result.error = {
+        message: e.message, line: e.line, col: e.col, name: e.name || 'LuauSyntaxError'
+      };
+      return result;
+    }
+    mark('parse');
+    var toks = parsed.toks, code = parsed.code, refs = parsed.refs, symbols = parsed.symbols;
+    result.warnings = parsed.warnings.slice();
+
+    // --------------------------------------------- 2. compile + emit bytecode
+    // The bytecode VM is the transformation pipeline: the AST is compiled to
+    // register bytecode and shipped inside an encrypted interpreter build.
+    var vmErr = null, vmOut = null;
+    try {
+      var prog = VMCompile.compile(parsed.ast, refs);
+      var vmRng = makeRng(opts.seed);
+      vmOut = VMEmit.emit(prog, {
+        rng: vmRng,
+        junk: opts.junk === 2 ? 2 : opts.junk === 1 ? 1 : 0,
+        minify: opts.minify !== false,
+        nameStyle: opts.nameStyle || 'random',
+        guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
+        captureGlobals: opts.captureGlobals !== false,
+        watermark: opts.watermark !== false,
+        lockPlace: opts.lockPlace || '',
+        lockUniverse: opts.lockUniverse || '',
+        envChecks: opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2,
+        envLock: opts.envLock === true,
+        antiTamper: opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0
+      });
+    } catch (e) {
+      vmErr = e;
+    }
+    if (vmOut) {
+      var vmSrc = vmOut.source;
+      if (!/\n$/.test(vmSrc)) vmSrc += '\n';
+      var vmBad = null;
+      try { Parser.parse(vmSrc); } catch (e2) { vmBad = e2; }
+      if (!vmBad) {
+        mark('vm');
+        result.stats.times = T;
+        result.stats.seed = vmRng.seed;
+        result.stats.engine = 'vm';
+        result.stats.ms = Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0);
+        result.stats.inputChars = String(src).length;
+        result.stats.outputChars = vmSrc.length;
+        result.stats.locals = symbols.length;
+        result.stats.ratio = result.stats.inputChars ? vmSrc.length / result.stats.inputChars : 0;
+        result.stats.bytecodeBytes = vmOut.stats.bytes;
+        result.stats.payloadChars = vmOut.stats.payload;
+        result.stats.opcodes = vmOut.stats.opcodes;
+        result.stats.protos = countProtos(prog);
+        result.ok = true;
+        result.output = vmSrc;
+        result.raw = vmSrc;
+        return result;
+      }
+      vmErr = vmBad;
+    }
+    // Nothing else can produce output for this input: report it rather than
+    // silently shipping something that was never verified.
+    result.error = {
+      message: 'Bytecode compiler could not handle this script: ' + (vmErr && vmErr.message ? vmErr.message : 'unknown error'),
+      line: vmErr && vmErr.line, col: vmErr && vmErr.col, name: 'VMCompileError'
+    };
+    return result;
+  }
+
+  function countProtos(p) {
+    var n = 1;
+    for (var i = 0; i < p.kids.length; i++) n += countProtos(p.kids[i]);
+    return n;
+  }
+
+  return {
+    obfuscate: obfuscate,
+    validate: validate,
+    parse: function (s) { return Parser.parse(s); },
+    tokenize: function (s) { return Lexer.tokenize(s); },
+    version: '4.3.0'
+  };
+});
+
+/* ===== js/app.js ===== */
+/*!
+ * app.js — Darkfuscator UI wiring.
+ * Depends on: luau-lexer.js, luau-parser.js, obfuscate.js (window.Darkfuscator)
+ */
+(function () {
+  'use strict';
+
+  var $ = function (sel) { return document.querySelector(sel); };
+  if (!window.Darkfuscator) {
+    var st = document.getElementById('status');
+    if (st) { st.className = 'status err'; st.textContent = 'Engine failed to load — check that js/*.js files are present.'; }
+    return;
+  }
+
+  var DK = window.Darkfuscator;
+  var el = {
+    input: $('#input'), output: $('#output'),
+    inmeta: $('#inmeta'), outmeta: $('#outmeta'),
+    status: $('#status'), error: $('#error'), stats: $('#stats'),
+    seed: $('#seed'),
+    file: $('#file'),
+    protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
+    copy: $('#copy'), download: $('#download'),
+    paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
+    advanced: $('#advanced')
+  };
+
+  // only the knobs the bytecode pipeline actually uses
+  var OPTION_CONTROLS = {
+    nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
+    guard: '#opt-guard', watermark: '#opt-watermark',
+    lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
+    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper'
+  };
+  var STORE_KEY = 'darkfuscator.opts.v2';
+
+  // ------------------------------------------------------------------ utils
+  function fmt(n) { return Number(n).toLocaleString(); }
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function countLines(s) { return s ? s.split('\n').length : 0; }
+
+  function setStatus(text, kind) {
+    el.status.textContent = text;
+    el.status.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function clearError() { el.error.hidden = true; el.error.innerHTML = ''; }
+
+  function showError(title, detail) {
+    el.error.hidden = false;
+    el.error.innerHTML = '';
+    var h = document.createElement('h4');
+    h.textContent = title;
+    el.error.appendChild(h);
+    if (detail) {
+      var pre = document.createElement('pre');
+      pre.textContent = detail;
+      el.error.appendChild(pre);
+    }
+  }
+
+  /** Render a parse error with the offending source line and a caret. */
+  function showSyntaxError(e, src) {
+    var lines = String(src).split('\n');
+    var line = e.line || 1, col = e.col || 1;
+    var text = lines[line - 1] !== undefined ? lines[line - 1] : '';
+    var frame = '';
+    if (text !== '') {
+      var caret = '';
+      for (var i = 1; i < col; i++) caret += (text.charAt(i - 1) === '\t' ? '\t' : ' ');
+      frame = text + '\n' + caret + '^';
+    }
+    showError('Luau syntax error — line ' + line + ', column ' + col, frame + '\n' + e.message);
+    setStatus('Fix the syntax error above, then try again.', 'err');
+  }
+
+  // ---------------------------------------------------------------- options
+  function readOptions() {
+    var o = {};
+    for (var key in OPTION_CONTROLS) {
+      var node = $(OPTION_CONTROLS[key]);
+      if (!node) continue;
+      o[key] = node.type === 'checkbox' ? node.checked : node.value;
+    }
+    o.junk = parseInt(o.junk, 10) || 0;
+    o.guard = parseInt(o.guard, 10);
+    if (o.guard !== 0 && o.guard !== 2) o.guard = 1;
+    var seed = el.seed.value.trim();
+    o.seed = seed === '' ? null : (isNaN(Number(seed)) ? seed : Number(seed));
+    return o;
+  }
+
+  function writeOptions(o) {
+    for (var key in OPTION_CONTROLS) {
+      if (o[key] === undefined) continue;
+      var node = $(OPTION_CONTROLS[key]);
+      if (!node) continue;
+      if (node.type === 'checkbox') node.checked = !!o[key];
+      else node.value = String(o[key]);
+    }
+  }
+
+  function saveOptions() {
+    try {
+      var o = readOptions();
+      delete o.seed;
+      localStorage.setItem(STORE_KEY, JSON.stringify(o));
+    } catch (e) { /* private mode — ignore */ }
+  }
+
+  function loadOptions() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return;
+      var o = JSON.parse(raw);
+      writeOptions(o);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ----------------------------------------------------------------- counts
+  function updateMeta() {
+    el.inmeta.textContent = fmt(el.input.value.length) + ' chars · ' + fmt(countLines(el.input.value)) + ' lines';
+    el.outmeta.textContent = fmt(el.output.value.length) + ' chars · ' + fmt(countLines(el.output.value)) + ' lines';
+  }
+
+  function updateStats(res) {
+    if (!res || !res.stats) { el.stats.hidden = true; return; }
+    var s = res.stats;
+    el.stats.hidden = false;
+    $('#st-protos').textContent = fmt(s.protos || 0);
+    $('#st-opcodes').textContent = fmt(s.opcodes || 0);
+    $('#st-bytes').textContent = fmt(s.bytecodeBytes || 0);
+    $('#st-payload').textContent = fmt(s.payloadChars || 0);
+    $('#st-size').textContent = fmt(s.inputChars) + ' \u2192 ' + fmt(s.outputChars) +
+      ' (' + (s.ratio < 1 ? '' : '+') + Math.round((s.ratio - 1) * 100) + '%)';
+    $('#st-time').textContent = fmt(s.ms || 0);
+    $('#st-seed').textContent = s.seed !== undefined ? s.seed : '\u2014';
+  }
+
+  // ------------------------------------------------------------- obfuscate
+  var lastFilename = 'protected.luau';
+
+  function runObfuscate() {
+    var src = el.input.value;
+    if (!src.trim()) {
+      setStatus('Paste some Luau, load an example, or upload a file first.', 'warn');
+      el.input.focus();
+      return;
+    }
+    clearError();
+    el.verified.hidden = true;
+    setStatus('Obfuscating…');
+
+    var opts = readOptions();
+    var res;
+    try {
+      res = DK.obfuscate(src, opts);
+    } catch (e) {
+      showError('The obfuscator hit an internal error', (e && e.message) || String(e));
+      setStatus('Nothing was produced.', 'err');
+      return;
+    }
+
+    if (!res.ok) {
+      if (res.error && res.error.name === 'LuauSyntaxError') showSyntaxError(res.error, src);
+      else showError('Could not obfuscate this input', (res.error && res.error.message) || 'Unknown error');
+      el.stats.hidden = true;
+      return;
+    }
+
+    el.output.value = res.output;
+    updateMeta();
+    updateStats(res);
+    el.verified.hidden = false;
+
+    if (window.DKUI && DKUI.recordBuild) {
+      DKUI.recordBuild({
+        filename: lastFilename || 'protected.luau',
+        date: new Date().toISOString(),
+        seed: res.stats ? res.stats.seed : null,
+        size: res.output.length,
+        output: res.output.length < 1800000 ? res.output : null
+      });
+    }
+
+    if (res.warnings && res.warnings.length) {
+      setStatus('Done — ' + res.warnings.join(' '), 'warn');
+    } else {
+      setStatus('Done. Output re-parsed as valid Luau (' + fmt(res.output.length) + ' chars).', 'ok');
+    }
+  }
+
+  function runValidate() {
+    var src = el.input.value;
+    if (!src.trim()) { setStatus('Nothing to validate yet.', 'warn'); return; }
+    var v = DK.validate(src);
+    if (v.ok) setStatus('Valid Luau — no syntax errors found.', 'ok');
+    else showSyntaxError(v, src);
+  }
+
+  // ------------------------------------------------------------ clipboard io
+  function copyOutput() {
+    if (!el.output.value) { setStatus('Nothing to copy yet.', 'warn'); return; }
+    var text = el.output.value;
+    var done = function () { setStatus('Output copied to clipboard.', 'ok'); };
+    var fallback = function () {
+      try {
+        el.output.select();
+        var ok = document.execCommand('copy');
+        window.getSelection().removeAllRanges();
+        ok ? done() : setStatus('Copy failed — select the output and copy manually.', 'warn');
+      } catch (e) {
+        setStatus('Copy failed — select the output and copy manually.', 'warn');
+      }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function downloadOutput() {
+    if (!el.output.value) { setStatus('Nothing to download yet.', 'warn'); return; }
+    var blob = new Blob([el.output.value], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = lastFilename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    setStatus('Downloaded ' + lastFilename + '.', 'ok');
+  }
+
+  // -------------------------------------------------------------- file input
+  function loadFile(file) {
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      el.input.value = String(reader.result || '');
+      lastFilename = file.name.replace(/\.(lua|luau|txt)$/i, '') + '.protected.luau';
+      el.output.value = '';
+      updateMeta();
+      clearError();
+      setStatus('Loaded ' + file.name + ' (' + fmt(el.input.value.length) + ' chars).', 'ok');
+    };
+    reader.onerror = function () { setStatus('Could not read that file.', 'err'); };
+    reader.readAsText(file);
+  }
+
+  // ------------------------------------------------------------------ events
+  el.input.addEventListener('input', updateMeta);
+  el.output.addEventListener('input', updateMeta);
+  Object.keys(OPTION_CONTROLS).forEach(function (key) {
+    var node = $(OPTION_CONTROLS[key]);
+    if (!node) return;
+    node.addEventListener('change', saveOptions);
+  });
+  el.seed.addEventListener('change', saveOptions);
+
+  el.protect.addEventListener('click', runObfuscate);
+  el.validate.addEventListener('click', runValidate);
+  el.copy.addEventListener('click', copyOutput);
+  el.download.addEventListener('click', downloadOutput);
+
+  el.clear.addEventListener('click', function () {
+    el.input.value = ''; el.output.value = ''; el.file.value = '';
+    el.verified.hidden = true;
+    el.stats.hidden = true;
+    clearError();
+    updateMeta();
+    setStatus('Cleared.');
+  });
+
+  el.file.addEventListener('change', function (e) {
+    loadFile(e.target.files && e.target.files[0]);
+  });
+
+  // drag & drop anywhere on the card
+  ['dragenter', 'dragover'].forEach(function (evt) {
+    el.paneIn.addEventListener(evt, function (e) {
+      e.preventDefault();
+      el.paneIn.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (evt) {
+    el.paneIn.addEventListener(evt, function (e) {
+      e.preventDefault();
+      el.paneIn.classList.remove('dragover');
+    });
+  });
+  el.paneIn.addEventListener('drop', function (e) {
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
+  });
+  // also accept drops on the output pane and the whole document
+  document.addEventListener('dragover', function (e) { e.preventDefault(); });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length && /\.(lua|luau|txt)$/i.test(dt.files[0].name)) loadFile(dt.files[0]);
+  });
+
+  // Ctrl/Cmd + Enter obfuscates
+  document.addEventListener('keydown', function (e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      runObfuscate();
+    }
+  });
+
+  // ------------------------------------------------------------------- init
+  loadOptions();
+  if (!el.input.value) updateMeta();
+  setStatus('Ready. Nothing leaves your browser.');
+})();
+
+</script>
+</body>
+</html>
