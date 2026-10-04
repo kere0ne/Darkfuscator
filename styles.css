@@ -322,3 +322,116 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   .shell.sidebar-open .sidebar { transform: translateX(0) }
   .shell.sidebar-open .sidebar-scrim { display: block }
 }
+
+/* ------------------------------------------------------------ dashboard */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.dk-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.dk-table th {
+  text-align: left;
+  font-weight: 600;
+  color: #8b7d74;
+  padding: 8px 10px;
+  border-bottom: 1px solid #2a1a12;
+  white-space: nowrap;
+}
+
+.dk-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #1c1210;
+  vertical-align: middle;
+}
+
+.dk-table b {
+  color: #ffb347;
+}
+
+.row-actions {
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: .72rem;
+}
+
+.chip-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 600;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.state-card {
+  border: 1px solid #2a1a12;
+  border-radius: 12px;
+  padding: 12px;
+  background: #140b10;
+}
+
+.state-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: .78rem;
+}
+
+.state-head select {
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 8px;
+  padding: 4px 6px;
+  font-size: .72rem;
+}
+
+.state-card textarea {
+  width: 100%;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: .72rem;
+  resize: vertical;
+}
+
+#gate input[type="password"] {
+  flex: 1;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .85rem;
+}
+
+.actions input[type="text"] {
+  flex: 1;
+  background: #0b0608;
+  color: #f5eee8;
+  border: 1px solid #2a1a12;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: .85rem;
+}

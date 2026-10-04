@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Darkfuscator · Loader dashboard</title>
+
+<meta name="description"
+content="Darkfuscator loader dashboard — build activity and configurable loader responses.">
+
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+
+<link
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<div class="shell">
+
+  <aside class="sidebar">
+
+    <div class="brand-mark" title="Darkfuscator">
+      DF
+    </div>
+
+    <a class="side-btn" href="index.html" title="Obfuscate">
+
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+
+        <rect x="4" y="4" width="16" height="16" rx="2"/>
+        <rect x="9" y="9" width="6" height="6"/>
+
+        <line x1="9" y1="1" x2="9" y2="4"/>
+        <line x1="15" y1="1" x2="15" y2="4"/>
+
+        <line x1="9" y1="20" x2="9" y2="23"/>
+        <line x1="15" y1="20" x2="15" y2="23"/>
+
+        <line x1="20" y1="9" x2="23" y2="9"/>
+        <line x1="20" y1="14" x2="23" y2="14"/>
+
+        <line x1="1" y1="9" x2="4" y2="9"/>
+        <line x1="1" y1="14" x2="4" y2="14"/>
+
+      </svg>
+
+    </a>
+
+    <a class="side-btn active" href="dashboard.html" title="Loader dashboard">
+
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+
+        <path d="M3 3v18h18"/>
+
+        <rect x="7" y="12" width="3" height="6"/>
+        <rect x="12" y="8" width="3" height="10"/>
+        <rect x="17" y="5" width="3" height="13"/>
+
+      </svg>
+
+    </a>
+
+  </aside>
+
+
+  <main class="content">
+
+    <header class="topbar">
+
+      <div class="greet">
+
+        <button
+          class="icon-btn"
+          id="btn-menu"
+          title="Toggle sidebar"
+          type="button">
+
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round">
+
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+
+          </svg>
+
+        </button>
+
+        <div>
+
+          <div class="muted" style="font-size:.78rem">
+            🎃 DARKFUSCATOR
+          </div>
+
+          <h1>
+            Loader dashboard
+          </h1>
+
+        </div>
+
+      </div>
+
+
+      <div class="top-right">
+
+        <span class="pill">
+          🎃 connected loaders · server-side validation
+        </span>
+
+      </div>
+
+    </header>
+
+
+    <section class="card" id="gate">
+
+      <div class="card-top">
+
+        <div>
+
+          <small class="eyebrow">
+            🕷️ ADMIN
+          </small>
+
+          <h2>
+            Enter your admin token
+          </h2>
+
+        </div>
+
+      </div>
+
+
+      <p class="muted" style="font-size:.85rem">
+        The token is the ADMIN_TOKEN environment variable on the Pages project.
+        It stays in your browser and is sent only to this API.
+
+      </p>
+
+
+      <div class="actions">
+
+        <input
+          id="gate-token"
+          type="password"
+          placeholder="ADMIN_TOKEN"
+          autocomplete="off">
+
+        <button
+          class="btn btn-primary"
+          id="gate-go"
+          type="button">
+
+          Unlock
+
+        </button>
+
+      </div>
+
+
+      <div
+        id="gate-error"
+        class="error"
+        hidden>
+      </div>
+
+    </section>
+
+
+    <div id="main" hidden>
+
+
+      <section class="card">
+
+        <div class="card-top">
+
+          <div>
+
+            <small class="eyebrow">
+              🕸️ ACTIVITY
+            </small>
+
+            <h2>
+              Builds &amp; loader requests
+            </h2>
+
+          </div>
+
+
+          <button
+            class="btn"
+            id="btn-refresh"
+            type="button">
+
+            Refresh
+
+          </button>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+          <table class="dk-table">
+
+            <thead>
+              <tr>
+                <th>Build</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Expires</th>
+                <th>24h</th>
+                <th>Total</th>
+                <th>Last request</th>
+                <th></th>
+              </tr>
+            </thead>
+
+            <tbody id="builds-body">
+              <tr>
+                <td colspan="8" class="muted">
+                  Loading…
+                </td>
+              </tr>
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+
+      <section class="card" id="editor" hidden>
+
+        <div class="card-top">
+
+          <div>
+
+            <small class="eyebrow">
+              🕷️ BUILD
+            </small>
+
+            <h2 id="editor-title">
+              —
+            </h2>
+
+          </div>
+
+
+          <div class="actions" style="gap:8px">
+
+            <button
+              class="btn"
+              id="ed-copy-loader"
+              type="button">
+
+              Copy loader code
+
+            </button>
+
+
+            <button
+              class="btn btn-primary"
+              id="ed-save"
+              type="button">
+
+              Save changes
+
+            </button>
+
+
+            <button
+              class="btn"
+              id="ed-close"
+              type="button">
+
+              Close
+
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <div
+          class="state-grid"
+          id="state-grid">
+        </div>
+
+
+        <div class="toggle-pair">
+
+          <div class="field">
+
+            <label>
+              Redirect unauthorized requests to (optional)
+            </label>
+
+            <input
+              id="ed-redirect"
+              type="text"
+              placeholder="https://…"
+              autocomplete="off">
+
+          </div>
+
+
+          <div class="field">
+
+            <label>
+              Expires at (leave empty = never)
+            </label>
+
+            <input
+              id="ed-expires"
+              type="datetime-local">
+
+          </div>
+
+        </div>
+
+
+        <div class="actions">
+
+          <button
+            class="btn"
+            id="ed-toggle-revoke"
+            type="button">
+
+            Revoke
+
+          </button>
+
+
+          <button
+            class="btn"
+            id="ed-delete"
+            type="button"
+            style="color:#ff5a5a">
+
+            Delete build
+
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <section class="card" id="logs-card" hidden>
+
+        <div class="card-top">
+
+          <div>
+
+            <small class="eyebrow">
+              🕯️ REQUEST LOG
+            </small>
+
+            <h2 id="logs-title">
+              —
+            </h2>
+
+          </div>
+
+        </div>
+
+
+        <div class="table-wrap">
+
+          <table class="dk-table">
+
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Metadata</th>
+              </tr>
+            </thead>
+
+            <tbody id="logs-body">
+            </tbody>
+
+          </table>
+
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+</div>
+
+
+<div class="modal-root" id="preview-modal">
+
+  <div
+    class="modal-backdrop"
+    id="preview-backdrop">
+  </div>
+
+
+  <div class="modal" style="max-width:720px">
+
+    <div class="modal-header">
+
+      <span id="preview-title">
+        Preview
+      </span>
+
+      <button id="preview-close">
+        &times;
+      </button>
+
+    </div>
+
+
+    <div class="modal-body">
+
+      <iframe
+        id="preview-frame"
+        style="width:100%;height:420px;border:0;border-radius:10px;background:#0b0608">
+      </iframe>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<div class="toast" id="toast">
+</div>
+
+
+<script src="js/dashboard.js">
+</script>
+
+</body>
+</html>
