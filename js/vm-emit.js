@@ -22,6 +22,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // the compression module (lz.js); optional: builds degrade gracefully
+  var LZ = null;
+  try { LZ = (typeof module === 'object' && module.exports) ? require('./lz.js') : self.DarkfuscatorLZ; } catch (e) { LZ = null; }
+
   var OPS = ['LOADK', 'LOADNIL', 'LOADBOOL', 'MOVE', 'BOX',
     'NEWTABLE', 'GETTABLE', 'SETTABLE', 'SETLISTM',
     'GETUPVAL', 'SETUPVAL', 'GETGLOBAL', 'SETGLOBAL',
@@ -120,7 +124,7 @@
   }
 
   // --------------------------------------------------------------- serialiser
-  function serialize(root, rng) {
+  function serialize(root, rng, useLz) {
     var bytes = [];
     // zigzag varint: operands are signed (jump offsets are negative when the
     // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
@@ -162,6 +166,16 @@
       c2 = (c2 + (((bytes[ci] + ((ci + 1) * 17)) % 256) * (ci + 3))) % 65519;
     }
 
+    // compression layer: LZSS dictionary pass over the plaintext stream,
+    // applied before any encryption (encrypted bytes are incompressible).
+    // The decoder unpacks it before recomputing the checksums, which still
+    // cover the full plaintext stream.
+    var origBytes = bytes.length, didLz = false;
+    if (useLz && LZ) {
+      var packedLz = LZ.compress(bytes);
+      if (packedLz) { bytes = packedLz; didLz = true; }
+    }
+
     var key = 1 + Math.floor(rng() * 254);
     // the audit seal: the decoder cannot unseal the payload without this
     // value, and it is handed over only by the passing environment audit, so
@@ -201,7 +215,7 @@
       }
     }
     if (nb > 0) out.push(alpha[acc % 64]);
-    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, rk: rk0, seal: seal, bytes: bytes.length, check1: c1, check2: c2 };
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, rk: rk0, seal: seal, bytes: bytes.length, origBytes: origBytes, lz: didLz ? 1 : 0, check1: c1, check2: c2 };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -330,7 +344,7 @@
         program.k.push({ t: 's', v: dp });
       }
     }
-    var blob = serialize(program, rng);
+    var blob = serialize(program, rng, opts.compress !== false);
     // per-build mask for the lazy string-constant layer
     var strMask = 1 + Math.floor(rng() * 254);
     var vtl = ng();
@@ -438,6 +452,14 @@
     line('do local rk0=' + blob.rk + '; for ' + L.i + '=1,' + L.n + ' do local je=' + L.o + '[' + L.i + ']; ' + L.o + '[' + L.i + ']=bit32.bxor(je,rk0); rk0=(je+' + L.i + ')%256 end end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
+    if (blob.lz) {
+      var Zp = ng(), Zo = ng(), Zc = ng(), Zf = ng(), Zb = ng(), Zv = ng(), Zs = ng(), Zt = ng(), Z1 = ng(), Z2 = ng(), Zd = ng(), Zm = ng(), Zk = ng();
+      var zl = LZ.luaSource({
+        src: L.o, count: L.n, p: Zp, out: Zo, oc: Zc, fl: Zf, fb: Zb,
+        v: Zv, sh: Zs, bt: Zt, b1: Z1, b2: Z2, dist: Zd, ml: Zm, k: Zk
+      });
+      for (i = 0; i < zl.length; i++) line(zl[i]);
+    }
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
     line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
@@ -817,7 +839,7 @@
     return {
       source: src,
       ids: ids,
-      stats: { bytes: blob.bytes, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+      stats: { bytes: blob.bytes, origBytes: blob.origBytes, lz: blob.lz, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
     };
   }
 
