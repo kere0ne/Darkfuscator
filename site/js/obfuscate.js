@@ -29,6 +29,7 @@
   var DEFAULTS = {
     nameStyle: 'random',        // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
+    compress: true,             // LZSS dictionary compression of the payload
     junk: 1,                    // 0 | 1 | 2 — decoy dispatch branches and slots
     guard: 1,                   // 0 | 1 | 2 — anti-environment audit strength
     captureGlobals: true,       // grab the caller's environment with getfenv()
@@ -110,6 +111,7 @@
       vmOut = VMEmit.emit(prog, {
         rng: vmRng,
         junk: Math.max(0, Math.min(3, Number(opts.junk) || 0)),
+        compress: opts.compress !== false,
         minify: opts.minify !== false,
         nameStyle: opts.nameStyle || 'random',
         guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
@@ -140,6 +142,8 @@
         result.stats.locals = symbols.length;
         result.stats.ratio = result.stats.inputChars ? vmSrc.length / result.stats.inputChars : 0;
         result.stats.bytecodeBytes = vmOut.stats.bytes;
+        result.stats.bytecodeOrigBytes = vmOut.stats.origBytes;
+        result.stats.lz = vmOut.stats.lz;
         result.stats.payloadChars = vmOut.stats.payload;
         result.stats.opcodes = vmOut.stats.opcodes;
         result.stats.protos = countProtos(prog);
@@ -170,6 +174,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '4.3.0'
+    version: '4.7.0'
   };
 });
