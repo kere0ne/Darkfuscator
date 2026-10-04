@@ -109,7 +109,7 @@
       var vmRng = makeRng(opts.seed);
       vmOut = VMEmit.emit(prog, {
         rng: vmRng,
-        junk: opts.junk === 2 ? 2 : opts.junk === 1 ? 1 : 0,
+        junk: Math.max(0, Math.min(3, Number(opts.junk) || 0)),
         minify: opts.minify !== false,
         nameStyle: opts.nameStyle || 'random',
         guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
