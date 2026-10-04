@@ -3,10 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+
 <title>Darkfuscator</title>
-<meta name="description" content="Darkfuscator \u2014 a browser-side Luau obfuscator. Real Luau parser, bytecode VM, anti-env, anti-tamper, 100% client-side.">
+
+<meta name="description"
+content="Darkfuscator — powerful Luau obfuscation with a Halloween-themed interface.">
+
 <meta name="color-scheme" content="dark">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link
+  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+  rel="stylesheet">
+
 <style>
 /* Darkfuscator — Halloween workspace theme */
 :root {
@@ -335,238 +343,988 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
 
 </style>
 </head>
+
 <body>
+
 <div class="shell">
-<div class="sidebar-scrim" id="scrim"></div>
-<aside class="sidebar">
-      <div class="brand-mark">DF</div>
-      <a class="side-btn active" data-page="obfuscate" title="Obfuscate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></a>
-    </aside>
+
+  <div class="sidebar-scrim" id="scrim"></div>
+
+  <aside class="sidebar">
+
+    <div class="brand-mark" title="Darkfuscator">
+      DF
+    </div>
+
+    <a
+      class="side-btn active"
+      data-page="obfuscate"
+      title="Obfuscate">
+
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round">
+
+        <rect x="4" y="4" width="16" height="16" rx="2"/>
+        <rect x="9" y="9" width="6" height="6"/>
+
+        <line x1="9" y1="1" x2="9" y2="4"/>
+        <line x1="15" y1="1" x2="15" y2="4"/>
+
+        <line x1="9" y1="20" x2="9" y2="23"/>
+        <line x1="15" y1="20" x2="15" y2="23"/>
+
+        <line x1="20" y1="9" x2="23" y2="9"/>
+        <line x1="20" y1="14" x2="23" y2="14"/>
+
+        <line x1="1" y1="9" x2="4" y2="9"/>
+        <line x1="1" y1="14" x2="4" y2="14"/>
+
+      </svg>
+
+    </a>
+
+  </aside>
+
+
   <main class="content">
+
     <header class="topbar">
+
       <div class="greet">
-        <button class="icon-btn" id="btn-menu" title="Toggle sidebar" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+
+        <button
+          class="icon-btn"
+          id="btn-menu"
+          title="Toggle sidebar"
+          type="button">
+
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round">
+
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+
+          </svg>
+
+        </button>
+
         <div>
-          <div class="muted" style="font-size:.78rem">DARKFUSCATOR</div>
-          <h1>Obfuscate</h1>
+
+          <div class="muted" style="font-size:.78rem">
+            🎃 DARKFUSCATOR
+          </div>
+
+          <h1>
+            Obfuscate
+          </h1>
+
         </div>
+
       </div>
-      <div class="top-right"><span class="pill">v4.5 &middot; 100% client-side</span></div>
+
+
+      <div class="top-right">
+
+        <span class="pill">
+          🎃 v4.5 · 100% client-side
+        </span>
+
+      </div>
+
     </header>
-    <section class="page active" id="page-obfuscate">
+
+
+    <section
+      class="page active"
+      id="page-obfuscate">
+
+
       <div class="page-head">
+
         <div>
-          <h2>Make your Luau harder to read without breaking it.</h2>
-          <div class="muted" style="margin-top:4px">Bytecode VM, layered encoding, anti-env and anti-tamper &mdash; everything runs right here in your browser, nothing is uploaded.</div>
+
+          <h2>
+            🕸️ Obfuscate your Luau
+          </h2>
+
+          <div
+            class="muted"
+            style="margin-top:4px">
+
+            Turn your Luau into a nightmare to read.
+            Everything runs locally in your browser —
+            your source code never leaves your device. 🎃
+
+          </div>
+
         </div>
-      </div>
-      <div class="upload" id="drop-zone">
-        <p>Drop a .lua / .luau file here, paste it below, or</p>
-        <button class="btn purple" id="btn-zone" style="margin-top:10px">CHOOSE FILE</button>
-      </div>
-<section id="obfuscator" class="card">
-    <div class="card-top">
-      <div>
-        <small class="eyebrow">OBFUSCATOR</small>
-        <h2>Protect your source</h2>
-      </div>
-      <button class="btn" id="btn-settings" type="button">SETTINGS &#9881;</button>
-      </div>
-    </div>
 
-    <div class="actions">
-      <label class="btn" for="file">Upload .luau</label>
-      <input id="file" type="file" accept=".lua,.luau,.txt,text/plain" hidden>
-      <button id="validate" class="btn" type="button" title="Check that the current text is valid Luau">Validate</button>
-      <button id="clear" class="btn" type="button">Clear</button>
-      <button id="protect" class="btn btn-primary" type="button">Obfuscate <kbd>⌘↵</kbd></button>
-    </div>
+      </div>
 
-    
 
-    <div class="editors">
-      <div class="pane" id="pane-in">
-        <div class="bar">
-          <span class="bar-name">INPUT.LUAU</span>
-          <span class="bar-meta" id="inmeta">0 chars · 0 lines</span>
+      <div
+        class="upload"
+        id="drop-zone">
+
+        <p>
+          🦇 Drop a .lua / .luau file here,
+          paste your code below, or
+        </p>
+
+        <button
+          class="btn purple"
+          id="btn-zone"
+          style="margin-top:10px">
+
+          🎃 CHOOSE FILE
+
+        </button>
+
+      </div>
+
+
+      <section
+        id="obfuscator"
+        class="card">
+
+
+        <div class="card-top">
+
+          <div>
+
+            <small class="eyebrow">
+              🕷️ DARKFUSCATOR
+            </small>
+
+            <h2>
+              Protect your source
+            </h2>
+
+          </div>
+
+
+          <button
+            class="btn"
+            id="btn-settings"
+            type="button">
+
+            ⚙ SETTINGS
+
+          </button>
+
         </div>
-        <textarea id="input" spellcheck="false" placeholder="Paste your Luau here, drop a .luau file, or pick an example above…"></textarea>
-        <div class="drop-hint">Drop a .luau file anywhere here</div>
-      </div>
-      <div class="arrow" aria-hidden="true">→</div>
-      <div class="pane" id="pane-out">
-        <div class="bar">
-          <span class="bar-name">OUTPUT.LUAU</span>
-          <span class="bar-meta" id="outmeta">0 chars · 0 lines</span>
+
+
+        <div class="actions">
+
+          <label
+            class="btn"
+            for="file">
+
+            🦇 Upload .luau
+
+          </label>
+
+          <input
+            id="file"
+            type="file"
+            accept=".lua,.luau,.txt,text/plain"
+            hidden>
+
+
+          <button
+            id="validate"
+            class="btn"
+            type="button"
+            title="Check that the current text is valid Luau">
+
+            Validate
+
+          </button>
+
+
+          <button
+            id="clear"
+            class="btn"
+            type="button">
+
+            Clear
+
+          </button>
+
+
+          <button
+            id="protect"
+            class="btn btn-primary"
+            type="button">
+
+            🎃 Obfuscate
+            <kbd>⌘↵</kbd>
+
+          </button>
+
         </div>
-        <textarea id="output" spellcheck="false" readonly placeholder="Protected Luau appears here…"></textarea>
-        <div class="drop-hint" id="verified-badge" hidden>✓ re-parsed as valid Luau</div>
-      </div>
-    </div>
 
-    <div id="status" class="status" role="status" aria-live="polite">Ready. Nothing leaves your browser.</div>
-    <div id="error" class="error" hidden></div>
 
-    <div class="stats" id="stats" hidden>
-      <span class="chip"><b id="st-protos">—</b>functions compiled</span>
-      <span class="chip"><b id="st-opcodes">—</b>opcodes</span>
-      <span class="chip"><b id="st-bytes">—</b>bytes bytecode</span>
-      <span class="chip"><b id="st-payload">—</b>chars payload</span>
-      <span class="chip"><b id="st-size">—</b>size</span>
-      <span class="chip"><b id="st-time">—</b>ms</span>
-      <span class="chip"><b id="st-seed">—</b>seed</span>
-    </div>
+        <div class="editors">
 
-    <div class="bottom">
-      <span class="hint">Tip: the same seed always produces the same build.</span>
-      <div class="bottom-buttons">
-        <button id="copy" class="btn" type="button">Copy output</button>
-        <button id="download" class="btn" type="button">Download .luau</button>
-      </div>
-    </div>
-  </section>
+
+          <div
+            class="pane"
+            id="pane-in">
+
+            <div class="bar">
+
+              <span class="bar-name">
+                INPUT.LUAU
+              </span>
+
+              <span
+                class="bar-meta"
+                id="inmeta">
+
+                0 chars · 0 lines
+
+              </span>
+
+            </div>
+
+
+            <textarea
+              id="input"
+              spellcheck="false"
+              placeholder="Paste your Luau here, drop a .luau file, or summon an example…"></textarea>
+
+
+            <div class="drop-hint">
+              🕸️ Drop a .luau file anywhere here
+            </div>
+
+          </div>
+
+
+          <div
+            class="arrow"
+            aria-hidden="true">
+
+            →
+
+          </div>
+
+
+          <div
+            class="pane"
+            id="pane-out">
+
+            <div class="bar">
+
+              <span class="bar-name">
+                OUTPUT.LUAU
+              </span>
+
+              <span
+                class="bar-meta"
+                id="outmeta">
+
+                0 chars · 0 lines
+
+              </span>
+
+            </div>
+
+
+            <textarea
+              id="output"
+              spellcheck="false"
+              readonly
+              placeholder="Your cursed Luau appears here…"></textarea>
+
+
+            <div
+              class="drop-hint"
+              id="verified-badge"
+              hidden>
+
+              ✓ Re-parsed as valid Luau
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div
+          id="status"
+          class="status"
+          role="status"
+          aria-live="polite">
+
+          🎃 Ready. Nothing leaves your browser.
+
+        </div>
+
+
+        <div
+          id="error"
+          class="error"
+          hidden>
+        </div>
+
+
+        <div
+          class="stats"
+          id="stats"
+          hidden>
+
+          <span class="chip">
+            <b id="st-protos">—</b>
+            functions compiled
+          </span>
+
+          <span class="chip">
+            <b id="st-opcodes">—</b>
+            opcodes
+          </span>
+
+          <span class="chip">
+            <b id="st-bytes">—</b>
+            bytes bytecode
+          </span>
+
+          <span class="chip">
+            <b id="st-payload">—</b>
+            chars payload
+          </span>
+
+          <span class="chip">
+            <b id="st-size">—</b>
+            size
+          </span>
+
+          <span class="chip">
+            <b id="st-time">—</b>
+            ms
+          </span>
+
+          <span class="chip">
+            <b id="st-seed">—</b>
+            seed
+          </span>
+
+        </div>
+
+
+        <div class="bottom">
+
+          <span class="hint">
+            🕯️ Tip: the same seed always produces the same build.
+          </span>
+
+
+          <div class="bottom-buttons">
+
+            <button
+              id="copy"
+              class="btn"
+              type="button">
+
+              Copy output
+
+            </button>
+
+
+            <button
+              id="download"
+              class="btn"
+              type="button">
+
+              🦇 Download .luau
+
+            </button>
+
+          </div>
+
+        </div>
+
+      </section>
+
     </section>
+
   </main>
+
 </div>
-<div class="modal-root" id="modal">
-    <div class="modal-backdrop" id="modal-backdrop"></div>
-    <div class="modal">
-      <div class="modal-header"><span>Darkfuscator Obfuscation</span><button id="modal-close">&times;</button></div>
-      <div class="modal-body">
-        <div class="field"><label>Build profile</label>
-          <select id="opt-junk">
-            <option value="1" selected>Normal &mdash; decoy branches</option>
-            <option value="0">Lean &mdash; smallest output</option>
-            <option value="2">Heavy &mdash; decoys + decoy slots</option>
-          </select>
-        </div>
-        <div class="field"><label>Audit level</label>
-          <select id="opt-guard">
-            <option value="1" selected>Standard &mdash; builtins audit</option>
-            <option value="0">Off &mdash; no audit</option>
-            <option value="2">Strict &mdash; toolkit + timing audit</option>
-          </select>
-        </div>
-        <div class="field"><label>Anti-environment</label>
-          <select id="opt-envChecks">
-            <option value="2" selected>Strict &mdash; probe battery + bound seal</option>
-            <option value="1">Standard &mdash; bound seal</option>
-            <option value="0">Off</option>
-          </select>
-        </div>
-        <div class="field"><label>Loader</label>
-          <select id="opt-antiTamper">
-            <option value="2" selected>Full &mdash; encrypted chunk loader</option>
-            <option value="1">Fast &mdash; plain chunk loader</option>
-            <option value="0">Off</option>
-          </select>
-        </div>
-        <div class="field"><label>Identifiers</label>
-          <select id="opt-nameStyle">
-            <option value="random" selected>random (1&ndash;4 chars)</option>
-            <option value="short">short (1&ndash;2 chars)</option>
-            <option value="confuse">confusable glyphs</option>
-          </select>
-        </div>
-        <div class="field switch-row"><input type="checkbox" id="opt-envLock" checked><span class="switch"></span>
-          <div><label for="opt-envLock">Require genuine Roblox client</label>
-            <div class="desc">The build refuses to run outside a real client environment.</div>
-          </div>
-        </div>
-        <div class="field switch-row"><input type="checkbox" id="opt-minify" checked><span class="switch"></span>
-          <div><label for="opt-minify">One-line output</label>
-            <div class="desc">Ships the whole build as a single line.</div>
-          </div>
-        </div>
-        <div class="field switch-row"><input type="checkbox" id="opt-watermark" checked><span class="switch"></span>
-          <div><label for="opt-watermark">Watermark header</label>
-            <div class="desc">Adds the Darkfuscator banner comment above the build.</div>
-          </div>
-        </div>
-        <div class="toggle-pair">
-          <div class="field"><label>Lock to place ID (optional)</label>
-            <input id="opt-lockPlace" type="text" inputmode="numeric" placeholder="e.g. 9876543210" autocomplete="off">
-          </div>
-          <div class="field"><label>Lock to universe ID (optional)</label>
-            <input id="opt-lockUniverse" type="text" inputmode="numeric" placeholder="e.g. 1234567890" autocomplete="off">
-          </div>
-        </div>
-        <div class="field"><label>Seed (optional)</label>
-          <input id="seed" type="text" inputmode="numeric" placeholder="random" autocomplete="off">
-          <div class="desc">The same seed always produces the same build.</div>
-        </div>
-      </div>
-      <div class="modal-foot"><button class="btn" id="modal-cancel">Cancel</button><button class="btn orange" id="modal-run">Obfuscate</button></div>
-    </div>
+
+
+<!-- SETTINGS MODAL -->
+
+<div
+  class="modal-root"
+  id="modal">
+
+  <div
+    class="modal-backdrop"
+    id="modal-backdrop">
   </div>
-<div class="toast" id="toast"></div>
-<footer><p>&copy; 2026 Darkfuscator &middot; Obfuscation raises the cost of reading code; it is not a security boundary.</p></footer>
-<noscript><p class="noscript">Darkfuscator needs JavaScript &mdash; it runs entirely in your browser.</p></noscript>
+
+
+  <div class="modal">
+
+
+    <div class="modal-header">
+
+      <span>
+        🎃 Darkfuscator Obfuscation
+      </span>
+
+      <button
+        id="modal-close">
+
+        &times;
+
+      </button>
+
+    </div>
+
+
+    <div class="modal-body">
+
+
+      <div class="field">
+
+        <label>
+          Build profile
+        </label>
+
+        <select id="opt-junk">
+
+          <option
+            value="1"
+            selected>
+
+            Normal — decoy branches
+
+          </option>
+
+          <option value="0">
+            Lean — smallest output
+          </option>
+
+          <option value="2">
+            Heavy — decoys + decoy slots
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Audit level
+        </label>
+
+        <select id="opt-guard">
+
+          <option
+            value="1"
+            selected>
+
+            Standard — builtins audit
+
+          </option>
+
+          <option value="0">
+            Off — no audit
+          </option>
+
+          <option value="2">
+            Strict — toolkit + timing audit
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Anti-environment
+        </label>
+
+        <select id="opt-envChecks">
+
+          <option
+            value="2"
+            selected>
+
+            Strict — probe battery + bound seal
+
+          </option>
+
+          <option value="1">
+            Standard — bound seal
+          </option>
+
+          <option value="0">
+            Off
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Loader
+        </label>
+
+        <select id="opt-antiTamper">
+
+          <option
+            value="2"
+            selected>
+
+            Full — encrypted chunk loader
+
+          </option>
+
+          <option value="1">
+            Fast — plain chunk loader
+          </option>
+
+          <option value="0">
+            Off
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Identifiers
+        </label>
+
+        <select id="opt-nameStyle">
+
+          <option
+            value="random"
+            selected>
+
+            random (1–4 chars)
+
+          </option>
+
+          <option value="short">
+            short (1–2 chars)
+          </option>
+
+          <option value="confuse">
+            confusable glyphs
+          </option>
+
+        </select>
+
+      </div>
+
+
+      <div class="field switch-row">
+
+        <input
+          type="checkbox"
+          id="opt-envLock"
+          checked>
+
+        <span class="switch"></span>
+
+        <div>
+
+          <label for="opt-envLock">
+            Require genuine Roblox client
+          </label>
+
+          <div class="desc">
+            The build refuses to run outside a real client environment.
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="field switch-row">
+
+        <input
+          type="checkbox"
+          id="opt-minify"
+          checked>
+
+        <span class="switch"></span>
+
+        <div>
+
+          <label for="opt-minify">
+            One-line output
+          </label>
+
+          <div class="desc">
+            Ships the whole build as a single line.
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="field switch-row">
+
+        <input
+          type="checkbox"
+          id="opt-watermark"
+          checked>
+
+        <span class="switch"></span>
+
+        <div>
+
+          <label for="opt-watermark">
+            Watermark header
+          </label>
+
+          <div class="desc">
+            Adds the Darkfuscator banner comment above the build.
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="toggle-pair">
+
+        <div class="field">
+
+          <label>
+            Lock to place ID (optional)
+          </label>
+
+          <input
+            id="opt-lockPlace"
+            type="text"
+            inputmode="numeric"
+            placeholder="e.g. 9876543210"
+            autocomplete="off">
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            Lock to universe ID (optional)
+          </label>
+
+          <input
+            id="opt-lockUniverse"
+            type="text"
+            inputmode="numeric"
+            placeholder="e.g. 1234567890"
+            autocomplete="off">
+
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          Seed (optional)
+        </label>
+
+        <input
+          id="seed"
+          type="text"
+          inputmode="numeric"
+          placeholder="random"
+          autocomplete="off">
+
+        <div class="desc">
+          The same seed always produces the same build.
+        </div>
+
+      </div>
+
+
+    </div>
+
+
+    <div class="modal-foot">
+
+      <button
+        class="btn"
+        id="modal-cancel">
+
+        Cancel
+
+      </button>
+
+      <button
+        class="btn orange"
+        id="modal-run">
+
+        🎃 Obfuscate
+
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<div
+  class="toast"
+  id="toast">
+</div>
+
+
+<footer>
+
+  <p>
+    🎃 &copy; 2026 Darkfuscator
+    · Obfuscation raises the cost of reading code;
+    it is not a security boundary.
+  </p>
+
+</footer>
+
+
+<noscript>
+
+  <p class="noscript">
+    Darkfuscator needs JavaScript —
+    it runs entirely in your browser.
+  </p>
+
+</noscript>
+
 
 <script>
 (function () {
+
   'use strict';
-  var $ = function (id) { return document.getElementById(id); };
+
+  var $ = function (id) {
+    return document.getElementById(id);
+  };
+
 
   function toast(msg, error) {
+
     var t = $('toast');
+
     t.textContent = msg;
-    t.className = 'toast show' + (error ? ' error' : '');
+
+    t.className =
+      'toast show' +
+      (error ? ' error' : '');
+
     clearTimeout(t._timer);
-    t._timer = setTimeout(function () { t.className = 'toast'; }, 3600);
-  }
-  window.DKUI = { toast: toast };
 
-  // ------------------------------------------------------- collapsible sidebar
+    t._timer = setTimeout(function () {
+      t.className = 'toast';
+    }, 3600);
+
+  }
+
+
+  window.DKUI = {
+    toast: toast
+  };
+
+
   function toggleSidebar() {
-    var shell = document.querySelector('.shell');
-    if (window.matchMedia('(max-width: 860px)').matches) {
-      shell.classList.toggle('sidebar-open');
+
+    var shell =
+      document.querySelector('.shell');
+
+    if (
+      window.matchMedia(
+        '(max-width: 860px)'
+      ).matches
+    ) {
+
+      shell.classList.toggle(
+        'sidebar-open'
+      );
+
     } else {
-      shell.classList.toggle('sidebar-hidden');
+
+      shell.classList.toggle(
+        'sidebar-hidden'
+      );
+
     }
+
   }
-  $('btn-menu').onclick = toggleSidebar;
+
+
+  $('btn-menu').onclick =
+    toggleSidebar;
+
+
   $('scrim').onclick = function () {
-    document.querySelector('.shell').classList.remove('sidebar-open');
+
+    document
+      .querySelector('.shell')
+      .classList
+      .remove('sidebar-open');
+
   };
 
-  // ------------------------------------------------------------------- modal
+
   var modal = $('modal');
-  function openModal() { modal.classList.add('open'); }
-  function closeModal() { modal.classList.remove('open'); }
-  $('btn-settings').onclick = openModal;
-  $('modal-close').onclick = $('modal-cancel').onclick = $('modal-backdrop').onclick = closeModal;
+
+
+  function openModal() {
+    modal.classList.add('open');
+  }
+
+
+  function closeModal() {
+    modal.classList.remove('open');
+  }
+
+
+  $('btn-settings').onclick =
+    openModal;
+
+
+  $('modal-close').onclick =
+  $('modal-cancel').onclick =
+  $('modal-backdrop').onclick =
+    closeModal;
+
+
   $('modal-run').onclick = function () {
+
     closeModal();
+
     var pr = $('protect');
-    if (pr) pr.click();
+
+    if (pr) {
+      pr.click();
+    }
+
   };
 
-  // -------------------------------------------------------------- upload zone
-  var dz = $('drop-zone'), fileInput = $('file');
-  $('btn-zone').onclick = function () { fileInput.click(); };
-  ['dragenter', 'dragover'].forEach(function (e) {
-    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = '#ff7a1a'; });
-  });
-  ['dragleave', 'drop'].forEach(function (e) {
-    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = ''; });
-  });
-  dz.addEventListener('drop', function (e) {
-    var f = e.dataTransfer.files[0];
-    if (!f) return;
-    var r = new FileReader();
-    r.onload = function () {
-      fileInput.value = '';
-      var inp = $('input');
-      inp.value = String(r.result || '');
-      inp.dispatchEvent(new Event('input'));
-      toast('Loaded ' + f.name);
+
+  var dz = $('drop-zone');
+  var fileInput = $('file');
+
+
+  $('btn-zone').onclick =
+    function () {
+      fileInput.click();
     };
-    r.readAsText(f);
-  });
+
+
+  ['dragenter', 'dragover']
+    .forEach(function (e) {
+
+      dz.addEventListener(
+        e,
+        function (ev) {
+
+          ev.preventDefault();
+
+          dz.style.borderColor =
+            '#ff7518';
+
+        }
+      );
+
+    });
+
+
+  ['dragleave', 'drop']
+    .forEach(function (e) {
+
+      dz.addEventListener(
+        e,
+        function (ev) {
+
+          ev.preventDefault();
+
+          dz.style.borderColor = '';
+
+        }
+      );
+
+    });
+
+
+  dz.addEventListener(
+    'drop',
+    function (e) {
+
+      var f =
+        e.dataTransfer.files[0];
+
+      if (!f) return;
+
+
+      var r =
+        new FileReader();
+
+
+      r.onload = function () {
+
+        fileInput.value = '';
+
+        var inp = $('input');
+
+        inp.value =
+          String(r.result || '');
+
+        inp.dispatchEvent(
+          new Event('input')
+        );
+
+        toast(
+          'Loaded ' + f.name
+        );
+
+      };
+
+
+      r.readAsText(f);
+
+    }
+  );
+
 })();
 </script>
+
 <script>
 /* ===== js/luau-lexer.js ===== */
 /*!
