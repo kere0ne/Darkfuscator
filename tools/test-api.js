@@ -1,7 +1,7 @@
 'use strict';
 // Tests for the connected-loader API library (pure logic + mock KV).
 
-const lib = require('../site/functions/api/_lib.js');
+const lib = require('../functions/api/_lib.js');
 
 let passed = 0, failed = 0;
 function ok(name, cond) {

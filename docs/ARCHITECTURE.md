@@ -58,10 +58,10 @@ ratio, ms, seed) so a broken profile shows up immediately.
 The published site can ship artifacts with server-side validation:
 
 ```
-site/functions/api/_lib.js    storage, IDs, tokens, response editor, assess()
-site/functions/api/builds.js  create/list artifacts
-site/functions/api/builds/[id].js  detail, editor (expiry/revocation/redirect), delete
-site/functions/api/loader/[id].js  loader endpoint: validates ID + token, serves
+functions/api/_lib.js    storage, IDs, tokens, response editor, assess()
+functions/api/builds.js  create/list artifacts
+functions/api/builds/[id].js  detail, editor (expiry/revocation/redirect), delete
+functions/api/loader/[id].js  loader endpoint: validates ID + token, serves
                                    payload or the state's custom response
 site/dashboard.html           dashboard: loader IDs, request logs, message editor,
                               preview before publish, expiry/revocation controls
