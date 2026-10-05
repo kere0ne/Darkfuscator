@@ -22,7 +22,7 @@ bin/                 CLI interface
   luau-obfuscator.js luau-obfuscator <input.luau> <output.luau> --preset maximum
 examples/            example scripts: plain input + obfuscated build
 docs/                architecture, VM, and bytecode format explanations
-references/anti-env/ reference anti-environment logger sources
+references/anti-env/ reference anti-environment logger sources (incl. AEL v1.10, wynfuscate harness)
 site/                publishable web build (index.html, engine, publishable service)
   js/                engine: lexer, parser, compiler, compression, emitter, orchestrator
   functions/api/     loader artifact service (Cloudflare Pages Functions)
@@ -56,6 +56,25 @@ npm link           # or run ./bin/luau-obfuscator.js directly
 
 Web: open `site/index.html` in a browser. Everything runs client-side; no
 server needed to build. Published site needs Cloudflare Pages (see docs).
+
+## /v1 API (Cloudflare Pages Functions)
+
+| Endpoint | Method | What it does |
+|---|---|---|
+| `/v1/protect` | POST | `{ source, preset?, seed?, options? }` → `{ ok, preset, output, bytes }`. Presets: `lightweight`, `balanced` (default), `maximum`. 200 KB source cap. |
+| `/v1/protect` | GET | Self-describing usage document. |
+| `/v1/health` | GET | `{ ok, name, version, engine, time }` liveness. |
+
+Example:
+
+```sh
+curl -s https://darkfuscator.pages.dev/v1/protect \
+  -H 'content-type: application/json' \
+  -d '{"source":"print(1+1)","preset":"balanced"}'
+```
+
+The engine runs server-side per request (the same pipeline the web UI runs
+client-side); no account, no key.
 
 ## CLI usage
 

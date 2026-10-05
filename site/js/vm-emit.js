@@ -587,6 +587,9 @@
       push('if ' + b1 + '==1 then');
       push('local ' + okc + '=true');
       push('pcall(function() if game.Close~=game.Close then ' + okc + '=false end if typeof(game:GetService("Lighting"))~="Instance" then ' + okc + '=false end if game:GetService("Lighting").ClockTime~=game:GetService("Lighting").ClockTime then ' + okc + '=false end end)');
+      push('pcall(function() if typeof(game.Loaded)~="boolean" then ' + okc + '=false end end)');
+      push('pcall(function() if typeof(game:GetService("ProximityPromptService").PromptShown)~="RBXScriptSignal" then ' + okc + '=false end end)');
+      push('pcall(function() if typeof(game.Workspace:GetServerTimeNow())~="number" then ' + okc + '=false end end)');
       push('if ' + okc + ' then');
       if (elevel >= 2) {
         push('local ' + n6 + ',' + n7 + ',' + n8 + ',' + n9 + ',' + n10 + '=0,0,0,0,0');
