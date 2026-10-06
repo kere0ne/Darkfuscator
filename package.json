@@ -1,13 +1,14 @@
 {
   "name": "darkfuscator",
   "version": "1.0.0",
-  "description": "**Open `index.html`** — it is a self-contained build: double-click it, no server, no install. **Upload the `site/` folder** to Cloudflare Pages to publish it (no build step).",
+  "description": "**Open `index.html`** \u2014 it is a self-contained build: double-click it, no server, no install. **Upload the `site/` folder** to Cloudflare Pages to publish it (no build step).",
   "main": "index.js",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node tools/serve.js"
   },
   "keywords": [],
   "author": "",
