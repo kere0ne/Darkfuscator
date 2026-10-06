@@ -15,6 +15,26 @@ randomized interpreter. Renaming, string encryption, control-flow flattening,
 opaque predicates, dead code, execution locks, and integrity checksums are all
 part of that pipeline.
 
+
+## v5.0 behavior
+
+**Every build ships maximum protection by default.** The engine defaults are the
+strongest profile: strict anti-environment audit, full anti-tamper loader,
+monstrous junk, `confuse` naming, compression. The web UI has no settings panel;
+the CLI still accepts `--preset lightweight|balanced|maximum` and explicit flags
+when you need a lighter build.
+
+**Failures are silent.** A tampered, dumped, or non-Roblox environment gets no
+message: the environment audit and anti-tamper battery stop the program quietly,
+before a single byte decrypts, and a failure caught by the Heartbeat re-audit
+hangs the thread. No error text names the protector or the check that tripped.
+
+**Two VM dispatch architectures.** Each build randomly picks between a shuffled
+compare ladder and a scrambled numeric jump table (opcode id maps straight to a
+handler reference, dead ids included), with 8 different handler bodies per used
+opcode at full junk and 20 provably-dead opaque predicates in the pool. There is
+no single interpreter loop to lift, and no two builds look alike.
+
 ## Folder structure
 
 ```
@@ -101,10 +121,10 @@ Config file (JSON), read from --config or ./darkfuscator.config.json:
 
 | Option | Values | What it does |
 |---|---|---|
-| junk | 0-3 | decoy dispatch branches; 3 = monstrous (~100k junk statements) |
+| junk | 0-3 | decoy dispatch branches; 3 = monstrous (~100k junk statements). **Default: 3** |
 | guard | 0-2 | anti-environment audit strength |
 | envChecks | 0-2 | anti-env probes; the passing audit feeds the decryption seal |
-| antiTamper | 0-2 | chunked loader wrapper + heartbeat re-audit: off / fast / full |
+| antiTamper | 0-2 | chunked loader wrapper + heartbeat re-audit: off / fast / full. **Default: 2** |
 | nameStyle | short / random / confuse | generated identifier style |
 | minify | true / false | one-line output |
 | compress | true / false | LZSS payload compression pass |

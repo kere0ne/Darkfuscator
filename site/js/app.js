@@ -1,6 +1,13 @@
 /*!
  * app.js — Darkfuscator UI wiring.
- * Depends on: luau-lexer.js, luau-parser.js, obfuscate.js (window.Darkfuscator)
+ * Depends on: luau-lexer.js, luau-parser.js, lz.js, vm-compile.js, vm-emit.js,
+ *             obfuscate.js (window.Darkfuscator)
+ *
+ * The engine's own defaults ARE the protection profile (maximum: strict
+ * anti-environment audit, full anti-tamper loader, monstrous junk, confuse
+ * naming, compression). The UI exposes no settings: every build ships the
+ * strongest profile. A hidden localStorage key ("darkfuscator.overrides")
+ * exists for automated testing only.
  */
 (function () {
   'use strict';
@@ -17,31 +24,17 @@
     input: $('#input'), output: $('#output'),
     inmeta: $('#inmeta'), outmeta: $('#outmeta'),
     status: $('#status'), error: $('#error'), stats: $('#stats'),
-    seed: $('#seed'),
-    file: $('#file'),
+    file: $('#file'), browse: $('#browse'),
     protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
     copy: $('#copy'), download: $('#download'), publish: $('#btn-publish'),
-    paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
-    advanced: $('#advanced')
+    paneIn: $('#pane-in'), verified: $('#verified-badge')
   };
 
-  // only the knobs the bytecode pipeline actually uses
-  var OPTION_CONTROLS = {
-    nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
-    guard: '#opt-guard', watermark: '#opt-watermark',
-    lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
-    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper',
-    loader: '#opt-loader'
-  };
-  var STORE_KEY = 'darkfuscator.opts.v2';
   var API_BASE = 'https://darkfuscator.pages.dev';
   var lastPayload = null;
 
   // ------------------------------------------------------------------ utils
   function fmt(n) { return Number(n).toLocaleString(); }
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
   function countLines(s) { return s ? s.split('\n').length : 0; }
 
   function setStatus(text, kind) {
@@ -80,46 +73,18 @@
   }
 
   // ---------------------------------------------------------------- options
+  // Maximum profile comes from the engine itself. The hidden overrides key is
+  // for automated tests, not a settings surface.
   function readOptions() {
     var o = {};
-    for (var key in OPTION_CONTROLS) {
-      var node = $(OPTION_CONTROLS[key]);
-      if (!node) continue;
-      o[key] = node.type === 'checkbox' ? node.checked : node.value;
-    }
-    o.junk = parseInt(o.junk, 10) || 0;
-    o.guard = parseInt(o.guard, 10);
-    if (o.guard !== 0 && o.guard !== 2) o.guard = 1;
-    var seed = el.seed.value.trim();
-    o.seed = seed === '' ? null : (isNaN(Number(seed)) ? seed : Number(seed));
-    return o;
-  }
-
-  function writeOptions(o) {
-    for (var key in OPTION_CONTROLS) {
-      if (o[key] === undefined) continue;
-      var node = $(OPTION_CONTROLS[key]);
-      if (!node) continue;
-      if (node.type === 'checkbox') node.checked = !!o[key];
-      else node.value = String(o[key]);
-    }
-  }
-
-  function saveOptions() {
     try {
-      var o = readOptions();
-      delete o.seed;
-      localStorage.setItem(STORE_KEY, JSON.stringify(o));
-    } catch (e) { /* private mode — ignore */ }
-  }
-
-  function loadOptions() {
-    try {
-      var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      var o = JSON.parse(raw);
-      writeOptions(o);
+      var raw = localStorage.getItem('darkfuscator.overrides');
+      if (raw) {
+        var ov = JSON.parse(raw);
+        for (var k in ov) o[k] = ov[k];
+      }
     } catch (e) { /* ignore */ }
+    return o;
   }
 
   // ----------------------------------------------------------------- counts
@@ -142,13 +107,13 @@
     $('#st-seed').textContent = s.seed !== undefined ? s.seed : '\u2014';
   }
 
-  // ------------------------------------------------------------- obfuscate
+  // --------------------------------------------------------------- obfuscate
   var lastFilename = 'protected.luau';
 
   function runObfuscate() {
     var src = el.input.value;
     if (!src.trim()) {
-      setStatus('Paste some Luau, load an example, or upload a file first.', 'warn');
+      setStatus('Paste some Luau, or drop a file first.', 'warn');
       el.input.focus();
       return;
     }
@@ -174,23 +139,10 @@
     }
 
     lastPayload = res.output;
-    el.publish.hidden = (String(opts.loader) !== '1');
-    if (String(opts.loader) === '1') { publishConnected(res.output); }
-
     el.output.value = res.output;
     updateMeta();
     updateStats(res);
     el.verified.hidden = false;
-
-    if (window.DKUI && DKUI.toast) { DKUI.toast('Build finished'); } if (false) {
-      DKUI.recordBuild({
-        filename: lastFilename || 'protected.luau',
-        date: new Date().toISOString(),
-        seed: res.stats ? res.stats.seed : null,
-        size: res.output.length,
-        output: res.output.length < 1800000 ? res.output : null
-      });
-    }
 
     if (res.warnings && res.warnings.length) {
       setStatus('Done — ' + res.warnings.join(' '), 'warn');
@@ -262,17 +214,12 @@
   // ------------------------------------------------------------------ events
   el.input.addEventListener('input', updateMeta);
   el.output.addEventListener('input', updateMeta);
-  Object.keys(OPTION_CONTROLS).forEach(function (key) {
-    var node = $(OPTION_CONTROLS[key]);
-    if (!node) return;
-    node.addEventListener('change', saveOptions);
-  });
-  el.seed.addEventListener('change', saveOptions);
 
   el.protect.addEventListener('click', runObfuscate);
   el.validate.addEventListener('click', runValidate);
   el.copy.addEventListener('click', copyOutput);
   el.download.addEventListener('click', downloadOutput);
+  el.browse.addEventListener('click', function () { el.file.click(); });
 
   el.clear.addEventListener('click', function () {
     el.input.value = ''; el.output.value = ''; el.file.value = '';
@@ -287,7 +234,7 @@
     loadFile(e.target.files && e.target.files[0]);
   });
 
-  // drag & drop anywhere on the card
+  // drag & drop anywhere
   ['dragenter', 'dragover'].forEach(function (evt) {
     el.paneIn.addEventListener(evt, function (e) {
       e.preventDefault();
@@ -304,7 +251,6 @@
     var dt = e.dataTransfer;
     if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
   });
-  // also accept drops on the output pane and the whole document
   document.addEventListener('dragover', function (e) { e.preventDefault(); });
   document.addEventListener('drop', function (e) {
     e.preventDefault();
@@ -340,16 +286,13 @@
       attempt(t).then(function (d) {
         el.output.value = d.loader;
         updateMeta();
-        el.publish.hidden = true;
         localStorage.setItem('dk_admin_token', t);
         setStatus('Published as ' + d.id + '. The output is now the connected loader — share that, not the build.', 'ok');
-        if (window.DKUI && DKUI.toast) { DKUI.toast('Published ' + d.id); }
       }).catch(function (e) {
         if (e.status === 401) {
           var asked = window.prompt('Darkfuscator admin token (ADMIN_TOKEN):', '');
           if (asked && asked.trim()) { run(asked.trim()); return; }
         }
-        el.publish.hidden = false;
         setStatus('Publish failed: ' + e.message + '. The self-contained build is still in the output.', 'warn');
       });
     };
@@ -362,7 +305,6 @@
   };
 
   // ------------------------------------------------------------------- init
-  loadOptions();
   if (!el.input.value) updateMeta();
-  setStatus('Ready. Nothing leaves your browser.');
+  setStatus('Ready. Maximum protection, automatically.');
 })();

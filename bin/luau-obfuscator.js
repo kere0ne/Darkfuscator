@@ -34,7 +34,7 @@ const HELP = [
   '  maximum       everything on: ~100k junk statements, strong audits, full anti-tamper',
   '',
   'Options:',
-  '  --preset <name>        lightweight | balanced | maximum (default: balanced)',
+  '  --preset <name>        lightweight | balanced | maximum (default: maximum)',
   '  --config <file>        JSON config file (default: ./darkfuscator.config.json)',
   '  --seed <n>             fixed build seed (reproducible builds)',
   '  --junk <0|1|2|3>       decoy dispatch branches / monstrous junk profile',
@@ -120,7 +120,7 @@ function main() {
   if (!input) { process.stdout.write(HELP + '\n'); process.exit(input === undefined ? 1 : 0); }
 
   // 1. preset
-  var presetName = flags.preset || 'balanced';
+  var presetName = flags.preset || 'maximum';
   if (presetName === 'light') presetName = 'lightweight';
   if (presetName === 'max') presetName = 'maximum';
   var preset = Presets.PRESETS[presetName];

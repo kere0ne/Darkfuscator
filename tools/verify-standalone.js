@@ -49,13 +49,10 @@ const check = (name, cond, extra) => {
 };
 
 check('engine loaded', !!window.Darkfuscator);
+check('no settings UI shipped', !$('#opt-junk') && !$('#opt-guard') && !window.document.querySelector('.modal'));
+window.localStorage.setItem('darkfuscator.overrides',
+  JSON.stringify({ antiTamper: 0, junk: 1 })); // engine defaults run anti-tamper; the luau CLI is not a Roblox client
 $('#input').value = SRC;
-$('#seed').value = '4242';
-if ($('#opt-envChecks')) $('#opt-envChecks').value = '0';
-if ($('#opt-loader')) $('#opt-loader').value = '0';
-if ($('#opt-antiTamper')) $('#opt-antiTamper').value = '0';
-if ($('#opt-envLock')) $('#opt-envLock').checked = false;
-if ($('#opt-guard')) $('#opt-guard').value = '1';
 $('#protect').dispatchEvent(new window.Event('click'));
 const out = $('#output').value;
 check('output produced', out.length > 500, 'len=' + out.length);
