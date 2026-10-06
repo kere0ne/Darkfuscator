@@ -29,15 +29,23 @@
   var DEFAULTS = {
     nameStyle: 'random',        // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
-    junk: 1,                    // 0 | 1 | 2 — decoy dispatch branches and slots
-    guard: 1,                   // 0 | 1 | 2 — anti-environment audit strength
+    junk: 3,                    // 0 | 1 | 2 | 3 — decoys, dead handlers, heavy junk (~900 KB)
+    guard: 2,                   // 0 | 1 | 2 — anti-environment audit strength
     captureGlobals: true,       // grab the caller's environment with getfenv()
     watermark: true,            // leading "protected by" comment
     lockPlace: '',              // optional Roblox place id the build is bound to
     lockUniverse: '',           // optional Roblox universe id the build is bound to
     envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
     envLock: false,             // refuse to decode outside a genuine Roblox client
-    antiTamper: 0               // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
+    antiTamper: 2,              // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
+    vmLayers: 2                 // 1 | 2 — nested VM: the build runs inside a second VM
+  };
+
+  // presets for the CLI and for callers that name one; the UI always uses maximum
+  var PRESETS = {
+    lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
+    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 1 },
+    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 2 }
   };
 
 
@@ -80,7 +88,17 @@
     }
     var opts = {};
     for (var k in DEFAULTS) opts[k] = DEFAULTS[k];
-    for (var ok in (options || {})) if (options[ok] !== undefined) opts[ok] = options[ok];
+    // resolution order: defaults <- preset <- explicit options (explicit wins)
+    var presetName = (options || {}).preset;
+    if (presetName && PRESETS[presetName]) {
+      var ps = PRESETS[presetName];
+      for (var pk in ps) opts[pk] = ps[pk];
+    }
+    for (var ok in (options || {})) if (options[ok] !== undefined && ok !== 'preset') opts[ok] = options[ok];
+    opts.junk = Math.max(0, Math.min(3, parseInt(opts.junk, 10) || 0));
+    opts.envChecks = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
+    opts.antiTamper = opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0;
+    opts.vmLayers = opts.vmLayers === 1 ? 1 : 2;
 
     var result = {
       ok: false, output: '', error: null, stats: {}, warnings: [], options: opts
@@ -109,7 +127,7 @@
       var vmRng = makeRng(opts.seed);
       vmOut = VMEmit.emit(prog, {
         rng: vmRng,
-        junk: opts.junk === 2 ? 2 : opts.junk === 1 ? 1 : 0,
+        junk: opts.junk >= 2 ? 2 : opts.junk === 1 ? 1 : 0,
         minify: opts.minify !== false,
         nameStyle: opts.nameStyle || 'random',
         guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
@@ -119,7 +137,8 @@
         lockUniverse: opts.lockUniverse || '',
         envChecks: opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2,
         envLock: opts.envLock === true,
-        antiTamper: opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0
+        antiTamper: opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0,
+        wrapReturn: opts.junk >= 3
       });
     } catch (e) {
       vmErr = e;
@@ -127,13 +146,52 @@
     if (vmOut) {
       var vmSrc = vmOut.source;
       if (!/\n$/.test(vmSrc)) vmSrc += '\n';
+      var engineName = 'vm';
+      // second VM layer: the first build's source is compiled AGAIN into a
+      // second freshly-randomised VM whose payload carries the whole first
+      // build. Two different opcode maps, two different seals, and a dumper
+      // has to peel both to see anything. Skipped for payloads too large to
+      // nest sensibly (>200 KB), which keeps big scripts on a single strong VM.
+      if (opts.vmLayers === 2 && vmSrc.length <= 200000) {
+        try {
+          var parsed2 = Parser.parse(vmSrc);
+          var prog2 = VMCompile.compile(parsed2.ast, parsed2.refs);
+          var vmRng2 = makeRng((vmRng.seed ^ 0x9E3779B9) >>> 0);
+          var vmOut2 = VMEmit.emit(prog2, {
+            rng: vmRng2,
+            junk: opts.junk >= 1 ? 1 : 0,
+            minify: true,
+            nameStyle: opts.nameStyle || 'random',
+            guard: 1,            // the outer build runs the full battery; the
+            captureGlobals: true,// inner one only seals its own payload
+            watermark: false,
+            lockPlace: '', lockUniverse: '',
+            envChecks: 1,
+            envLock: false,
+            antiTamper: 0,
+            wrapReturn: opts.junk >= 3
+          });
+          Parser.parse(vmOut2.source);
+          vmSrc = vmOut2.source;
+          if (!/\n$/.test(vmSrc)) vmSrc += '\n';
+          vmOut = vmOut2; vmRng = vmRng2;
+          engineName = 'nested-vm';
+        } catch (eN) { /* nested pass refused the payload: keep the single VM build */ }
+      }
+      // heavy junk (junk 3): dead `if false` statements appended to the final
+      // source, never executed, capped at ~950 KB
+      if (opts.junk >= 3) {
+        var jR = heavyJunk(vmSrc, vmRng);
+        vmSrc = jR.src;
+        result.stats.junkStatements = jR.stmts;
+      }
       var vmBad = null;
       try { Parser.parse(vmSrc); } catch (e2) { vmBad = e2; }
       if (!vmBad) {
         mark('vm');
         result.stats.times = T;
         result.stats.seed = vmRng.seed;
-        result.stats.engine = 'vm';
+        result.stats.engine = engineName;
         result.stats.ms = Math.round(((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - t0);
         result.stats.inputChars = String(src).length;
         result.stats.outputChars = vmSrc.length;
@@ -165,11 +223,51 @@
     return n;
   }
 
+  // Heavy junk (junk 3): dead `if false` blocks stuffed with pure arithmetic on
+  // local-only integers. The runtime skips them entirely, every value stays
+  // non-negative so nothing can throw even if it ran, and the only effect is
+  // parser noise: ~100k statements or ~950 KB, whichever limit hits first.
+  function heavyJunk(src, rng) {
+    var TARGET = 900000, MAXSTMT = 100000;
+    var parts = [], stmts = 0, size = 0;
+    // two-character locals keep the noise dense: ~9 characters per statement
+    // puts the 100k-statement target and the 900 KB target at the same place
+    var POOL = 'abcdefghijklmnopqrstuvwxyz';
+    while (stmts < MAXSTMT && size < TARGET) {
+      var NV = 24 + Math.floor(rng() * 17);
+      var vs = [], i;
+      for (i = 0; i < NV; i++) vs.push(POOL.charAt(i % 26) + POOL.charAt(Math.floor(i / 26)));
+      // scramble which names survive per block (they are block-local anyway)
+      for (i = NV - 1; i > 0; i--) { var j3 = Math.floor(rng() * (i + 1)); var t3 = vs[i]; vs[i] = vs[j3]; vs[j3] = t3; }
+      var b = ['if false then',
+        'local ' + vs.join(',') + '=' + vs.map(function () { return String(1 + Math.floor(rng() * 999983)); }).join(',')];
+      for (var s2 = 0; s2 < 6000 && stmts < MAXSTMT && size < TARGET; s2++) {
+        var a = vs[Math.floor(rng() * NV)], c = vs[Math.floor(rng() * NV)];
+        var lit = 1 + Math.floor(rng() * 2147483);
+        var kind = Math.floor(rng() * 100), st;
+        if (kind < 84) {
+          var op = ['+', '-', '*'][Math.floor(rng() * 3)];
+          st = a + '=' + a + op + c;
+        } else if (kind < 93) {
+          st = a + '=' + a + '%999983';
+        } else if (kind < 91) {
+          st = a + '=(' + a + '+' + lit + '-' + c + ')%999983';
+        } else {
+          st = a + '=bit32.bxor(' + a + ',' + c + ')%2147483647';
+        }
+        b.push(st); stmts++; size += st.length + 1;
+      }
+      b.push('end');
+      parts.push(b.join('\n'));
+    }
+    return { src: src + '\n' + parts.join('\n') + '\n', stmts: stmts };
+  }
+
   return {
     obfuscate: obfuscate,
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '4.3.0'
+    version: '6.0.0'
   };
 });
