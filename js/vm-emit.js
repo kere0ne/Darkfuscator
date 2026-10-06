@@ -568,7 +568,15 @@
       wl('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
       wl('checks[11]={name="env_write",run=function() local cv="_dkcv"..tostring(math.floor((os.clock()%1)*1000000)) local ok2=false pcall(function() getfenv(0)[cv]=1187 if getfenv(0)[cv]==1187 then ok2=true end getfenv(0)[cv]=nil end) if not ok2 then return false end return true end}');
       wl('checks[12]={name="string_integrity",run=function() if tostring("ab")~="ab" or string.rep("x",2)~="xx" or ("ab"):upper()~="AB" or #"ab"~=2 then return false end return true end}');
-      wl('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") end return true end}');
+      wl('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end local bad=false if game~=nil then pcall(function() if game.Close~=game.Close then bad=true end end) end local hooked=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") if bad then return false end end if (dn>0 or hooked) and bad then return false end return true end}');
+      wl('checks[14]={name="identity_consistency",run=function() if game==nil or typeof(game)~="Instance" then return true end local ok,L=pcall(game.GetService,game,"Lighting") if ok and L.ClockTime~=L.ClockTime then return false end if workspace.CurrentCamera~=workspace.CurrentCamera then return false end local ok2,a=pcall(game.GetService,game,"Lighting") local ok3,b=pcall(game.GetService,game,"Lighting") if ok2~=ok3 then return false end return true end}');
+      wl('checks[15]={name="json_determinism",run=function() if game==nil then return true end local ok,hs=pcall(game.GetService,game,"HttpService") if not ok or type(hs.JSONEncode)~="function" then return true end local ok2,e1=pcall(hs.JSONEncode,hs,{}) local ok3,e2=pcall(hs.JSONEncode,hs,{}) if not ok2 or not ok3 or e1~=e2 then return false end return true end}');
+      wl('checks[16]={name="clone_locked",run=function() if game==nil then return true end local ok,cl=pcall(game.Clone,game) if ok and cl~=nil then return false end return true end}');
+      wl('checks[17]={name="cframe_math",run=function() local ok,cf=pcall(CFrame.new,50,100,50) if not ok then return true end local ok2,r=pcall(function() return cf*CFrame.Angles(0,math.pi/2,0) end) if not ok2 then return false end if math.abs(r.RightVector.Z)<0.9 or math.abs(r.Position.X-50)>0.1 then return false end return true end}');
+      wl('checks[18]={name="readonly_props",run=function() if game==nil then return true end local ok,err=pcall(function() game.PlaceId=0 end) if ok then return false end if type(err)~="string" or #err==0 then return false end return true end}');
+      wl('checks[19]={name="settings_sane",run=function() local ok,s=pcall(function() return settings() end) if not ok or type(s)~="table" then return true end local ok2,pt=pcall(function() return s.Physics.ThrottleAdjustTime end) local ok3,il=pcall(function() return s.Network.IncomingReplicationLag end) if ok2 and type(pt)=="number" and pt>1 then return false end if ok3 and type(il)=="number" and il>1 then return false end return true end}');
+      wl('checks[20]={name="debug_sane",run=function() if type(debug)~="table" or type(debug.getinfo)~="function" then return true end local ok,a=pcall(debug.getinfo,1,"l") local ok2,b=pcall(debug.getinfo,1,"l") if not ok or not ok2 or type(a)~="table" or type(b)~="table" or a.currentline~=b.currentline then return false end return true end}');
+      wl('checks[21]={name="addr_determinism",run=function() local s1=tostring({}) local s2=tostring({}) if #s1>=15 and #s2>=15 and string.sub(s1,8,15)==string.sub(s2,8,15) then return false end local t1={} local d1=tostring(t1) local d2=tostring(t1) if d1~=d2 then return false end return true end}');
       wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end return true end');
       wl('runChecks()');
       wl('if detected then print(MSG) return end');
@@ -623,13 +631,16 @@
       if (glevel === 2) {
         line('if ' + ge + ' then local g=game; if g==nil or typeof(g)~="Instance" or g.ClassName~="DataModel" then return 8 end; if game.Close~=game.Close then return 9 end end');
         line('if game ~= nil and typeof(game)=="Instance" and (typeof(workspace)~="Instance" or typeof(game.GetService)~="function") then return 10 end');
+        line('do local okc,cf=pcall(function() return CFrame.new(50,100,50)*CFrame.Angles(0,math.pi/2,0) end); if okc and (math.abs(cf.RightVector.Z)<0.9 or math.abs(cf.Position.X-50)>0.1) then return 12 end end');
+        line('if game ~= nil and typeof(game)=="Instance" then local okk,cl=pcall(function() return game.Clone(game) end); if okk and cl~=nil then return 13 end; local okj,e1=pcall(function() return game:GetService("HttpService"):JSONEncode({}) end); local okj2,e2=pcall(function() return game:GetService("HttpService"):JSONEncode({}) end); if okj and okj2 and e1~=e2 then return 14 end; local okp,pe=pcall(function() game.PlaceId=0 end); if okp then return 15 end end');
+        line('if type(debug)=="table" and type(debug.getinfo)=="function" then local okd,a=pcall(function() return debug.getinfo(1,"l").currentline end); local okd2,b=pcall(function() return debug.getinfo(1,"l").currentline end); if okd and okd2 and a~=b then return 16 end end');
         // anti-debug timing: a step-debugger or a hook that throttles every
         // operation makes even a small loop take absurd wall time; the threshold
         // keeps ~100x headroom over a normal Luau VM so clean runs never trip it
         line('do local t0=os.clock() local s=0 for i=1,120000 do s=(s+i*7)%1000003 end if os.clock()-t0>0.4 then return 11 end end');
       }
       if (elevel >= 1) {
-        sealBinding(line, 'G', 'return 12');
+        sealBinding(line, 'G', 'return 17');
       } else {
         line('G["' + N.seal + '"]=' + blob.seal + ';');
       }
