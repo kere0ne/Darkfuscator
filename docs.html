@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API Docs · Darkfuscator</title>
+<meta name="description" content="Darkfuscator API documentation: authenticate with your API key and obfuscate Luau source from any language.">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{margin:0;background:#08080a;color:#e8e8ec;font-family:"DM Sans",sans-serif;min-height:100vh}
+a{color:#c9c9d1}
+.layout{display:flex;max-width:1180px;margin:0 auto;padding:28px 20px 90px;gap:36px}
+.sidebar{width:230px;flex-shrink:0;position:sticky;top:28px;align-self:flex-start;max-height:calc(100vh - 60px);overflow-y:auto}
+.sidebar .brand{display:flex;align-items:center;gap:10px;text-decoration:none;margin-bottom:26px}
+.sidebar .mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#fff,#9a9aa4);color:#0a0a0c;font-weight:700;display:flex;align-items:center;justify-content:center;font-size:13px}
+.sidebar .bname{font-weight:700;letter-spacing:.05em;font-size:14px;color:#f2f2f4}
+.side-group{margin-bottom:20px}
+.side-group .g-title{font-size:10.5px;text-transform:uppercase;letter-spacing:.12em;color:#71717a;margin:0 0 8px 12px;font-weight:600}
+.side-group a{display:block;padding:6px 12px;border-radius:8px;color:#9a9aa4;text-decoration:none;font-size:13.5px;transition:all .12s}
+.side-group a:hover{color:#fff;background:rgba(255,255,255,.05)}
+.side-group a.on{color:#fff;background:rgba(255,255,255,.08);font-weight:600}
+.main{flex:1;min-width:0}
+.topline{display:flex;justify-content:space-between;align-items:center;margin-bottom:34px}
+.topline .links a{margin-left:16px;font-size:13.5px;text-decoration:none;color:#9a9aa4}
+.topline .links a:hover{color:#fff}
+h1{font-size:30px;margin:0 0 10px;font-weight:700}
+.sub{color:#9a9aa4;font-size:15px;line-height:1.6;max-width:640px}
+section{margin-top:52px;scroll-margin-top:24px}
+h2{font-size:21px;margin:0 0 12px;font-weight:700}
+h3{font-size:15.5px;margin:26px 0 8px;font-weight:600;color:#f2f2f4}
+p{line-height:1.65;font-size:14.5px;color:#b9b9c2;margin:10px 0}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+p code,li code,td code{background:rgba(255,255,255,.07);border-radius:5px;padding:2px 6px;color:#fff}
+ul{padding-left:22px;line-height:1.7;font-size:14.5px;color:#b9b9c2}
+.codeblock{position:relative;background:#0d0d10;border:1px solid rgba(255,255,255,.09);border-radius:13px;margin:14px 0;overflow:hidden}
+.codeblock .cb-head{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.07);font-size:11.5px;color:#71717a;letter-spacing:.04em}
+.copy-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#c9c9d1;border-radius:7px;padding:4px 11px;font:inherit;font-size:11.5px;cursor:pointer;transition:all .12s}
+.copy-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.codeblock pre{margin:0;padding:14px 16px;overflow-x:auto;font-size:12.8px;line-height:1.6;color:#d8d8e0}
+.endpoint-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:22px 24px;margin:18px 0}
+.method{display:inline-block;font-family:ui-monospace,monospace;font-size:11.5px;font-weight:700;border-radius:7px;padding:3px 10px;margin-right:10px;letter-spacing:.05em}
+.method.post{background:rgba(120,170,255,.14);color:#8ab4ff;border:1px solid rgba(120,170,255,.25)}
+.method.get{background:rgba(120,255,170,.12);color:#7de8a8;border:1px solid rgba(120,255,170,.22)}
+.ep-path{font-family:ui-monospace,monospace;font-size:14.5px;color:#fff;font-weight:600}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+th{text-align:left;padding:9px 12px;color:#9a9aa4;font-weight:600;border-bottom:1px solid rgba(255,255,255,.1);font-size:12.5px}
+td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.55;vertical-align:top}
+tr td:first-child{white-space:nowrap}
+.badge{display:inline-block;font-family:ui-monospace,monospace;font-size:11px;font-weight:700;border-radius:6px;padding:2px 8px;margin-right:8px}
+.b-2xx{background:rgba(120,255,170,.12);color:#7de8a8}
+.b-4xx{background:rgba(255,200,90,.1);color:#ffc85a}
+.b-5xx{background:rgba(255,90,90,.12);color:#ff8a8a}
+.callout{border:1px solid rgba(120,200,255,.25);background:rgba(120,200,255,.06);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.6;color:#a8c8e8;margin:16px 0}
+.callout.warn{border-color:rgba(255,200,90,.3);background:rgba(255,200,90,.06);color:#e8d5a8}
+.footer{margin-top:70px;padding-top:22px;border-top:1px solid rgba(255,255,255,.07);font-size:12.5px;color:#71717a}
+@media (max-width:860px){.sidebar{display:none}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <a class="brand" href="index.html">
+      <div class="mark">DF</div>
+      <div class="bname">DARKFUSCATOR</div>
+    </a>
+    <div class="side-group">
+      <div class="g-title">Getting started</div>
+      <a href="#overview" class="on">Overview</a>
+      <a href="#quickstart">Quick start</a>
+      <a href="#authentication">Authentication</a>
+      <a href="#base-url">Base URL</a>
+    </div>
+    <div class="side-group">
+      <div class="g-title">API reference</div>
+      <a href="#obfuscate">Obfuscate</a>
+      <a href="#options">Options &amp; presets</a>
+      <a href="#health">Health</a>
+      <a href="#errors">Errors</a>
+      <a href="#rate-limits">Rate limits</a>
+    </div>
+    <div class="side-group">
+      <div class="g-title">Examples</div>
+      <a href="#example-curl">cURL</a>
+      <a href="#example-js">JavaScript</a>
+      <a href="#example-python">Python</a>
+      <a href="#example-lua">Lua</a>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topline">
+      <span style="font-size:13px;color:#71717a">API v1 &middot; engine v5.1</span>
+      <nav class="links">
+        <a href="index.html">Obfuscator</a>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="login.html">Sign in</a>
+      </nav>
+    </div>
+
+    <h1>Darkfuscator API</h1>
+    <p class="sub">Obfuscate Luau source from any language. Send code to the API with your key, get back a VM-protected build: variable renaming, string encryption, control-flow flattening, junk insertion, an encrypted chunked anti-tamper loader and a custom bytecode VM.</p>
+
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>Every Darkfuscator account automatically gets a personal API key. Create one on the <a href="login.html#signup">sign-up page</a>, copy it from your <a href="dashboard.html">dashboard</a>, and you are ready to call the API. Keys are shown as <code>dk_live_...</code> and are tied to your account; usage is metered per key.</p>
+      <p>The API is served from Cloudflare's edge network, runs the same engine as the website, and never exposes the engine internals: only the obfuscated output travels back.</p>
+    </section>
+
+    <section id="quickstart">
+      <h2>Quick start</h2>
+      <p>One request is all it takes:</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>TERMINAL</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>curl -X POST https://darkfuscator.pages.dev/api/v1/obfuscate \
+  -H "Authorization: Bearer dk_live_YOUR_KEY_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "print(\u0027Hello World\u0027)"}'</pre>
+      </div>
+      <p>A successful response looks like:</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>RESPONSE · 200</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>{
+  "success": true,
+  "requestId": "req_9f3ab2c17d40e518",
+  "preset": "maximum",
+  "bytes": 82491,
+  "durationMs": 1420,
+  "result": "-- obfuscated Luau source, executed with loadstring(...) ..."
+}</pre>
+      </div>
+    </section>
+
+    <section id="authentication">
+      <h2>Authentication</h2>
+      <p>All obfuscation endpoints authenticate with your API key in the <code>Authorization</code> header, using the Bearer scheme:</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>REQUEST HEADER</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>Authorization: Bearer YOUR_API_KEY</pre>
+      </div>
+      <ul>
+        <li>Keys start with <code>dk_live_</code> and are unique per account.</li>
+        <li>Your key is available any time on the <a href="dashboard.html">dashboard</a>; the old key stops working the moment you regenerate.</li>
+        <li>Never publish your key in client-side code, public repositories or screenshots. If a key leaks, regenerate it from the dashboard.</li>
+        <li>Sessions on the website itself use httpOnly cookies; your API key is never needed by the browser.</li>
+      </ul>
+      <div class="callout warn">Treat your API key like a password. Requests with a missing, malformed or regenerated key return <code>401</code>.</div>
+    </section>
+
+    <section id="base-url">
+      <h2>Base URL</h2>
+      <div class="codeblock">
+        <div class="cb-head"><span>BASE URL</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>https://darkfuscator.pages.dev</pre>
+      </div>
+      <p>All endpoint paths in this document are relative to this base URL. The API supports cross-origin requests (CORS), so you can call it from browser-based apps and server code alike.</p>
+    </section>
+
+    <section id="obfuscate">
+      <h2>Obfuscate</h2>
+      <div class="endpoint-card">
+        <span class="method post">POST</span><span class="ep-path">/api/v1/obfuscate</span>
+        <p style="margin-bottom:0">Obfuscates Luau source and returns the protected build.</p>
+      </div>
+      <h3>Request headers</h3>
+      <table>
+        <tr><th>Header</th><th>Value</th></tr>
+        <tr><td><code>Authorization</code></td><td><code>Bearer YOUR_API_KEY</code> (required)</td></tr>
+        <tr><td><code>Content-Type</code></td><td><code>application/json</code></td></tr>
+      </table>
+      <h3>Request body</h3>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>source</code></td><td>string</td><td>Luau source to protect. Required. Up to 200,000 characters.</td></tr>
+        <tr><td><code>preset</code></td><td>string</td><td><code>lightweight</code>, <code>balanced</code> or <code>maximum</code>. Defaults to <code>maximum</code>.</td></tr>
+        <tr><td><code>options</code></td><td>object</td><td>Optional per-option overrides, applied on top of the preset. See <a href="#options">Options</a>.</td></tr>
+        <tr><td><code>seed</code></td><td>number</td><td>Optional deterministic seed (0 to 4294967295). The same source with the same seed produces the same output.</td></tr>
+      </table>
+      <div class="codeblock">
+        <div class="cb-head"><span>REQUEST</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>{
+  "source": "local Players = game:GetService('Players')\nprint(Players.LocalPlayer.Name)",
+  "preset": "maximum",
+  "options": {
+    "encryptStrings": true,
+    "renameVariables": true
+  }
+}</pre>
+      </div>
+      <h3>Response</h3>
+      <table>
+        <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+        <tr><td><code>success</code></td><td>boolean</td><td><code>true</code> when the build succeeded.</td></tr>
+        <tr><td><code>requestId</code></td><td>string</td><td>Unique id for this request, useful when contacting support.</td></tr>
+        <tr><td><code>preset</code></td><td>string</td><td>The preset that was applied.</td></tr>
+        <tr><td><code>bytes</code></td><td>number</td><td>Size of the protected output in bytes.</td></tr>
+        <tr><td><code>durationMs</code></td><td>number</td><td>Engine time in milliseconds.</td></tr>
+        <tr><td><code>result</code></td><td>string</td><td>The obfuscated Luau source. Run it with <code>loadstring</code>/<code>load</code>.</td></tr>
+      </table>
+      <p>Response headers always carry your current rate-limit state: <code>X-RateLimit-Remaining-Minute</code> and <code>X-RateLimit-Remaining-Day</code>.</p>
+    </section>
+
+    <section id="options">
+      <h2>Options &amp; presets</h2>
+      <p>Presets are complete option sets. The <code>maximum</code> preset (the default) enables every protection layer and cannot be weakened from the API: options can only add work, not remove protections already in the preset.</p>
+      <table>
+        <tr><th>Preset</th><th>Protection layers</th><th>Best for</th></tr>
+        <tr><td><code>lightweight</code></td><td>Renaming, string encryption, basic flattening</td><td>Large scripts, faster builds</td></tr>
+        <tr><td><code>balanced</code></td><td>Renaming, string encryption, control-flow flattening, moderate junk</td><td>Everyday scripts</td></tr>
+        <tr><td><code>maximum</code></td><td>Everything: full flattening, heavy junk, encrypted chunked anti-tamper loader, scrambled VM dispatch, silent environment auditing</td><td>Maximum resistance to deobfuscation</td></tr>
+      </table>
+      <p>Common option overrides (valid keys depend on the engine version; unknown keys are ignored):</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>OPTIONS EXAMPLE</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>{
+  "options": {
+    "renameVariables": true,
+    "encryptStrings": true,
+    "controlFlow": true,
+    "junk": 2,
+    "guard": 2,
+    "antiTamper": 2,
+    "nameStyle": "confuse"
+  }
+}</pre>
+      </div>
+    </section>
+
+    <section id="health">
+      <h2>Health</h2>
+      <div class="endpoint-card">
+        <span class="method get">GET</span><span class="ep-path">/api/v1/health</span>
+        <p style="margin-bottom:0">Liveness check. No authentication required.</p>
+      </div>
+      <div class="codeblock">
+        <div class="cb-head"><span>RESPONSE · 200</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>{
+  "ok": true,
+  "name": "Darkfuscator",
+  "version": "5.1.0",
+  "engine": "bytecode-vm",
+  "time": "2026-10-06T01:30:00.000Z"
+}</pre>
+      </div>
+    </section>
+
+    <section id="errors">
+      <h2>Errors</h2>
+      <p>Error responses share one shape:</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>ERROR · 401</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>{
+  "success": false,
+  "error": {
+    "code": "unauthorized",
+    "message": "Invalid or revoked API key."
+  }
+}</pre>
+      </div>
+      <table>
+        <tr><th>Status</th><th>Code</th><th>Meaning</th></tr>
+        <tr><td><span class="badge b-4xx">400</span></td><td><code>bad_request</code></td><td>Missing or malformed fields; unparseable source.</td></tr>
+        <tr><td><span class="badge b-4xx">401</span></td><td><code>unauthorized</code></td><td>API key missing, invalid or regenerated.</td></tr>
+        <tr><td><span class="badge b-4xx">413</span></td><td><code>payload_too_large</code></td><td>Source over 200,000 characters or body over ~1 MB.</td></tr>
+        <tr><td><span class="badge b-4xx">429</span></td><td><code>rate_limited</code></td><td>Rate limit hit. Respect <code>Retry-After</code>.</td></tr>
+        <tr><td><span class="badge b-5xx">500</span></td><td><code>engine_error</code></td><td>The engine failed on this input.</td></tr>
+      </table>
+      <p>Authentication is never read from the request body or query string, only from the <code>Authorization</code> header.</p>
+    </section>
+
+    <section id="rate-limits">
+      <h2>Rate limits</h2>
+      <table>
+        <tr><th>Scope</th><th>Limit</th></tr>
+        <tr><td>Per API key</td><td>30 requests / minute</td></tr>
+        <tr><td>Per API key</td><td>1,000 requests / day</td></tr>
+        <tr><td>Auth endpoints</td><td>20 requests / minute per IP</td></tr>
+      </table>
+      <p>When limited, the API returns <code>429</code> with a <code>Retry-After</code> header (seconds). Every response includes <code>X-RateLimit-*</code> headers so you can pace your client before hitting the limit.</p>
+    </section>
+
+    <section id="example-curl">
+      <h2>Example: cURL</h2>
+      <div class="codeblock">
+        <div class="cb-head"><span>CURL</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>curl -X POST https://darkfuscator.pages.dev/api/v1/obfuscate \
+  -H "Authorization: Bearer dk_live_YOUR_KEY_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "print(\u0027hi\u0027)", "preset": "maximum"}' \
+  | python3 -c "import json,sys; open('out.luau','w').write(json.load(sys.stdin)['result'])"</pre>
+      </div>
+    </section>
+
+    <section id="example-js">
+      <h2>Example: JavaScript</h2>
+      <div class="codeblock">
+        <div class="cb-head"><span>NODE.JS 18+ (fetch)</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>const res = await fetch('https://darkfuscator.pages.dev/api/v1/obfuscate', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer dk_live_YOUR_KEY_HERE',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    source: "print('Hello from Darkfuscator')",
+    preset: 'maximum'
+  })
+});
+
+const data = await res.json();
+if (!data.success) throw new Error(data.error.message);
+console.log('protected build:', data.bytes, 'bytes');
+await import('node:fs').then(fs =&gt; fs.writeFileSync('out.luau', data.result));</pre>
+      </div>
+    </section>
+
+    <section id="example-python">
+      <h2>Example: Python</h2>
+      <div class="codeblock">
+        <div class="cb-head"><span>PYTHON 3 (requests)</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>import requests
+
+API = "https://darkfuscator.pages.dev/api/v1/obfuscate"
+KEY = "dk_live_YOUR_KEY_HERE"
+
+resp = requests.post(
+    API,
+    headers={
+        "Authorization": f"Bearer {KEY}",
+        "Content-Type": "application/json",
+    },
+    json={"source": "print('Hello from Darkfuscator')", "preset": "maximum"},
+    timeout=120,
+)
+resp.raise_for_status()
+data = resp.json()
+
+with open("out.luau", "w") as f:
+    f.write(data["result"])
+print(f"protected build: {data['bytes']} bytes in {data['durationMs']} ms")</pre>
+      </div>
+    </section>
+
+    <section id="example-lua">
+      <h2>Example: Lua</h2>
+      <p>Calling the API from an executor or Roblox server with <code>HttpService</code>:</p>
+      <div class="codeblock">
+        <div class="cb-head"><span>LUAU</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre>local HttpService = game:GetService("HttpService")
+
+local function obfuscate(source)
+    local payload = HttpService:JSONEncode({
+        source = source,
+        preset = "maximum",
+    })
+    local ok, res = pcall(function()
+        return HttpService:RequestAsync({
+            Url = "https://darkfuscator.pages.dev/api/v1/obfuscate",
+            Method = "POST",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["Authorization"] = "Bearer dk_live_YOUR_KEY_HERE",
+            },
+            Body = payload,
+        })
+    end)
+    if not ok or not res.Success then
+        error("Darkfuscator API request failed")
+    end
+    local data = HttpService:JSONDecode(res.Body)
+    if not data.success then
+        error("Darkfuscator API error: " .. tostring(data.error and data.error.message or data.error))
+    end
+    return data.result
+end
+
+local protected = obfuscate("print('Hello from Darkfuscator')")
+print(("protected build: %d bytes"):format(#protected))</pre>
+      </div>
+    </section>
+
+    <div class="footer">
+      Darkfuscator API v1 &middot; engine internals are documented in <a href="docs/ARCHITECTURE.md">ARCHITECTURE.md</a>, <a href="docs/VM.md">VM.md</a> and <a href="docs/BYTECODE.md">BYTECODE.md</a> &middot; <a href="index.html">Obfuscator</a> &middot; <a href="dashboard.html">Dashboard</a>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  var btns = document.querySelectorAll('.copy-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].addEventListener('click', function () {
+      var pre = this.closest('.codeblock').querySelector('pre');
+      var text = pre.textContent;
+      var done = function () {
+        this.textContent = 'Copied';
+        var b = this;
+        setTimeout(function () { b.textContent = 'Copy'; }, 1600);
+      }.bind(this);
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done);
+      else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); done(); }
+    });
+  }
+  // scroll-spy for the sidebar
+  var links = document.querySelectorAll('.side-group a');
+  var ids = [];
+  for (var j = 0; j < links.length; j++) ids.push(links[j].getAttribute('href').slice(1));
+  function spy() {
+    var cur = ids[0];
+    for (var k = 0; k < ids.length; k++) {
+      var el = document.getElementById(ids[k]);
+      if (el && el.getBoundingClientRect().top < 120) cur = ids[k];
+    }
+    for (var m = 0; m < links.length; m++) links[m].classList.toggle('on', links[m].getAttribute('href') === '#' + cur);
+  }
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+})();
+</script>
+</body>
+</html>
