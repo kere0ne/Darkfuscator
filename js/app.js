@@ -20,7 +20,7 @@
     seed: $('#seed'),
     file: $('#file'),
     protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
-    copy: $('#copy'), download: $('#download'), publish: $('#btn-publish'),
+    copy: $('#copy'), download: $('#download'),
     paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
     advanced: $('#advanced')
   };
@@ -30,12 +30,9 @@
     nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
     guard: '#opt-guard', watermark: '#opt-watermark',
     lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
-    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper',
-    loader: '#opt-loader'
+    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper'
   };
   var STORE_KEY = 'darkfuscator.opts.v2';
-  var API_BASE = 'https://darkfuscator.pages.dev';
-  var lastPayload = null;
 
   // ------------------------------------------------------------------ utils
   function fmt(n) { return Number(n).toLocaleString(); }
@@ -173,16 +170,12 @@
       return;
     }
 
-    lastPayload = res.output;
-    el.publish.hidden = (String(opts.loader) !== '1');
-    if (String(opts.loader) === '1') { publishConnected(res.output); }
-
     el.output.value = res.output;
     updateMeta();
     updateStats(res);
     el.verified.hidden = false;
 
-    if (window.DKUI && DKUI.toast) { DKUI.toast('Build finished'); } if (false) {
+    if (window.DKUI && DKUI.recordBuild) {
       DKUI.recordBuild({
         filename: lastFilename || 'protected.luau',
         date: new Date().toISOString(),
@@ -319,47 +312,6 @@
       runObfuscate();
     }
   });
-
-  // ------------------------------------------------- connected loader publish
-  function publishConnected(payload) {
-    var tok = localStorage.getItem('dk_admin_token') || '';
-    var attempt = function (t) {
-      return fetch(API_BASE + '/api/builds', {
-        method: 'POST',
-        headers: { 'x-admin-token': t, 'content-type': 'application/json' },
-        body: JSON.stringify({ payload: payload })
-      }).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (d) {
-          if (!r.ok) { var err = new Error((d && d.error) || ('HTTP ' + r.status)); err.status = r.status; throw err; }
-          return d;
-        });
-      });
-    };
-    var run = function (t) {
-      setStatus('Publishing to dashboard…');
-      attempt(t).then(function (d) {
-        el.output.value = d.loader;
-        updateMeta();
-        el.publish.hidden = true;
-        localStorage.setItem('dk_admin_token', t);
-        setStatus('Published as ' + d.id + '. The output is now the connected loader — share that, not the build.', 'ok');
-        if (window.DKUI && DKUI.toast) { DKUI.toast('Published ' + d.id); }
-      }).catch(function (e) {
-        if (e.status === 401) {
-          var asked = window.prompt('Darkfuscator admin token (ADMIN_TOKEN):', '');
-          if (asked && asked.trim()) { run(asked.trim()); return; }
-        }
-        el.publish.hidden = false;
-        setStatus('Publish failed: ' + e.message + '. The self-contained build is still in the output.', 'warn');
-      });
-    };
-    run(tok);
-  }
-
-  el.publish.onclick = function () {
-    if (lastPayload) { publishConnected(lastPayload); }
-    else { setStatus('Obfuscate something first, then publish.', 'warn'); }
-  };
 
   // ------------------------------------------------------------------- init
   loadOptions();
