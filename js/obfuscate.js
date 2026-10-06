@@ -27,18 +27,18 @@
   // Every build is a bytecode VM build, so these are intensity knobs for that
   // pipeline rather than separate obfuscation modes.
   var DEFAULTS = {
-    nameStyle: 'random',        // short | random | confuse — generated identifiers
+    nameStyle: 'confuse',       // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
     compress: true,             // LZSS dictionary compression of the payload
-    junk: 1,                    // 0 | 1 | 2 — decoy dispatch branches and slots
-    guard: 1,                   // 0 | 1 | 2 — anti-environment audit strength
+    junk: 3,                    // 0..3 — decoy dispatch branches, slots, monstrous junk
+    guard: 2,                   // 0 | 1 | 2 — anti-environment audit strength
     captureGlobals: true,       // grab the caller's environment with getfenv()
     watermark: true,            // leading "protected by" comment
     lockPlace: '',              // optional Roblox place id the build is bound to
     lockUniverse: '',           // optional Roblox universe id the build is bound to
     envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
     envLock: false,             // refuse to decode outside a genuine Roblox client
-    antiTamper: 0               // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
+    antiTamper: 2               // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
   };
 
 
@@ -174,6 +174,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '4.7.0'
+    version: '5.0.0'
   };
 });
