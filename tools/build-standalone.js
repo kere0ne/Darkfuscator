@@ -18,7 +18,7 @@ const OUT = require.main === module && process.argv[2]
   ? path.resolve(process.argv[2]) : DEFAULT_OUT;
 
 const SCRIPTS = ['js/luau-lexer.js', 'js/luau-parser.js', 'js/vm-compile.js',
-  'js/lz.js', 'js/vm-emit.js', 'js/obfuscate.js'];
+  'js/vm-emit.js', 'js/obfuscate.js'];
 
 function main() {
 let html = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');

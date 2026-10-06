@@ -3,18 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-
 <title>Darkfuscator</title>
-
-<meta name="description"
-content="Darkfuscator — powerful Luau obfuscation with a Halloween-themed interface.">
-
+<meta name="description" content="Darkfuscator — a browser-side Luau obfuscator. Real Luau parser, bytecode VM, anti-env, anti-tamper, 100% client-side.">
 <meta name="color-scheme" content="dark">
-
-<link
-  href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
-  rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Darkfuscator — Halloween workspace theme */
 :root {
@@ -341,1166 +333,457 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   .shell.sidebar-open .sidebar-scrim { display: block }
 }
 
-/* ------------------------------------------------------------ dashboard */
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-.dk-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: .82rem;
-}
-
-.dk-table th {
-  text-align: left;
-  font-weight: 600;
-  color: #8b7d74;
-  padding: 8px 10px;
-  border-bottom: 1px solid #2a1a12;
-  white-space: nowrap;
-}
-
-.dk-table td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #1c1210;
-  vertical-align: middle;
-}
-
-.dk-table b {
-  color: #ffb347;
-}
-
-.row-actions {
-  white-space: nowrap;
-}
-
-.btn-sm {
-  padding: 5px 10px;
-  font-size: .72rem;
-}
-
-.chip-status {
-  display: inline-block;
-  padding: 2px 9px;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: .7rem;
-  font-weight: 600;
-}
-
-.state-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
-  margin-top: 14px;
-}
-
-.state-card {
-  border: 1px solid #2a1a12;
-  border-radius: 12px;
-  padding: 12px;
-  background: #140b10;
-}
-
-.state-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: .78rem;
-}
-
-.state-head select {
-  background: #0b0608;
-  color: #f5eee8;
-  border: 1px solid #2a1a12;
-  border-radius: 8px;
-  padding: 4px 6px;
-  font-size: .72rem;
-}
-
-.state-card textarea {
-  width: 100%;
-  background: #0b0608;
-  color: #f5eee8;
-  border: 1px solid #2a1a12;
-  border-radius: 10px;
-  padding: 10px;
-  font-family: ui-monospace, monospace;
-  font-size: .72rem;
-  resize: vertical;
-}
-
-#gate input[type="password"] {
-  flex: 1;
-  background: #0b0608;
-  color: #f5eee8;
-  border: 1px solid #2a1a12;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: .85rem;
-}
-
-.actions input[type="text"] {
-  flex: 1;
-  background: #0b0608;
-  color: #f5eee8;
-  border: 1px solid #2a1a12;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: .85rem;
-}
-
 </style>
 </head>
-
 <body>
-
 <div class="shell">
-
-  <div class="sidebar-scrim" id="scrim"></div>
-
-  <aside class="sidebar">
-
-    <div class="brand-mark" title="Darkfuscator">
-      DF
-    </div>
-
-    <a
-      class="side-btn active"
-      data-page="obfuscate"
-      title="Obfuscate">
-
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round">
-
-        <rect x="4" y="4" width="16" height="16" rx="2"/>
-        <rect x="9" y="9" width="6" height="6"/>
-
-        <line x1="9" y1="1" x2="9" y2="4"/>
-        <line x1="15" y1="1" x2="15" y2="4"/>
-
-        <line x1="9" y1="20" x2="9" y2="23"/>
-        <line x1="15" y1="20" x2="15" y2="23"/>
-
-        <line x1="20" y1="9" x2="23" y2="9"/>
-        <line x1="20" y1="14" x2="23" y2="14"/>
-
-        <line x1="1" y1="9" x2="4" y2="9"/>
-        <line x1="1" y1="14" x2="4" y2="14"/>
-
-      </svg>
-
-    </a>
-
-    <a
-      class="side-btn"
-      href="dashboard.html"
-      title="Loader dashboard">
-
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round">
-
-        <path d="M3 3v18h18"/>
-
-        <rect x="7" y="12" width="3" height="6"/>
-        <rect x="12" y="8" width="3" height="10"/>
-        <rect x="17" y="5" width="3" height="13"/>
-
-      </svg>
-
-    </a>
-
-  </aside>
-
-
+<div class="sidebar-scrim" id="scrim"></div>
+<aside class="sidebar">
+      <div class="brand-mark">DF</div>
+      <a class="side-btn active" data-page="home" title="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
+      <a class="side-btn" data-page="obfuscate" title="Obfuscate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></a>
+      <a class="side-btn" data-page="files" title="My Files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></a>
+      <a class="side-btn" data-page="account" title="Account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
+      <a class="side-btn" data-page="docs" title="Docs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></a>
+      <button class="side-btn danger" id="btn-reset" title="Clear local data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+    </aside>
   <main class="content">
-
     <header class="topbar">
-
       <div class="greet">
-
-        <button
-          class="icon-btn"
-          id="btn-menu"
-          title="Toggle sidebar"
-          type="button">
-
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round">
-
-            <line x1="3" y1="6" x2="21" y2="6"/>
-            <line x1="3" y1="12" x2="21" y2="12"/>
-            <line x1="3" y1="18" x2="21" y2="18"/>
-
-          </svg>
-
+        <button class="icon-btn" id="btn-menu" title="Toggle sidebar" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-
         <div>
-
-          <div class="muted" style="font-size:.78rem">
-            🎃 DARKFUSCATOR
-          </div>
-
-          <h1>
-            Obfuscate
-          </h1>
-
+          <div class="muted" style="font-size:.78rem">DARKFUSCATOR WORKSPACE</div>
+          <h1 id="page-title">Welcome</h1>
         </div>
-
       </div>
-
-
-      <div class="top-right">
-
-        <span class="pill">
-          🎃 v4.5 · 100% client-side
-        </span>
-
-      </div>
-
+      <div class="top-right"><span class="pill" id="storage-pill">0 stored builds</span><button class="btn orange" id="btn-new">NEW OBFUSCATION +</button></div>
     </header>
-
-
-    <section
-      class="page active"
-      id="page-obfuscate">
-
-
-      <div class="page-head">
-
-        <div>
-
-          <h2>
-            🕸️ Obfuscate your Luau
-          </h2>
-
-          <div
-            class="muted"
-            style="margin-top:4px">
-
-            Turn your Luau into a nightmare to read.
-            Everything runs locally in your browser —
-            your source code never leaves your device. 🎃
-
-          </div>
-
+    <section class="page active" id="page-home">
+      <div class="grid">
+        <div class="panel panel-purple">
+          <small class="eyebrow">REAL LUAU PARSER &middot; BYTECODE VM &middot; NO SERVER</small>
+          <h2 style="margin-top:10px">Make your Luau <em>harder to read</em> without breaking it.</h2>
+          <p class="muted" style="margin-top:10px;line-height:1.6">Your script is compiled to register bytecode, packed into an encrypted payload and shipped inside a generated interpreter &mdash; then re-parsed before you ever see it, so what comes out still runs.</p>
+          <button class="btn orange" id="btn-start" style="margin-top:18px">GET STARTED &rarr;</button>
         </div>
-
+        <div class="panel">
+          <h3>Protection stack</h3>
+          <div class="stat">10 <small>protection layers</small></div>
+          <div class="muted">Custom bytecode VM, layered string encoding, opaque predicates, execution locks, anti-env, anti-tamper and more.</div>
+          <div class="line"></div>
+          <div class="stat">v4.5 <small>hardened engine</small></div>
+          <div class="muted">Per-build VM variation, decoy opcodes and handler variants reshuffled from your seed on every build.</div>
+        </div>
+        <div class="panel">
+          <h3>Obfuscation</h3><span class="status-dot" id="job-status"><i></i><span>Not running</span></span>
+          <div class="orb"></div>
+          <div class="center muted" id="job-message">Paste a Lua/Luau file to start a new build.</div>
+        </div>
       </div>
-
-
-      <div
-        class="upload"
-        id="drop-zone">
-
-        <p>
-          🦇 Drop a .lua / .luau file here,
-          paste your code below, or
-        </p>
-
-        <button
-          class="btn purple"
-          id="btn-zone"
-          style="margin-top:10px">
-
-          🎃 CHOOSE FILE
-
-        </button>
-
+      <div class="panel" style="margin-top:16px">
+        <div class="page-head"><h3>Recent Obfuscations</h3><button class="btn sm" id="btn-allfiles">ALL FILES</button></div>
+        <div class="table-wrap">
+          <table class="hist">
+            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Action</th></tr></thead>
+            <tbody id="recent-body"><tr><td colspan="5" class="empty">No stored builds yet.</td></tr></tbody>
+          </table>
+        </div>
       </div>
-
-
-      <section
-        id="obfuscator"
-        class="card">
-
-
-        <div class="card-top">
-
-          <div>
-
-            <small class="eyebrow">
-              🕷️ DARKFUSCATOR
-            </small>
-
-            <h2>
-              Protect your source
-            </h2>
-
-          </div>
-
-
-          <button
-            class="btn"
-            id="btn-settings"
-            type="button">
-
-            ⚙ SETTINGS
-
-          </button>
-
-        </div>
-
-
-        <div class="actions">
-
-          <label
-            class="btn"
-            for="file">
-
-            🦇 Upload .luau
-
-          </label>
-
-          <input
-            id="file"
-            type="file"
-            accept=".lua,.luau,.txt,text/plain"
-            hidden>
-
-
-          <button
-            id="validate"
-            class="btn"
-            type="button"
-            title="Check that the current text is valid Luau">
-
-            Validate
-
-          </button>
-
-
-          <button
-            id="clear"
-            class="btn"
-            type="button">
-
-            Clear
-
-          </button>
-
-
-          <button
-            id="protect"
-            class="btn btn-primary"
-            type="button">
-
-            🎃 Obfuscate
-            <kbd>⌘↵</kbd>
-
-          </button>
-
-        </div>
-
-
-        <div class="editors">
-
-
-          <div
-            class="pane"
-            id="pane-in">
-
-            <div class="bar">
-
-              <span class="bar-name">
-                INPUT.LUAU
-              </span>
-
-              <span
-                class="bar-meta"
-                id="inmeta">
-
-                0 chars · 0 lines
-
-              </span>
-
-            </div>
-
-
-            <textarea
-              id="input"
-              spellcheck="false"
-              placeholder="Paste your Luau here, drop a .luau file, or summon an example…"></textarea>
-
-
-            <div class="drop-hint">
-              🕸️ Drop a .luau file anywhere here
-            </div>
-
-          </div>
-
-
-          <div
-            class="arrow"
-            aria-hidden="true">
-
-            →
-
-          </div>
-
-
-          <div
-            class="pane"
-            id="pane-out">
-
-            <div class="bar">
-
-              <span class="bar-name">
-                OUTPUT.LUAU
-              </span>
-
-              <span
-                class="bar-meta"
-                id="outmeta">
-
-                0 chars · 0 lines
-
-              </span>
-
-            </div>
-
-
-            <textarea
-              id="output"
-              spellcheck="false"
-              readonly
-              placeholder="Your cursed Luau appears here…"></textarea>
-
-
-            <div
-              class="drop-hint"
-              id="verified-badge"
-              hidden>
-
-              ✓ Re-parsed as valid Luau
-
-            </div>
-
-          </div>
-
-        </div>
-
-
-        <div
-          id="status"
-          class="status"
-          role="status"
-          aria-live="polite">
-
-          🎃 Ready. Nothing leaves your browser.
-
-        </div>
-
-
-        <div
-          id="error"
-          class="error"
-          hidden>
-        </div>
-
-
-        <div
-          class="stats"
-          id="stats"
-          hidden>
-
-          <span class="chip">
-            <b id="st-protos">—</b>
-            functions compiled
-          </span>
-
-          <span class="chip">
-            <b id="st-opcodes">—</b>
-            opcodes
-          </span>
-
-          <span class="chip">
-            <b id="st-bytes">—</b>
-            bytes bytecode
-          </span>
-
-          <span class="chip">
-            <b id="st-payload">—</b>
-            chars payload
-          </span>
-
-          <span class="chip">
-            <b id="st-size">—</b>
-            size
-          </span>
-
-          <span class="chip">
-            <b id="st-time">—</b>
-            ms
-          </span>
-
-          <span class="chip">
-            <b id="st-seed">—</b>
-            seed
-          </span>
-
-        </div>
-
-
-        <div class="bottom">
-
-          <span class="hint">
-            🕯️ Tip: the same seed always produces the same build.
-          </span>
-
-
-          <div class="bottom-buttons">
-
-            <button
-              id="btn-publish"
-              class="btn purple"
-              type="button"
-              hidden>
-
-              Publish to dashboard
-
-            </button>
-
-
-            <button
-              id="copy"
-              class="btn"
-              type="button">
-
-              Copy output
-
-            </button>
-
-
-            <button
-              id="download"
-              class="btn"
-              type="button">
-
-              🦇 Download .luau
-
-            </button>
-
-          </div>
-
-        </div>
-
-      </section>
-
     </section>
+    <section class="page" id="page-obfuscate">
+      <div class="page-head">
+        <div>
+          <h2>Obfuscation</h2>
+          <div class="muted" style="margin-top:4px">Source is processed entirely on this page; nothing is uploaded anywhere.</div>
+        </div>
+        <span class="pill">engine v4.5 &middot; self-verifying output</span>
+      </div>
+      <div class="upload" id="drop-zone">
+        <h2>Drop a file to obfuscate</h2>
+        <p>.lua, .luau or .txt &middot; or paste it straight into the editor below</p>
+        <button class="btn purple" id="btn-zone">CHOOSE FILE</button>
+      </div>
+<section id="obfuscator" class="card">
+    <div class="card-top">
+      <div>
+        <small class="eyebrow">OBFUSCATOR</small>
+        <h2>Protect your source</h2>
+      </div>
+      <button class="btn" id="btn-settings" type="button">SETTINGS &#9881;</button>
+      </div>
+    </div>
 
+    <div class="actions">
+      <label class="btn" for="file">Upload .luau</label>
+      <input id="file" type="file" accept=".lua,.luau,.txt,text/plain" hidden>
+      <button id="validate" class="btn" type="button" title="Check that the current text is valid Luau">Validate</button>
+      <button id="clear" class="btn" type="button">Clear</button>
+      <button id="protect" class="btn btn-primary" type="button">Obfuscate <kbd>⌘↵</kbd></button>
+    </div>
+
+    
+
+    <div class="editors">
+      <div class="pane" id="pane-in">
+        <div class="bar">
+          <span class="bar-name">INPUT.LUAU</span>
+          <span class="bar-meta" id="inmeta">0 chars · 0 lines</span>
+        </div>
+        <textarea id="input" spellcheck="false" placeholder="Paste your Luau here, drop a .luau file, or pick an example above…"></textarea>
+        <div class="drop-hint">Drop a .luau file anywhere here</div>
+      </div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="pane" id="pane-out">
+        <div class="bar">
+          <span class="bar-name">OUTPUT.LUAU</span>
+          <span class="bar-meta" id="outmeta">0 chars · 0 lines</span>
+        </div>
+        <textarea id="output" spellcheck="false" readonly placeholder="Protected Luau appears here…"></textarea>
+        <div class="drop-hint" id="verified-badge" hidden>✓ re-parsed as valid Luau</div>
+      </div>
+    </div>
+
+    <div id="status" class="status" role="status" aria-live="polite">Ready. Nothing leaves your browser.</div>
+    <div id="error" class="error" hidden></div>
+
+    <div class="stats" id="stats" hidden>
+      <span class="chip"><b id="st-protos">—</b>functions compiled</span>
+      <span class="chip"><b id="st-opcodes">—</b>opcodes</span>
+      <span class="chip"><b id="st-bytes">—</b>bytes bytecode</span>
+      <span class="chip"><b id="st-payload">—</b>chars payload</span>
+      <span class="chip"><b id="st-size">—</b>size</span>
+      <span class="chip"><b id="st-time">—</b>ms</span>
+      <span class="chip"><b id="st-seed">—</b>seed</span>
+    </div>
+
+    <div class="bottom">
+      <span class="hint">Tip: the same seed always produces the same build.</span>
+      <div class="bottom-buttons">
+        <button id="copy" class="btn" type="button">Copy output</button>
+        <button id="download" class="btn" type="button">Download .luau</button>
+      </div>
+    </div>
+  </section>
+    </section>
+    <section class="page" id="page-files">
+      <div class="page-head">
+        <div>
+          <h2>My Files</h2>
+          <div class="muted" style="margin-top:4px">Build history is kept in this browser only &mdash; no account, no server.</div>
+        </div>
+        <button class="btn orange" id="btn-new-files">NEW OBFUSCATION +</button>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="hist">
+            <thead><tr><th>Date</th><th>File</th><th>Seed</th><th>Size</th><th>Actions</th></tr></thead>
+            <tbody id="files-body"><tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <section class="page" id="page-account">
+      <div class="page-head"><h2>Your Engine</h2></div>
+      <div class="panel account-card">
+        <div class="brand-mark big">DF</div>
+        <div>
+          <h2>Darkfuscator</h2>
+          <div class="muted">Luau obfuscator &middot; engine v4.5 &middot; hardened VM</div>
+          <div class="kv">
+            <div class="k">Pipeline</div><div class="v">Luau lexer &rarr; parser &rarr; register-bytecode compiler &rarr; encrypted VM emitter</div>
+            <div class="k">Runs</div><div class="v">100% in your browser &mdash; no API key, no network calls, no telemetry</div>
+            <div class="k">Stored data</div><div class="v">Options and build history live in this browser's local storage only</div>
+            <div class="k">Site</div><div class="v">darkfuscator.pages.dev</div>
+          </div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h3>Local data</h3>
+        <p class="muted" style="margin:8px 0 14px;line-height:1.6">Clear stored options and build history from this browser. Nothing is ever sent anywhere.</p>
+        <button class="btn danger" id="btn-reset-2">CLEAR LOCAL DATA</button>
+      </div>
+    </section>
+    <section class="page" id="page-docs">
+      <div class="page-head"><h2>Darkfuscator Guide</h2></div>
+      <div class="docs">
+        <div class="panel doc">
+          <h3>Build profiles</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Lean keeps output small. Normal adds decoy branches. Heavy adds decoy slots and the most handler variants &mdash; the same seed always produces the same build.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Anti-environment</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Strict probes the environment (identity, services, data types, settings) and binds the unseal key to it. A tampered or simulated environment fails the audit before the payload decodes.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Loader</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Full wraps the build in an encrypted chunk loader with runtime checks and a Heartbeat re-audit. Fast uses a plain loader. Off ships the bare build.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Execution locks</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Bind a build to a place ID, a universe ID, or both. The check runs before the payload is decoded, so the build refuses to run anywhere else.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Require genuine client</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Refuses to run outside a real Roblox client: fewer than three genuine service probes fail the audit. Use it for builds that must never run under a simulator.</p>
+        </div>
+        <div class="panel doc">
+          <h3>Honest limits</h3>
+          <p class="muted" style="margin-top:8px;line-height:1.6">Obfuscation raises the cost of reading code; it is not a security boundary. Determined analysis of client-side code can always eventually recover it.</p>
+        </div>
+      </div>
+    </section>
   </main>
-
 </div>
-
-
-<!-- SETTINGS MODAL -->
-
-<div
-  class="modal-root"
-  id="modal">
-
-  <div
-    class="modal-backdrop"
-    id="modal-backdrop">
+  <div class="modal-root" id="modal">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal">
+      <div class="modal-header"><span>Darkfuscator Obfuscation</span><button id="modal-close">&times;</button></div>
+      <div class="modal-body">
+        <div class="field"><label>Build profile</label>
+          <select id="opt-junk">
+            <option value="1" selected>Normal &mdash; decoy branches</option>
+            <option value="0">Lean &mdash; smallest output</option>
+            <option value="2">Heavy &mdash; decoys + decoy slots</option>
+          </select>
+        </div>
+        <div class="field"><label>Audit level</label>
+          <select id="opt-guard">
+            <option value="1" selected>Standard &mdash; builtins audit</option>
+            <option value="0">Off &mdash; no audit</option>
+            <option value="2">Strict &mdash; toolkit + timing audit</option>
+          </select>
+        </div>
+        <div class="field"><label>Anti-environment</label>
+          <select id="opt-envChecks">
+            <option value="2" selected>Strict &mdash; probe battery + bound seal</option>
+            <option value="1">Standard &mdash; bound seal</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+        <div class="field"><label>Loader</label>
+          <select id="opt-antiTamper">
+            <option value="2" selected>Full &mdash; encrypted chunk loader</option>
+            <option value="1">Fast &mdash; plain chunk loader</option>
+            <option value="0">Off</option>
+          </select>
+        </div>
+        <div class="field"><label>Identifiers</label>
+          <select id="opt-nameStyle">
+            <option value="random" selected>random (1&ndash;4 chars)</option>
+            <option value="short">short (1&ndash;2 chars)</option>
+            <option value="confuse">confusable glyphs</option>
+          </select>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-envLock" checked><span class="switch"></span>
+          <div><label for="opt-envLock">Require genuine Roblox client</label>
+            <div class="desc">The build refuses to run outside a real client environment.</div>
+          </div>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-minify" checked><span class="switch"></span>
+          <div><label for="opt-minify">One-line output</label>
+            <div class="desc">Ships the whole build as a single line.</div>
+          </div>
+        </div>
+        <div class="field switch-row"><input type="checkbox" id="opt-watermark" checked><span class="switch"></span>
+          <div><label for="opt-watermark">Watermark header</label>
+            <div class="desc">Adds the Darkfuscator banner comment above the build.</div>
+          </div>
+        </div>
+        <div class="toggle-pair">
+          <div class="field"><label>Lock to place ID (optional)</label>
+            <input id="opt-lockPlace" type="text" inputmode="numeric" placeholder="e.g. 9876543210" autocomplete="off">
+          </div>
+          <div class="field"><label>Lock to universe ID (optional)</label>
+            <input id="opt-lockUniverse" type="text" inputmode="numeric" placeholder="e.g. 1234567890" autocomplete="off">
+          </div>
+        </div>
+        <div class="field"><label>Seed (optional)</label>
+          <input id="seed" type="text" inputmode="numeric" placeholder="random" autocomplete="off">
+          <div class="desc">The same seed always produces the same build.</div>
+        </div>
+      </div>
+      <div class="modal-foot"><button class="btn" id="modal-cancel">Cancel</button><button class="btn orange" id="modal-run">Obfuscate</button></div>
+    </div>
   </div>
+  <div class="toast" id="toast"></div>
 
-
-  <div class="modal">
-
-
-    <div class="modal-header">
-
-      <span>
-        🎃 Darkfuscator Obfuscation
-      </span>
-
-      <button
-        id="modal-close">
-
-        &times;
-
-      </button>
-
-    </div>
-
-
-    <div class="modal-body">
-
-
-      <div class="field">
-
-        <label>
-          Build profile
-        </label>
-
-        <select id="opt-junk">
-
-          <option
-            value="1"
-            selected>
-
-            Normal — decoy branches
-
-          </option>
-
-          <option value="0">
-            Lean — smallest output
-          </option>
-
-          <option value="2">
-            Heavy — decoys + decoy slots
-          </option>
-
-          <option value="3">
-            Monstrous — ~100k junk statements (~900 KB)
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Audit level
-        </label>
-
-        <select id="opt-guard">
-
-          <option
-            value="1"
-            selected>
-
-            Standard — builtins audit
-
-          </option>
-
-          <option value="0">
-            Off — no audit
-          </option>
-
-          <option value="2">
-            Strict — toolkit + timing audit
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Anti-environment
-        </label>
-
-        <select id="opt-envChecks">
-
-          <option
-            value="2"
-            selected>
-
-            Strict — probe battery + bound seal
-
-          </option>
-
-          <option value="1">
-            Standard — bound seal
-          </option>
-
-          <option value="0">
-            Off
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Loader
-        </label>
-
-        <select id="opt-antiTamper">
-
-          <option
-            value="2"
-            selected>
-
-            Full — encrypted chunk loader
-
-          </option>
-
-          <option value="1">
-            Fast — plain chunk loader
-          </option>
-
-          <option value="0">
-            Off
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Connected loader
-        </label>
-
-        <select id="opt-loader">
-
-          <option
-            value="1"
-            selected>
-
-            Dashboard-connected — server-validated
-
-          </option>
-
-          <option value="0">
-            Off — self-contained build
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Identifiers
-        </label>
-
-        <select id="opt-nameStyle">
-
-          <option
-            value="random"
-            selected>
-
-            random (1–4 chars)
-
-          </option>
-
-          <option value="short">
-            short (1–2 chars)
-          </option>
-
-          <option value="confuse">
-            confusable glyphs
-          </option>
-
-        </select>
-
-      </div>
-
-
-      <div class="field switch-row">
-
-        <input
-          type="checkbox"
-          id="opt-envLock"
-          checked>
-
-        <span class="switch"></span>
-
-        <div>
-
-          <label for="opt-envLock">
-            Require genuine Roblox client
-          </label>
-
-          <div class="desc">
-            The build refuses to run outside a real client environment.
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="field switch-row">
-
-        <input
-          type="checkbox"
-          id="opt-minify"
-          checked>
-
-        <span class="switch"></span>
-
-        <div>
-
-          <label for="opt-minify">
-            One-line output
-          </label>
-
-          <div class="desc">
-            Ships the whole build as a single line.
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="field switch-row">
-
-        <input
-          type="checkbox"
-          id="opt-watermark"
-          checked>
-
-        <span class="switch"></span>
-
-        <div>
-
-          <label for="opt-watermark">
-            Watermark header
-          </label>
-
-          <div class="desc">
-            Adds the Darkfuscator banner comment above the build.
-          </div>
-
-        </div>
-
-      </div>
-
-
-      <div class="toggle-pair">
-
-        <div class="field">
-
-          <label>
-            Lock to place ID (optional)
-          </label>
-
-          <input
-            id="opt-lockPlace"
-            type="text"
-            inputmode="numeric"
-            placeholder="e.g. 9876543210"
-            autocomplete="off">
-
-        </div>
-
-
-        <div class="field">
-
-          <label>
-            Lock to universe ID (optional)
-          </label>
-
-          <input
-            id="opt-lockUniverse"
-            type="text"
-            inputmode="numeric"
-            placeholder="e.g. 1234567890"
-            autocomplete="off">
-
-        </div>
-
-      </div>
-
-
-      <div class="field">
-
-        <label>
-          Seed (optional)
-        </label>
-
-        <input
-          id="seed"
-          type="text"
-          inputmode="numeric"
-          placeholder="random"
-          autocomplete="off">
-
-        <div class="desc">
-          The same seed always produces the same build.
-        </div>
-
-      </div>
-
-
-    </div>
-
-
-    <div class="modal-foot">
-
-      <button
-        class="btn"
-        id="modal-cancel">
-
-        Cancel
-
-      </button>
-
-      <button
-        class="btn orange"
-        id="modal-run">
-
-        🎃 Obfuscate
-
-      </button>
-
-    </div>
-
-  </div>
-
-</div>
-
-
-<div
-  class="toast"
-  id="toast">
-</div>
-
-
-<footer>
-
-  <p>
-    🎃 &copy; 2026 Darkfuscator
-    · Obfuscation raises the cost of reading code;
-    it is not a security boundary.
-  </p>
-
-</footer>
-
-
-<noscript>
-
-  <p class="noscript">
-    Darkfuscator needs JavaScript —
-    it runs entirely in your browser.
-  </p>
-
-</noscript>
-
+<footer><p>&copy; 2026 Darkfuscator &middot; Obfuscation raises the cost of reading code; it is not a security boundary.</p></footer>
+<noscript><p class="noscript">Darkfuscator needs JavaScript &mdash; it runs entirely in your browser.</p></noscript>
 
 <script>
 (function () {
-
   'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var TITLES = { home: 'Welcome', obfuscate: 'Obfuscate', files: 'My Files', account: 'Your Engine', docs: 'Guide' };
 
-  var $ = function (id) {
-    return document.getElementById(id);
-  };
+  function go(id) {
+    document.querySelectorAll('.page').forEach(function (p) { p.classList.remove('active'); });
+    document.querySelectorAll('.side-btn[data-page]').forEach(function (b) { b.classList.remove('active'); });
+    var p = $('page-' + id);
+    if (p) p.classList.add('active');
+    var b = document.querySelector('.side-btn[data-page="' + id + '"]');
+    if (b) b.classList.add('active');
+    var t = $('page-title');
+    if (t && TITLES[id]) t.textContent = TITLES[id];
+    history.replaceState(null, '', '#' + id);
+  }
+  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
+    b.onclick = function () { go(b.dataset.page); };
+  });
 
-
+  // ------------------------------------------------------------- toast
   function toast(msg, error) {
-
     var t = $('toast');
-
     t.textContent = msg;
-
-    t.className =
-      'toast show' +
-      (error ? ' error' : '');
-
+    t.className = 'toast show' + (error ? ' error' : '');
     clearTimeout(t._timer);
-
-    t._timer = setTimeout(function () {
-      t.className = 'toast';
-    }, 3600);
-
+    t._timer = setTimeout(function () { t.className = 'toast'; }, 3600);
   }
 
-
-  window.DKUI = {
-    toast: toast
-  };
-
-
-  function toggleSidebar() {
-
-    var shell =
-      document.querySelector('.shell');
-
-    if (
-      window.matchMedia(
-        '(max-width: 860px)'
-      ).matches
-    ) {
-
-      shell.classList.toggle(
-        'sidebar-open'
-      );
-
-    } else {
-
-      shell.classList.toggle(
-        'sidebar-hidden'
-      );
-
-    }
-
-  }
-
-
-  $('btn-menu').onclick =
-    toggleSidebar;
-
-
-  $('scrim').onclick = function () {
-
-    document
-      .querySelector('.shell')
-      .classList
-      .remove('sidebar-open');
-
-  };
-
-
+  // ------------------------------------------------------------- modal
   var modal = $('modal');
-
-
-  function openModal() {
-    modal.classList.add('open');
-  }
-
-
-  function closeModal() {
-    modal.classList.remove('open');
-  }
-
-
-  $('btn-settings').onclick =
-    openModal;
-
-
-  $('modal-close').onclick =
-  $('modal-cancel').onclick =
-  $('modal-backdrop').onclick =
-    closeModal;
-
-
+  function openModal() { modal.classList.add('open'); }
+  function closeModal() { modal.classList.remove('open'); }
+  $('btn-settings').onclick = openModal;
+  $('modal-close').onclick = $('modal-cancel').onclick = $('modal-backdrop').onclick = closeModal;
   $('modal-run').onclick = function () {
-
     closeModal();
-
+    go('obfuscate');
     var pr = $('protect');
-
-    if (pr) {
-      pr.click();
-    }
-
+    if (pr) pr.click();
   };
 
-
-  var dz = $('drop-zone');
-  var fileInput = $('file');
-
-
-  $('btn-zone').onclick =
-    function () {
-      fileInput.click();
-    };
-
-
-  ['dragenter', 'dragover']
-    .forEach(function (e) {
-
-      dz.addEventListener(
-        e,
-        function (ev) {
-
-          ev.preventDefault();
-
-          dz.style.borderColor =
-            '#ff7518';
-
-        }
-      );
-
+  // ------------------------------------------------------- build history
+  var KEY = 'darkfuscator.builds.v1';
+  function load() {
+    try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; }
+  }
+  function save(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* quota */ }
+  }
+  function fmtBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(1) + ' MB';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>'"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c];
     });
-
-
-  ['dragleave', 'drop']
-    .forEach(function (e) {
-
-      dz.addEventListener(
-        e,
-        function (ev) {
-
-          ev.preventDefault();
-
-          dz.style.borderColor = '';
-
-        }
-      );
-
-    });
-
-
-  dz.addEventListener(
-    'drop',
-    function (e) {
-
-      var f =
-        e.dataTransfer.files[0];
-
-      if (!f) return;
-
-
-      var r =
-        new FileReader();
-
-
-      r.onload = function () {
-
-        fileInput.value = '';
-
-        var inp = $('input');
-
-        inp.value =
-          String(r.result || '');
-
-        inp.dispatchEvent(
-          new Event('input')
-        );
-
-        toast(
-          'Loaded ' + f.name
-        );
-
-      };
-
-
-      r.readAsText(f);
-
+  }
+  function row(f, actions) {
+    var dl = f.output
+      ? '<button class="btn sm" onclick="DKUI.download(\'' + esc(f.id) + '\')">Download</button>'
+      : '<span class="muted" style="font-size:.76rem">not stored</span>';
+    var del = actions ? '<button class="btn danger sm" onclick="DKUI.remove(\'' + esc(f.id) + '\')">Delete</button>' : '';
+    return '<tr><td>' + esc(new Date(f.date).toLocaleString()) + '</td><td class="name">' + esc(f.filename) +
+      '</td><td>' + esc(f.seed == null ? 'random' : f.seed) + '</td><td>' + esc(fmtBytes(f.size)) +
+      '</td><td><div class="actions-row">' + dl + del + '</div></td></tr>';
+  }
+  function render() {
+    var list = load();
+    $('build-count') && ($('build-count').textContent = list.length);
+    $('storage-pill').textContent = list.length + ' stored ' + (list.length === 1 ? 'build' : 'builds');
+    var rb = $('recent-body');
+    rb.innerHTML = list.length ? list.slice(0, 5).map(function (f) { return row(f, false); }).join('')
+      : '<tr><td colspan="5" class="empty">No stored builds yet.</td></tr>';
+    var fb = $('files-body');
+    fb.innerHTML = list.length ? list.map(function (f) { return row(f, true); }).join('')
+      : '<tr><td colspan="5" class="empty">No stored builds yet. Create your first obfuscation.</td></tr>';
+  }
+  function recordBuild(b) {
+    var list = load();
+    b.id = 'b' + Date.now();
+    list.unshift(b);
+    if (list.length > 30) list = list.slice(0, 30);
+    save(list);
+    render();
+    var js = $('job-status');
+    if (js) {
+      js.className = 'status-dot done';
+      js.querySelector('span').textContent = 'Finished';
     }
-  );
+    var jm = $('job-message');
+    if (jm) jm.textContent = b.filename + ' finished \u2014 ' + fmtBytes(b.size) + '.';
+  }
+  function download(id) {
+    var f = load().filter(function (x) { return x.id === id; })[0];
+    if (!f || !f.output) { toast('Output was too large to keep in browser storage', true); return; }
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([f.output], { type: 'text/plain' }));
+    a.download = f.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  function remove(id) {
+    save(load().filter(function (x) { return x.id !== id; }));
+    render();
+    toast('Build removed');
+  }
+  function resetAll() {
+    if (!confirm('Clear all stored options and build history from this browser?')) return;
+    try { localStorage.removeItem(KEY); localStorage.removeItem('darkfuscator.opts.v2'); } catch (e) {}
+    render();
+    toast('Local data cleared');
+  }
+  window.DKUI = { recordBuild: recordBuild, download: download, remove: remove, resetAll: resetAll };
 
+  $('btn-reset').onclick = resetAll;
+  $('btn-reset-2').onclick = resetAll;
+  $('btn-new').onclick = $('btn-new-files').onclick = $('btn-start').onclick = function () { go('obfuscate'); };
+  $('btn-allfiles').onclick = function () { go('files'); };
+
+  // ------------------------------------------------------- upload zone
+  var dz = $('drop-zone'), fileInput = $('file');
+  $('btn-zone').onclick = function () { fileInput.click(); };
+  ['dragenter', 'dragover'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = '#ff7a1a'; });
+  });
+  ['dragleave', 'drop'].forEach(function (e) {
+    dz.addEventListener(e, function (ev) { ev.preventDefault(); dz.style.borderColor = ''; });
+  });
+  dz.addEventListener('drop', function (e) {
+    var f = e.dataTransfer.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () {
+      fileInput.value = '';
+      var inp = $('input');
+      inp.value = String(r.result || '');
+      inp.dispatchEvent(new Event('input'));
+      toast('Loaded ' + f.name);
+    };
+    r.readAsText(f);
+  });
+
+  // -------------------------------------------------- collapsible sidebar
+  function toggleSidebar() {
+    var shell = document.querySelector('.shell');
+    if (window.matchMedia('(max-width: 860px)').matches) {
+      shell.classList.toggle('sidebar-open');
+    } else {
+      shell.classList.toggle('sidebar-hidden');
+    }
+  }
+  $('btn-menu').onclick = toggleSidebar;
+  $('scrim').onclick = function () {
+    document.querySelector('.shell').classList.remove('sidebar-open');
+  };
+  document.querySelectorAll('.side-btn[data-page]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelector('.shell').classList.remove('sidebar-open');
+    });
+  });
+
+  render();
+  var hash = (location.hash || '#home').slice(1);
+  if ($('page-' + hash)) go(hash);
 })();
 </script>
-
 <script>
 /* ===== js/luau-lexer.js ===== */
 /*!
@@ -3858,126 +3141,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   return { compile: compile, OPS: OPS, OP: OP, Fn: Fn };
 });
 
-/* ===== js/lz.js ===== */
-/*!
- * lz.js — the Darkfuscator compression module.
- *
- * A dictionary compressor (LZSS) over the serialized bytecode stream, applied
- * at build time before encryption (encrypted bytes are incompressible) and
- * undone inside the generated VM before the integrity checksums run, so the
- * checksums still cover the full plaintext stream.
- *
- * Token stream, 8 tokens per flag byte (LSB first):
- *   flag bit 1 -> literal byte
- *   flag bit 0 -> match: b1 = (dist-1) & 0xFF, b2 = ((dist-1)>>8)<<4 | (len-3)
- * Window 4096 bytes, match length 3..18. The stream starts with a plain
- * varint holding the decompressed length, so the Lua decoder knows when to
- * stop without an end marker.
- *
- * compress() returns null when the packed stream is not smaller than the
- * input; callers fall back to the raw bytes.
- *
- * Browser: window.DarkfuscatorLZ   Node: require('./lz.js')
- */
-;(function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory();
-  else root.DarkfuscatorLZ = factory();
-})(typeof self !== 'undefined' ? self : this, function () {
-  'use strict';
-
-  var WINDOW = 4096, MIN_MATCH = 3, MAX_MATCH = 18, CHAIN = 64;
-
-  function writeVar(out, v) {
-    while (v >= 128) { out.push((v % 128) | 128); v = Math.floor(v / 128); }
-    out.push(v);
-  }
-
-  function compress(bytes) {
-    var n = bytes.length;
-    if (n < 16) return null;
-    var out = [];
-    writeVar(out, n);
-    var head = Object.create(null);   // 3-byte key -> most recent position
-    var prev = [];                    // position -> previous position, same key
-    var pos = 0, flagPos = -1, flagBits = 8;
-
-    while (pos < n) {
-      if (flagBits === 8) { flagPos = out.length; out.push(0); flagBits = 0; }
-
-      var bestLen = 0, bestDist = 0;
-      if (pos + MIN_MATCH <= n) {
-        var key = bytes[pos] | (bytes[pos + 1] << 8) | (bytes[pos + 2] << 16);
-        var cand = (head[key] !== undefined) ? head[key] : -1;
-        var floor = pos - WINDOW;
-        var maxLen = Math.min(MAX_MATCH, n - pos);
-        var tries = CHAIN;
-        while (cand >= 0 && cand >= floor && tries-- > 0) {
-          var l = 0;
-          while (l < maxLen && bytes[cand + l] === bytes[pos + l]) l++;
-          if (l > bestLen) {
-            bestLen = l; bestDist = pos - cand;
-            if (bestLen >= maxLen) break;
-          }
-          cand = (prev[cand] !== undefined) ? prev[cand] : -1;
-        }
-      }
-
-      var end;
-      if (bestLen >= MIN_MATCH) {
-        var d1 = bestDist - 1;
-        out.push(d1 & 255);
-        out.push(((d1 >> 8) << 4) | (bestLen - 3));
-        end = pos + bestLen;
-      } else {
-        out.push(bytes[pos]);
-        out[flagPos] |= (1 << flagBits);
-        end = pos + 1;
-      }
-      flagBits++;
-
-      // chain-insert every position the token consumed
-      for (var ip = pos; ip < end && ip + MIN_MATCH <= n; ip++) {
-        var k2 = bytes[ip] | (bytes[ip + 1] << 8) | (bytes[ip + 2] << 16);
-        prev[ip] = (head[k2] !== undefined) ? head[k2] : -1;
-        head[k2] = ip;
-      }
-      pos = end;
-    }
-
-    if (out.length >= n) return null;
-    return out;
-  }
-
-  // Lua-side decompressor, emitted into every compressed build. All variable
-  // names are the emitter's generated, collision-checked names.
-  // v.src / v.count are the decoder's byte table and byte-count locals and are
-  // reassigned in place; the rest are fresh locals for this block.
-  function luaSource(v) {
-    return [
-      // plaintext stream is LZSS-compressed: undo it before the checksums
-      'local ' + v.p + '=1',
-      'local ' + v.v + ',' + v.sh + '=0,1',
-      'while true do local ' + v.b1 + '=' + v.src + '[' + v.p + ']; ' + v.p + '=' + v.p + '+1; ' +
-        v.v + '=' + v.v + '+(' + v.b1 + '%128)*' + v.sh + '; if ' + v.b1 + '<128 then break end; ' +
-        v.sh + '=' + v.sh + '*128 end',
-      'local ' + v.out + '={} local ' + v.oc + '=0 local ' + v.fl + '=0 local ' + v.fb + '=0',
-      'while ' + v.oc + '<' + v.v + ' do',
-      'if ' + v.fb + '==0 then ' + v.fl + '=' + v.src + '[' + v.p + ']; ' + v.p + '=' + v.p + '+1; ' + v.fb + '=8 end',
-      'local ' + v.bt + '=' + v.fl + '%2; ' + v.fl + '=(' + v.fl + '-' + v.bt + ')/2; ' + v.fb + '=' + v.fb + '-1',
-      'if ' + v.bt + '==1 then ' + v.oc + '=' + v.oc + '+1; ' + v.out + '[' + v.oc + ']=' + v.src + '[' + v.p + ']; ' +
-        v.p + '=' + v.p + '+1 else',
-      'local ' + v.b1 + '=' + v.src + '[' + v.p + ']; local ' + v.b2 + '=' + v.src + '[' + v.p + '+1]; ' + v.p + '=' + v.p + '+2',
-      'local ' + v.dist + '=math.floor(' + v.b2 + '/16)*256+' + v.b1 + '+1',
-      'local ' + v.ml + '=math.floor(' + v.b2 + ' % 16)+3',
-      'for ' + v.k + '=1,' + v.ml + ' do ' + v.oc + '=' + v.oc + '+1; ' + v.out + '[' + v.oc + ']=' + v.out + '[' + v.oc + '-' + v.dist + '] end',
-      'end end',
-      v.src + '=' + v.out + '; ' + v.count + '=' + v.v
-    ];
-  }
-
-  return { compress: compress, luaSource: luaSource, WINDOW: WINDOW, MIN_MATCH: MIN_MATCH, MAX_MATCH: MAX_MATCH };
-});
-
 /* ===== js/vm-emit.js ===== */
 /*
  * Darkfuscator — VM emitter.
@@ -4002,10 +3165,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   else root.DarkfuscatorVMEmit = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
-
-  // the compression module (lz.js); optional: builds degrade gracefully
-  var LZ = null;
-  try { LZ = (typeof module === 'object' && module.exports) ? require('./lz.js') : self.DarkfuscatorLZ; } catch (e) { LZ = null; }
 
   var OPS = ['LOADK', 'LOADNIL', 'LOADBOOL', 'MOVE', 'BOX',
     'NEWTABLE', 'GETTABLE', 'SETTABLE', 'SETLISTM',
@@ -4042,16 +3201,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' +
     'acc args by ip it len li ms mt na nb nc nk np nr nu nv nx nz q res st tn va value vr ' +
     'OPC _ENV _G __iter').split(' ');
-  // letter+digit pairs (c1, c2, rk0, ...) and the fixed locals the emitted
-  // decoder declares can never be handed out as random names: a collision
-  // would shadow a decoder local and corrupt the build
-  for (var _r1 = 0; _r1 < 26; _r1++) {
-    for (var _r2 = 0; _r2 < 10; _r2++) {
-      RESERVED.push(String.fromCharCode(97 + _r1) + _r2);
-      RESERVED.push(String.fromCharCode(65 + _r1) + _r2);
-    }
-  }
-  RESERVED = RESERVED.concat(['je', 'rk0']);
 
   function nameGen(rng, taken, style) {
     var used = Object.create(null);
@@ -4105,7 +3254,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   }
 
   // --------------------------------------------------------------- serialiser
-  function serialize(root, rng, useLz) {
+  function serialize(root, rng) {
     var bytes = [];
     // zigzag varint: operands are signed (jump offsets are negative when the
     // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
@@ -4147,16 +3296,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       c2 = (c2 + (((bytes[ci] + ((ci + 1) * 17)) % 256) * (ci + 3))) % 65519;
     }
 
-    // compression layer: LZSS dictionary pass over the plaintext stream,
-    // applied before any encryption (encrypted bytes are incompressible).
-    // The decoder unpacks it before recomputing the checksums, which still
-    // cover the full plaintext stream.
-    var origBytes = bytes.length, didLz = false;
-    if (useLz && LZ) {
-      var packedLz = LZ.compress(bytes);
-      if (packedLz) { bytes = packedLz; didLz = true; }
-    }
-
     var key = 1 + Math.floor(rng() * 254);
     // the audit seal: the decoder cannot unseal the payload without this
     // value, and it is handed over only by the passing environment audit, so
@@ -4168,17 +3307,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     // (the decoder un-XORs first, then un-adds)
     var xk = 1 + Math.floor(rng() * 254);
     for (i = 0; i < bytes.length; i++) bytes[i] = bytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
-
-    // third layer: a rolling XOR key, applied last (the decoder unwraps it
-    // first). Key N+1 is derived from stored byte N, so the stream cannot be
-    // peeled byte-independently: every byte depends on every byte before it.
-    var rk0 = 1 + Math.floor(rng() * 254);
-    var rkk = rk0;
-    for (i = 0; i < bytes.length; i++) {
-      var re = bytes[i];
-      bytes[i] = re ^ rkk;
-      rkk = (bytes[i] + i + 1) % 256;
-    }
 
     var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
     for (var s = alpha.length - 1; s > 0; s--) {           // per-build alphabet shuffle
@@ -4196,7 +3324,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       }
     }
     if (nb > 0) out.push(alpha[acc % 64]);
-    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, rk: rk0, seal: seal, bytes: bytes.length, origBytes: origBytes, lz: didLz ? 1 : 0, check1: c1, check2: c2 };
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2 };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -4325,7 +3453,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
         program.k.push({ t: 's', v: dp });
       }
     }
-    var blob = serialize(program, rng, opts.compress !== false);
+    var blob = serialize(program, rng);
     // per-build mask for the lazy string-constant layer
     var strMask = 1 + Math.floor(rng() * 254);
     var vtl = ng();
@@ -4339,7 +3467,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       ids.push(v);
     }
     var deadIds = [];
-    for (i = 0; i < (opts.junk >= 2 ? 30 : opts.junk >= 1 ? 12 : 0); i++) {
+    for (i = 0; i < (opts.junk === 2 ? 30 : opts.junk === 1 ? 12 : 0); i++) {
       var dv;
       do { dv = 1 + Math.floor(rng() * 0xFFFE); } while (seen[dv]);
       seen[dv] = 1;
@@ -4362,52 +3490,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
 
     // a comment must end with a newline even when the rest is minified
     if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator\n');
-    // monstrous junk (profile 3): ~100k dead statements (~900 KB) of opaque
-    // arithmetic inside always-false branches. The branches never run (each
-    // block costs one comparison), but they bury any analyst, make every
-    // distributed copy byte-unique at scale, and drown standard decompilers.
-    if (opts.junk >= 3) {
-      var ja = ng(), jb = ng(), jc = ng(), jd = ng();
-      var JCOND = [
-        ja + '~=' + ja,
-        jb + '>' + jb + '+1',
-        '((' + ja + '%2))==2',
-        jc + '==' + jc + ' and ' + jc + '<0',
-        jd + '~=' + jd + ' or ' + ja + '>2^53',
-        '(' + jb + '*' + jc + ')>2^62'
-      ];
-      var JSTMT = [
-        '@a=@a*3+7',
-        '@b=(@b+@a)%9973',
-        '@c=bit32.bxor(@c,0x9e)',
-        '@a,@b=@b,@a',
-        '@c=@c*2-@a',
-        '@d=(@d-@b)%65521',
-        '@b=bit32.bxor(@b,@a%256)',
-        '@a=@a+13',
-        'if @b%3==0 then @b=@b+1 end',
-        '@c=(@c*@d+5)%104729',
-        '@d=@d+@a-@b',
-        '@a=@a%104729'
-      ];
-      line('do');
-      line('local ' + ja + ',' + jb + ',' + jc + ',' + jd + '=0,1,2,3');
-      var jStmts = 0, jBytes = 0, bs;
-      while (jStmts < 100000 && jBytes < 950000) {
-        var blk = ['if ' + JCOND[Math.floor(rng() * JCOND.length)] + ' then'];
-        var bn = 10 + Math.floor(rng() * 7);
-        for (bs = 0; bs < bn; bs++) {
-          blk.push(JSTMT[Math.floor(rng() * JSTMT.length)]
-            .replace(/@a/g, ja).replace(/@b/g, jb).replace(/@c/g, jc).replace(/@d/g, jd));
-        }
-        blk.push('end');
-        jStmts += bn;
-        jBytes += blk.join('\n').length + 1;
-        for (bs = 0; bs < blk.length; bs++) line(blk[bs]);
-      }
-      line('end');
-    }
-
     line('return ({');
 
     // ---------------------------------------------------------- payload slots
@@ -4429,18 +3511,8 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     line('while nb>=8 do ' + L.n + '=' + L.n + '+1; ' + L.o + '[' + L.n + ']=acc%256; acc=(acc-acc%256)/256; nb=nb-8 end');
     line('end');
         line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=math.floor(' + L.o + '[' + L.i + ']) end');
-    // rolling-key layer: key N+1 derives from stored byte N (see serialize)
-    line('do local rk0=' + blob.rk + '; for ' + L.i + '=1,' + L.n + ' do local je=' + L.o + '[' + L.i + ']; ' + L.o + '[' + L.i + ']=bit32.bxor(je,rk0); rk0=(je+' + L.i + ')%256 end end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
-    if (blob.lz) {
-      var Zp = ng(), Zo = ng(), Zc = ng(), Zf = ng(), Zb = ng(), Zv = ng(), Zs = ng(), Zt = ng(), Z1 = ng(), Z2 = ng(), Zd = ng(), Zm = ng(), Zk = ng();
-      var zl = LZ.luaSource({
-        src: L.o, count: L.n, p: Zp, out: Zo, oc: Zc, fl: Zf, fb: Zb,
-        v: Zv, sh: Zs, bt: Zt, b1: Z1, b2: Z2, dist: Zd, ml: Zm, k: Zk
-      });
-      for (i = 0; i < zl.length; i++) line(zl[i]);
-    }
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
     line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
@@ -4478,7 +3550,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     // each used opcode gets several *different* bodies (the same semantics,
     // wrapped in provably-dead opaque predicates) and dispatch picks one per
     // call, so a lifted interpreter can never be matched against one body
-    var nVariants = opts.junk >= 3 ? 6 : opts.junk === 2 ? 4 : opts.junk >= 1 ? 3 : 1;
+    var nVariants = opts.junk === 2 ? 4 : opts.junk === 1 ? 3 : 1;
     var JUNKS = [
       'if I[1]>65535 then return 0 end',
       'if F.ip<0 then F.d=true end',
@@ -4489,12 +3561,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       'if I[1]%2==2 then return 0 end',
       'if I[2]~=I[2] then return 0 end',
       'do local jz=I[2]*I[2]; if jz<0 then return 0 end end',
-      'do local jz=F.ip*2; if jz<0 then return 0 end end',
-      'if I[3]~=I[3] then return 0 end',
-      'do local jz=I[3]*I[3]; if jz<0 then return 0 end end',
-      'if F.ip>F.ip+1 then return 0 end',
-      'do local jz=bit32.bxor(I[1],I[1]); if jz~=0 then F.d=true end end',
-      'if I[1]>65535 and I[2]<0 then return 0 end'
+      'do local jz=F.ip*2; if jz<0 then return 0 end end'
     ];
     var VT = {};
     for (i = 0; i < OPS.length; i++) {
@@ -4518,7 +3585,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
           // two opaque predicates, a different pair per variant: always false
           // by construction (opcode ids stay under 65535, ip under 1, F.o
           // never below -1, an instruction never has more than 5 fields)
-          var nj = opts.junk >= 3 ? 3 + (Math.floor(rng() * 3)) : 2 + (Math.floor(rng() * 2));
+          var nj = 2 + (Math.floor(rng() * 2));
           for (var jk = 0; jk < nj; jk++) {
             var pick = Math.floor(rng() * JUNKS.length);
             line(JUNKS[pick]);
@@ -4806,7 +3873,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     line('end)');
 
     // decoy slots, as in the reference build
-    var decoys = opts.junk >= 3 ? 40 : opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
+    var decoys = opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
     for (i = 0; i < decoys; i++) {
       line(',["' + ng() + '"]=(function(' + ng() + ',' + ng() + ',' + ng() + ')end)');
     }
@@ -4820,7 +3887,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     return {
       source: src,
       ids: ids,
-      stats: { bytes: blob.bytes, origBytes: blob.origBytes, lz: blob.lz, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+      stats: { bytes: blob.bytes, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
     };
   }
 
@@ -4861,7 +3928,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
   var DEFAULTS = {
     nameStyle: 'random',        // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
-    compress: true,             // LZSS dictionary compression of the payload
     junk: 1,                    // 0 | 1 | 2 — decoy dispatch branches and slots
     guard: 1,                   // 0 | 1 | 2 — anti-environment audit strength
     captureGlobals: true,       // grab the caller's environment with getfenv()
@@ -4942,8 +4008,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       var vmRng = makeRng(opts.seed);
       vmOut = VMEmit.emit(prog, {
         rng: vmRng,
-        junk: Math.max(0, Math.min(3, Number(opts.junk) || 0)),
-        compress: opts.compress !== false,
+        junk: opts.junk === 2 ? 2 : opts.junk === 1 ? 1 : 0,
         minify: opts.minify !== false,
         nameStyle: opts.nameStyle || 'random',
         guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
@@ -4974,8 +4039,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
         result.stats.locals = symbols.length;
         result.stats.ratio = result.stats.inputChars ? vmSrc.length / result.stats.inputChars : 0;
         result.stats.bytecodeBytes = vmOut.stats.bytes;
-        result.stats.bytecodeOrigBytes = vmOut.stats.origBytes;
-        result.stats.lz = vmOut.stats.lz;
         result.stats.payloadChars = vmOut.stats.payload;
         result.stats.opcodes = vmOut.stats.opcodes;
         result.stats.protos = countProtos(prog);
@@ -5006,7 +4069,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '4.7.0'
+    version: '4.3.0'
   };
 });
 
@@ -5033,7 +4096,7 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     seed: $('#seed'),
     file: $('#file'),
     protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
-    copy: $('#copy'), download: $('#download'), publish: $('#btn-publish'),
+    copy: $('#copy'), download: $('#download'),
     paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
     advanced: $('#advanced')
   };
@@ -5043,12 +4106,9 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
     nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
     guard: '#opt-guard', watermark: '#opt-watermark',
     lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
-    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper',
-    loader: '#opt-loader'
+    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper'
   };
   var STORE_KEY = 'darkfuscator.opts.v2';
-  var API_BASE = 'https://darkfuscator.pages.dev';
-  var lastPayload = null;
 
   // ------------------------------------------------------------------ utils
   function fmt(n) { return Number(n).toLocaleString(); }
@@ -5186,16 +4246,12 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       return;
     }
 
-    lastPayload = res.output;
-    el.publish.hidden = (String(opts.loader) !== '1');
-    if (String(opts.loader) === '1') { publishConnected(res.output); }
-
     el.output.value = res.output;
     updateMeta();
     updateStats(res);
     el.verified.hidden = false;
 
-    if (window.DKUI && DKUI.toast) { DKUI.toast('Build finished'); } if (false) {
+    if (window.DKUI && DKUI.recordBuild) {
       DKUI.recordBuild({
         filename: lastFilename || 'protected.luau',
         date: new Date().toISOString(),
@@ -5332,47 +4388,6 @@ footer { padding: 18px 30px 30px 108px; color: #6e5f66; font-size: .8rem }
       runObfuscate();
     }
   });
-
-  // ------------------------------------------------- connected loader publish
-  function publishConnected(payload) {
-    var tok = localStorage.getItem('dk_admin_token') || '';
-    var attempt = function (t) {
-      return fetch(API_BASE + '/api/builds', {
-        method: 'POST',
-        headers: { 'x-admin-token': t, 'content-type': 'application/json' },
-        body: JSON.stringify({ payload: payload })
-      }).then(function (r) {
-        return r.json().catch(function () { return {}; }).then(function (d) {
-          if (!r.ok) { var err = new Error((d && d.error) || ('HTTP ' + r.status)); err.status = r.status; throw err; }
-          return d;
-        });
-      });
-    };
-    var run = function (t) {
-      setStatus('Publishing to dashboard…');
-      attempt(t).then(function (d) {
-        el.output.value = d.loader;
-        updateMeta();
-        el.publish.hidden = true;
-        localStorage.setItem('dk_admin_token', t);
-        setStatus('Published as ' + d.id + '. The output is now the connected loader — share that, not the build.', 'ok');
-        if (window.DKUI && DKUI.toast) { DKUI.toast('Published ' + d.id); }
-      }).catch(function (e) {
-        if (e.status === 401) {
-          var asked = window.prompt('Darkfuscator admin token (ADMIN_TOKEN):', '');
-          if (asked && asked.trim()) { run(asked.trim()); return; }
-        }
-        el.publish.hidden = false;
-        setStatus('Publish failed: ' + e.message + '. The self-contained build is still in the output.', 'warn');
-      });
-    };
-    run(tok);
-  }
-
-  el.publish.onclick = function () {
-    if (lastPayload) { publishConnected(lastPayload); }
-    else { setStatus('Obfuscate something first, then publish.', 'warn'); }
-  };
 
   // ------------------------------------------------------------------- init
   loadOptions();

@@ -22,10 +22,6 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  // the compression module (lz.js); optional: builds degrade gracefully
-  var LZ = null;
-  try { LZ = (typeof module === 'object' && module.exports) ? require('./lz.js') : self.DarkfuscatorLZ; } catch (e) { LZ = null; }
-
   var OPS = ['LOADK', 'LOADNIL', 'LOADBOOL', 'MOVE', 'BOX',
     'NEWTABLE', 'GETTABLE', 'SETTABLE', 'SETLISTM',
     'GETUPVAL', 'SETUPVAL', 'GETGLOBAL', 'SETGLOBAL',
@@ -61,16 +57,6 @@
     'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' +
     'acc args by ip it len li ms mt na nb nc nk np nr nu nv nx nz q res st tn va value vr ' +
     'OPC _ENV _G __iter').split(' ');
-  // letter+digit pairs (c1, c2, rk0, ...) and the fixed locals the emitted
-  // decoder declares can never be handed out as random names: a collision
-  // would shadow a decoder local and corrupt the build
-  for (var _r1 = 0; _r1 < 26; _r1++) {
-    for (var _r2 = 0; _r2 < 10; _r2++) {
-      RESERVED.push(String.fromCharCode(97 + _r1) + _r2);
-      RESERVED.push(String.fromCharCode(65 + _r1) + _r2);
-    }
-  }
-  RESERVED = RESERVED.concat(['je', 'rk0']);
 
   function nameGen(rng, taken, style) {
     var used = Object.create(null);
@@ -124,7 +110,7 @@
   }
 
   // --------------------------------------------------------------- serialiser
-  function serialize(root, rng, useLz) {
+  function serialize(root, rng) {
     var bytes = [];
     // zigzag varint: operands are signed (jump offsets are negative when the
     // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
@@ -166,16 +152,6 @@
       c2 = (c2 + (((bytes[ci] + ((ci + 1) * 17)) % 256) * (ci + 3))) % 65519;
     }
 
-    // compression layer: LZSS dictionary pass over the plaintext stream,
-    // applied before any encryption (encrypted bytes are incompressible).
-    // The decoder unpacks it before recomputing the checksums, which still
-    // cover the full plaintext stream.
-    var origBytes = bytes.length, didLz = false;
-    if (useLz && LZ) {
-      var packedLz = LZ.compress(bytes);
-      if (packedLz) { bytes = packedLz; didLz = true; }
-    }
-
     var key = 1 + Math.floor(rng() * 254);
     // the audit seal: the decoder cannot unseal the payload without this
     // value, and it is handed over only by the passing environment audit, so
@@ -187,17 +163,6 @@
     // (the decoder un-XORs first, then un-adds)
     var xk = 1 + Math.floor(rng() * 254);
     for (i = 0; i < bytes.length; i++) bytes[i] = bytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
-
-    // third layer: a rolling XOR key, applied last (the decoder unwraps it
-    // first). Key N+1 is derived from stored byte N, so the stream cannot be
-    // peeled byte-independently: every byte depends on every byte before it.
-    var rk0 = 1 + Math.floor(rng() * 254);
-    var rkk = rk0;
-    for (i = 0; i < bytes.length; i++) {
-      var re = bytes[i];
-      bytes[i] = re ^ rkk;
-      rkk = (bytes[i] + i + 1) % 256;
-    }
 
     var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
     for (var s = alpha.length - 1; s > 0; s--) {           // per-build alphabet shuffle
@@ -215,7 +180,7 @@
       }
     }
     if (nb > 0) out.push(alpha[acc % 64]);
-    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, rk: rk0, seal: seal, bytes: bytes.length, origBytes: origBytes, lz: didLz ? 1 : 0, check1: c1, check2: c2 };
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2 };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -344,7 +309,7 @@
         program.k.push({ t: 's', v: dp });
       }
     }
-    var blob = serialize(program, rng, opts.compress !== false);
+    var blob = serialize(program, rng);
     // per-build mask for the lazy string-constant layer
     var strMask = 1 + Math.floor(rng() * 254);
     var vtl = ng();
@@ -358,7 +323,7 @@
       ids.push(v);
     }
     var deadIds = [];
-    for (i = 0; i < (opts.junk >= 2 ? 30 : opts.junk >= 1 ? 12 : 0); i++) {
+    for (i = 0; i < (opts.junk === 2 ? 30 : opts.junk === 1 ? 12 : 0); i++) {
       var dv;
       do { dv = 1 + Math.floor(rng() * 0xFFFE); } while (seen[dv]);
       seen[dv] = 1;
@@ -381,52 +346,6 @@
 
     // a comment must end with a newline even when the rest is minified
     if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator\n');
-    // monstrous junk (profile 3): ~100k dead statements (~900 KB) of opaque
-    // arithmetic inside always-false branches. The branches never run (each
-    // block costs one comparison), but they bury any analyst, make every
-    // distributed copy byte-unique at scale, and drown standard decompilers.
-    if (opts.junk >= 3) {
-      var ja = ng(), jb = ng(), jc = ng(), jd = ng();
-      var JCOND = [
-        ja + '~=' + ja,
-        jb + '>' + jb + '+1',
-        '((' + ja + '%2))==2',
-        jc + '==' + jc + ' and ' + jc + '<0',
-        jd + '~=' + jd + ' or ' + ja + '>2^53',
-        '(' + jb + '*' + jc + ')>2^62'
-      ];
-      var JSTMT = [
-        '@a=@a*3+7',
-        '@b=(@b+@a)%9973',
-        '@c=bit32.bxor(@c,0x9e)',
-        '@a,@b=@b,@a',
-        '@c=@c*2-@a',
-        '@d=(@d-@b)%65521',
-        '@b=bit32.bxor(@b,@a%256)',
-        '@a=@a+13',
-        'if @b%3==0 then @b=@b+1 end',
-        '@c=(@c*@d+5)%104729',
-        '@d=@d+@a-@b',
-        '@a=@a%104729'
-      ];
-      line('do');
-      line('local ' + ja + ',' + jb + ',' + jc + ',' + jd + '=0,1,2,3');
-      var jStmts = 0, jBytes = 0, bs;
-      while (jStmts < 100000 && jBytes < 950000) {
-        var blk = ['if ' + JCOND[Math.floor(rng() * JCOND.length)] + ' then'];
-        var bn = 10 + Math.floor(rng() * 7);
-        for (bs = 0; bs < bn; bs++) {
-          blk.push(JSTMT[Math.floor(rng() * JSTMT.length)]
-            .replace(/@a/g, ja).replace(/@b/g, jb).replace(/@c/g, jc).replace(/@d/g, jd));
-        }
-        blk.push('end');
-        jStmts += bn;
-        jBytes += blk.join('\n').length + 1;
-        for (bs = 0; bs < blk.length; bs++) line(blk[bs]);
-      }
-      line('end');
-    }
-
     line('return ({');
 
     // ---------------------------------------------------------- payload slots
@@ -448,18 +367,8 @@
     line('while nb>=8 do ' + L.n + '=' + L.n + '+1; ' + L.o + '[' + L.n + ']=acc%256; acc=(acc-acc%256)/256; nb=nb-8 end');
     line('end');
         line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=math.floor(' + L.o + '[' + L.i + ']) end');
-    // rolling-key layer: key N+1 derives from stored byte N (see serialize)
-    line('do local rk0=' + blob.rk + '; for ' + L.i + '=1,' + L.n + ' do local je=' + L.o + '[' + L.i + ']; ' + L.o + '[' + L.i + ']=bit32.bxor(je,rk0); rk0=(je+' + L.i + ')%256 end end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
-    if (blob.lz) {
-      var Zp = ng(), Zo = ng(), Zc = ng(), Zf = ng(), Zb = ng(), Zv = ng(), Zs = ng(), Zt = ng(), Z1 = ng(), Z2 = ng(), Zd = ng(), Zm = ng(), Zk = ng();
-      var zl = LZ.luaSource({
-        src: L.o, count: L.n, p: Zp, out: Zo, oc: Zc, fl: Zf, fb: Zb,
-        v: Zv, sh: Zs, bt: Zt, b1: Z1, b2: Z2, dist: Zd, ml: Zm, k: Zk
-      });
-      for (i = 0; i < zl.length; i++) line(zl[i]);
-    }
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
     line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
@@ -497,7 +406,7 @@
     // each used opcode gets several *different* bodies (the same semantics,
     // wrapped in provably-dead opaque predicates) and dispatch picks one per
     // call, so a lifted interpreter can never be matched against one body
-    var nVariants = opts.junk >= 3 ? 6 : opts.junk === 2 ? 4 : opts.junk >= 1 ? 3 : 1;
+    var nVariants = opts.junk === 2 ? 4 : opts.junk === 1 ? 3 : 1;
     var JUNKS = [
       'if I[1]>65535 then return 0 end',
       'if F.ip<0 then F.d=true end',
@@ -508,12 +417,7 @@
       'if I[1]%2==2 then return 0 end',
       'if I[2]~=I[2] then return 0 end',
       'do local jz=I[2]*I[2]; if jz<0 then return 0 end end',
-      'do local jz=F.ip*2; if jz<0 then return 0 end end',
-      'if I[3]~=I[3] then return 0 end',
-      'do local jz=I[3]*I[3]; if jz<0 then return 0 end end',
-      'if F.ip>F.ip+1 then return 0 end',
-      'do local jz=bit32.bxor(I[1],I[1]); if jz~=0 then F.d=true end end',
-      'if I[1]>65535 and I[2]<0 then return 0 end'
+      'do local jz=F.ip*2; if jz<0 then return 0 end end'
     ];
     var VT = {};
     for (i = 0; i < OPS.length; i++) {
@@ -537,7 +441,7 @@
           // two opaque predicates, a different pair per variant: always false
           // by construction (opcode ids stay under 65535, ip under 1, F.o
           // never below -1, an instruction never has more than 5 fields)
-          var nj = opts.junk >= 3 ? 3 + (Math.floor(rng() * 3)) : 2 + (Math.floor(rng() * 2));
+          var nj = 2 + (Math.floor(rng() * 2));
           for (var jk = 0; jk < nj; jk++) {
             var pick = Math.floor(rng() * JUNKS.length);
             line(JUNKS[pick]);
@@ -587,9 +491,6 @@
       push('if ' + b1 + '==1 then');
       push('local ' + okc + '=true');
       push('pcall(function() if game.Close~=game.Close then ' + okc + '=false end if typeof(game:GetService("Lighting"))~="Instance" then ' + okc + '=false end if game:GetService("Lighting").ClockTime~=game:GetService("Lighting").ClockTime then ' + okc + '=false end end)');
-      push('pcall(function() if typeof(game.Loaded)~="boolean" then ' + okc + '=false end end)');
-      push('pcall(function() if typeof(game:GetService("ProximityPromptService").PromptShown)~="RBXScriptSignal" then ' + okc + '=false end end)');
-      push('pcall(function() if typeof(game.Workspace:GetServerTimeNow())~="number" then ' + okc + '=false end end)');
       push('if ' + okc + ' then');
       if (elevel >= 2) {
         push('local ' + n6 + ',' + n7 + ',' + n8 + ',' + n9 + ',' + n10 + '=0,0,0,0,0');
@@ -828,7 +729,7 @@
     line('end)');
 
     // decoy slots, as in the reference build
-    var decoys = opts.junk >= 3 ? 40 : opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
+    var decoys = opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
     for (i = 0; i < decoys; i++) {
       line(',["' + ng() + '"]=(function(' + ng() + ',' + ng() + ',' + ng() + ')end)');
     }
@@ -842,7 +743,7 @@
     return {
       source: src,
       ids: ids,
-      stats: { bytes: blob.bytes, origBytes: blob.origBytes, lz: blob.lz, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+      stats: { bytes: blob.bytes, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
     };
   }
 
