@@ -78,25 +78,6 @@ content="Darkfuscator loader dashboard — build activity and configurable loade
 
     </a>
 
-    <a class="side-btn" href="docs.html" title="API docs">
-
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round">
-
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-
-      </svg>
-
-    </a>
-
   </aside>
 
 
@@ -130,7 +111,7 @@ content="Darkfuscator loader dashboard — build activity and configurable loade
         <div>
 
           <div class="muted" style="font-size:.78rem">
-            DARKFUSCATOR
+            🎃 DARKFUSCATOR
           </div>
 
           <h1>
@@ -145,101 +126,12 @@ content="Darkfuscator loader dashboard — build activity and configurable loade
       <div class="top-right">
 
         <span class="pill">
-          connected loaders · server-side validation
+          🎃 connected loaders · server-side validation
         </span>
 
       </div>
 
     </header>
-
-
-    <div id="signin-prompt" hidden>
-      <section class="card">
-        <div class="card-top">
-          <div>
-            <small class="eyebrow">Account</small>
-            <h2>Sign in to manage your API key</h2>
-          </div>
-        </div>
-        <p class="muted" style="font-size:.85rem">Your account dashboard holds your API key, usage stats and settings. Sign in to continue, or create an account in under a minute.</p>
-        <div class="actions">
-          <a class="btn btn-primary" href="login.html">Sign in / Create account</a>
-        </div>
-      </section>
-    </div>
-
-    <div id="user-panel" hidden>
-      <section class="card">
-        <div class="card-top">
-          <div>
-            <small class="eyebrow">API access</small>
-            <h2>Your API key</h2>
-          </div>
-          <button class="btn" id="btn-key-copy" type="button">Copy</button>
-        </div>
-        <p class="muted" style="font-size:.85rem">Authenticate with <code style="font-size:.8rem">Authorization: Bearer &lt;key&gt;</code>. Full reference on the <a href="docs.html" style="color:inherit">docs page</a>.</p>
-        <div class="keybox">
-          <code id="key-masked" class="key-text">dk_live_••••••••••••</code>
-          <code id="key-full" class="key-text" hidden></code>
-        </div>
-        <div class="actions" style="gap:8px">
-          <button class="btn" id="btn-key-reveal" type="button">Reveal</button>
-          <button class="btn btn-danger" id="btn-key-regen" type="button">Regenerate key</button>
-        </div>
-        <div id="regen-confirm" class="warnbox" hidden>
-          <p style="margin:0 0 8px;font-size:.85rem">Regenerating immediately invalidates your current key. Every integration using it will stop working until you update them.</p>
-          <div class="actions" style="gap:8px">
-            <button class="btn btn-danger" id="regen-yes" type="button">Yes, regenerate</button>
-            <button class="btn" id="regen-no" type="button">Cancel</button>
-          </div>
-        </div>
-        <div id="key-note" class="form-note" hidden style="margin-top:10px"></div>
-        <div class="stat-grid" style="margin-top:14px">
-          <div class="stat"><span class="stat-label">Created</span><span class="stat-value" id="key-created">&mdash;</span></div>
-          <div class="stat"><span class="stat-label">Last used</span><span class="stat-value" id="key-used">never</span></div>
-          <div class="stat"><span class="stat-label">Rate limit</span><span class="stat-value"><span id="rl-minute">30</span> / min &middot; <span id="rl-day">1,000</span> / day</span></div>
-        </div>
-      </section>
-
-      <section class="card">
-        <div class="card-top">
-          <div>
-            <small class="eyebrow">Usage</small>
-            <h2>API activity</h2>
-          </div>
-        </div>
-        <div class="stat-grid">
-          <div class="stat"><span class="stat-label">Total requests</span><span class="stat-value" id="u-total">0</span></div>
-          <div class="stat"><span class="stat-label">Successful</span><span class="stat-value" id="u-ok">0</span></div>
-          <div class="stat"><span class="stat-label">Failed</span><span class="stat-value" id="u-fail">0</span></div>
-          <div class="stat"><span class="stat-label">Rate-limited</span><span class="stat-value" id="u-limited">0</span></div>
-        </div>
-        <div id="u-recent" style="margin-top:14px"></div>
-      </section>
-
-      <section class="card">
-        <div class="card-top">
-          <div>
-            <small class="eyebrow">Account</small>
-            <h2>Settings</h2>
-          </div>
-          <button class="btn" id="btn-logout" type="button">Sign out</button>
-        </div>
-        <p class="muted" style="font-size:.85rem">Signed in as <strong id="acc-who">&mdash;</strong> (<span id="acc-email">&mdash;</span>)<span id="acc-since" class="muted"></span></p>
-        <div class="field" style="max-width:360px">
-          <label style="display:block;font-size:.78rem;color:var(--muted,#9a9aa4);margin-bottom:5px">Current password</label>
-          <input type="password" id="pw-current" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:inherit;font:inherit">
-        </div>
-        <div class="field" style="max-width:360px">
-          <label style="display:block;font-size:.78rem;color:var(--muted,#9a9aa4);margin-bottom:5px">New password</label>
-          <input type="password" id="pw-new" autocomplete="new-password" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:inherit;font:inherit">
-        </div>
-        <div class="actions" style="gap:8px">
-          <button class="btn btn-primary" id="btn-chpass" type="button">Update password</button>
-        </div>
-        <div id="pw-note" class="form-note" hidden style="margin-top:10px"></div>
-      </section>
-    </div>
 
 
     <section class="card" id="gate">
@@ -570,6 +462,5 @@ content="Darkfuscator loader dashboard — build activity and configurable loade
 <script src="js/dashboard.js">
 </script>
 
-<script src="js/auth.js"></script>
 </body>
 </html>

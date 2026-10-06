@@ -7,7 +7,7 @@ function json(data, status) {
 
 // GET /v1/health — liveness + version.
 export async function onRequestGet() {
-  return json({ ok: true, name: 'Darkfuscator', version: '5.1.0', engine: 'bytecode-vm', time: new Date().toISOString() });
+  return json({ ok: true, name: 'Darkfuscator', version: '4.8.0', engine: 'bytecode-vm', time: new Date().toISOString() });
 }
 
 export async function onRequestHead() {

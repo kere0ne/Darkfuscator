@@ -34,12 +34,6 @@ function findLuau() {
 }
 const LUAU = findLuau();
 const DARK = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
-// v5 default profile ships the full anti-tamper loader, which (by design)
-// silently refuses to run outside a genuine Roblox client. The suite executes
-// builds with the luau CLI to compare behavior, so it forces the wrapper off;
-// presets and the wrapper itself are covered in tools/test-cli.js.
-const _baseObf = DARK.obfuscate.bind(DARK);
-DARK.obfuscate = (src, o) => _baseObf(src, Object.assign({ antiTamper: 0 }, o));
 const Parser = require(path.join(__dirname, '..', 'site', 'js', 'luau-parser.js'));
 
 const CORPUS = path.join(__dirname, 'corpus');

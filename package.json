@@ -1,6 +1,6 @@
 {
   "name": "darkfuscator",
-  "version": "5.1.0",
+  "version": "4.8.0",
   "description": "Luau obfuscator with a custom bytecode VM: parser, IR, encrypted+compressed bytecode, per-build randomized interpreter. CLI + web + /v1 API.",
   "main": "index.js",
   "directories": {

@@ -15,26 +15,6 @@ randomized interpreter. Renaming, string encryption, control-flow flattening,
 opaque predicates, dead code, execution locks, and integrity checksums are all
 part of that pipeline.
 
-
-## v5.0 behavior
-
-**Every build ships maximum protection by default.** The engine defaults are the
-strongest profile: strict anti-environment audit, full anti-tamper loader,
-monstrous junk, `confuse` naming, compression. The web UI has no settings panel;
-the CLI still accepts `--preset lightweight|balanced|maximum` and explicit flags
-when you need a lighter build.
-
-**Failures are silent.** A tampered, dumped, or non-Roblox environment gets no
-message: the environment audit and anti-tamper battery stop the program quietly,
-before a single byte decrypts, and a failure caught by the Heartbeat re-audit
-hangs the thread. No error text names the protector or the check that tripped.
-
-**Two VM dispatch architectures.** Each build randomly picks between a shuffled
-compare ladder and a scrambled numeric jump table (opcode id maps straight to a
-handler reference, dead ids included), with 8 different handler bodies per used
-opcode at full junk and 20 provably-dead opaque predicates in the pool. There is
-no single interpreter loop to lift, and no two builds look alike.
-
 ## Folder structure
 
 ```
@@ -121,10 +101,10 @@ Config file (JSON), read from --config or ./darkfuscator.config.json:
 
 | Option | Values | What it does |
 |---|---|---|
-| junk | 0-3 | decoy dispatch branches; 3 = monstrous (~100k junk statements). **Default: 3** |
+| junk | 0-3 | decoy dispatch branches; 3 = monstrous (~100k junk statements) |
 | guard | 0-2 | anti-environment audit strength |
 | envChecks | 0-2 | anti-env probes; the passing audit feeds the decryption seal |
-| antiTamper | 0-2 | chunked loader wrapper + heartbeat re-audit: off / fast / full. **Default: 2** |
+| antiTamper | 0-2 | chunked loader wrapper + heartbeat re-audit: off / fast / full |
 | nameStyle | short / random / confuse | generated identifier style |
 | minify | true / false | one-line output |
 | compress | true / false | LZSS payload compression pass |
@@ -153,44 +133,6 @@ npm test            # full engine suite
 node tools/test-api.js   # loader artifact service (mock storage)
 node tools/test-cli.js   # CLI + presets + compression roundtrip
 ```
-
-## Accounts, API keys and the public API (v5.1)
-
-Every account automatically gets a personal API key (`dk_live_...`). Passwords
-are PBKDF2-SHA-256 hashed (120k iterations, per-user salt) and never stored in
-plaintext. API keys are stored as a SHA-256 lookup hash plus an AES-GCM
-encrypted copy (key derived from the AUTH_SECRET env var), so only the owner
-can reveal their key from the dashboard.
-
-- `POST /api/auth/signup` `{username, email, password}` — creates the account,
-  its API key and a 7-day httpOnly session cookie.
-- `POST /api/auth/login` `{identifier, password}` — username or email.
-- `POST /api/auth/logout`, `GET /api/auth/me` — session lifecycle.
-- `POST /api/auth/account` — change password / email / username (current
-  password required for each).
-- `GET /api/me/key` — your key (masked + full for the owner), created date,
-  last-used, usage counters.
-- `POST /api/me/key/regenerate` — rotates the key; the old key is deleted from
-  the lookup table immediately.
-- `GET /api/me/usage` — usage stats + last 20 requests (status, bytes, ms; no
-  source or key material is ever logged).
-- `POST /api/v1/obfuscate` — the public API: Bearer key auth, per-key rate
-  limits (30/min, 1000/day), body validation, per-user usage accounting.
-  `{source, preset?, options?, seed?}` -> `{success, requestId, preset, bytes,
-  durationMs, result}`.
-- `POST /api/v1/protect` — authenticated alias of `/api/v1/obfuscate`.
-- `GET /api/v1/health` — liveness + version.
-
-The developer documentation lives at `/docs` (docs.html): base URL, auth
-scheme, endpoint reference, options, status codes, rate limits and cURL /
-JavaScript / Python / Lua examples. No real key material appears in the docs.
-
-Backend notes: Cloudflare Pages Functions + KV (`DARKFUSCATOR_KV`); set
-`AUTH_SECRET` (or `ADMIN_TOKEN`) as an environment variable — never hardcode
-secrets into the frontend. CORS is open on `/api/v1/*` (API-key auth) and
-intentionally absent on `/api/auth/*` + `/api/me/*` (same-origin cookies).
-Rate limiting uses short-TTL KV counters; auth endpoints are additionally
-capped per IP (20/min).
 
 ## Docs
 
