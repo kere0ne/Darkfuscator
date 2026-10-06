@@ -1,0 +1,27 @@
+# Render blueprint: Darkfuscator is a fully client-side static site,
+# so there is no build step; site/ is published as-is.
+services:
+  - type: web
+    name: darkfuscator
+    runtime: static
+    staticPublishPath: ./site
+    autoDeploy: true
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: geolocation=(), microphone=(), camera=()
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: same-origin
+      - path: /styles.css
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /js/*
+        name: Cache-Control
+        value: public, max-age=3600
