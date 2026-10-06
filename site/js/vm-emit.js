@@ -310,6 +310,9 @@
       }
     }
     var blob = serialize(program, rng);
+    // silent-failure scramble value: any detected tamper rewrites the seal
+    // to this instead of raising a patchable, brandable error message
+    var scrG = String((blob.seal + 91 + (blob.key % 89)) % 256);
     // per-build mask for the lazy string-constant layer
     var strMask = 1 + Math.floor(rng() * 254);
     var vtl = ng();
@@ -346,7 +349,10 @@
 
     // a comment must end with a newline even when the rest is minified
     if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator\n');
-    line('return ({');
+    // wrapReturn lets the caller append top-level statements (heavy junk)
+    // after the build: `return` is only legal as the last statement of a
+    // block, so the whole table-return is wrapped in a do-end
+    line(opts.wrapReturn ? 'do return ({' : 'return ({');
 
     // ---------------------------------------------------------- payload slots
     line('["' + N.blob + '"]=' + JSON.stringify(blob.payload) + ',');
@@ -371,7 +377,7 @@
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
-    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
+    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then for dp=1,' + L.n + ' do ' + L.o + '[dp]=(' + L.o + '[dp]+dp*17)%256 end end');
 
     line('local ' + L.c + '=' + L.o);
     line('local p=1');
@@ -560,6 +566,9 @@
       wl('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
       wl('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
       wl('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
+      wl('checks[11]={name="env_write",run=function() local cv="_dkcv"..tostring(math.floor((os.clock()%1)*1000000)) local ok2=false pcall(function() getfenv(0)[cv]=1187 if getfenv(0)[cv]==1187 then ok2=true end getfenv(0)[cv]=nil end) if not ok2 then return false end return true end}');
+      wl('checks[12]={name="string_integrity",run=function() if tostring("ab")~="ab" or string.rep("x",2)~="xx" or ("ab"):upper()~="AB" or #"ab"~=2 then return false end return true end}');
+      wl('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") end return true end}');
       wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end return true end');
       wl('runChecks()');
       wl('if detected then print(MSG) return end');
@@ -641,7 +650,7 @@
     line('if ' + P.p + '[2] then local np=' + P.p + '[1]; local na=select("#",...); ' +
       'local v={select(np+1,...)} v.n=(na>np) and na-np or 0 F.V=v end');
     line('local ' + L.c + '=' + P.p + '[5]');
-    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then error("Darkfuscator integrity check failed",0) end end');
+    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then F.d=true;F.n=0;F.o=0 end end');
     var vtEntries = [];
     for (i = 0; i < OPS.length; i++) {
       if (usedOps[i]) vtEntries.push('[' + i + ']={'+ VT[i].map(function(n) { return P.s + '["' + n + '"]'; }).join(',') + '}');
@@ -704,7 +713,7 @@
     if (glevel === 0) {
       if (elevel >= 1) {
         line('do');
-        sealBinding(line, P.s, 'error("Darkfuscator protected program: environment audit failed",0)');
+        sealBinding(line, P.s, P.s + '["' + N.seal + '"]=' + scrG);
         line('end');
       } else {
         line(P.s + '["' + N.seal + '"]=' + blob.seal + ';');
@@ -712,10 +721,10 @@
     }
     if (glevel >= 1) {
       line('local ' + ge + '=' + P.s + '["' + N.guard + '"](' + P.s + ')');
-      line('if ' + ge + ' then error("Darkfuscator protected program: environment audit failed",0) end');
+      line('if ' + ge + ' then ' + P.s + '["' + N.seal + '"]=' + scrG + ' end');
     }
     line('local P=' + P.s + '["' + N.dec + '"](' + P.s + ',' + P.s + '["' + N.blob + '"])');
-    line(P.s + '["' + N.blob + '"]=nil; ' + P.s + '["' + N.alpha + '"]=nil; ' + P.s + '["' + N.check1 + '"]=nil; ' + P.s + '["' + N.check2 + '"]=nil; ' + P.s + '["' + N.dec + '"]=nil; ' + P.s + '["' + N.seal + '"]=nil');
+    line(P.s + '["' + N.blob + '"]=nil; ' + P.s + '["' + N.alpha + '"]=nil; ' + P.s + '["' + N.check1 + '"]=nil; ' + P.s + '["' + N.check2 + '"]=nil; ' + P.s + '["' + N.dec + '"]=nil; ' + P.s + '["' + N.seal + '"]=nil; ' + P.s + '["' + N.guard + '"]=nil');
 
     line('local f=' + P.s + '["' + N.mk + '"](' + P.s + ',P,{})');
     // anti-dump re-audit: the battery runs again one scheduler step after the
@@ -735,7 +744,7 @@
     }
 
     var envExpr = opts.captureGlobals === false ? '_ENV or _G' : 'getfenv and getfenv() or _ENV or _G';
-    line('}):' + N.entry + '(' + envExpr + ');');
+    line('}):' + N.entry + '(' + envExpr + ');' + (opts.wrapReturn ? ' end' : ''));
 
     // statements must stay separated even when minified — a space is enough
     var src = out.join(opts.minify === false ? '\n' : ' ');

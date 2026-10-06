@@ -34,6 +34,15 @@ function findLuau() {
 }
 const LUAU = findLuau();
 const DARK = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
+
+// Headless-safe base for every build below: the anti-tamper wrapper requires a
+// live Roblox client (its battery hard-fails under the plain Luau CLI) and the
+// nested second VM roughly doubles every build, so the suite pins both off
+// unless a specific test opts in.
+const HEADLESS = { antiTamper: 0, vmLayers: 1 };
+function obf(src, opts) {
+  return DARK.obfuscate(src, Object.assign({}, HEADLESS, opts || {}));
+}
 const Parser = require(path.join(__dirname, '..', 'site', 'js', 'luau-parser.js'));
 
 const CORPUS = path.join(__dirname, 'corpus');
@@ -143,7 +152,7 @@ for (const file of corpusFiles) {
     for (const seed of [1, 7, 99]) {
       const label = `${cfg.label}/seed${seed}`;
       let res;
-      try { res = DARK.obfuscate(src, Object.assign({ seed: seed }, cfg.opts)); }
+      try { res = obf(src, Object.assign({ seed: seed }, cfg.opts)); }
       catch (e) { log(false, label + ' obfuscate', 'threw: ' + e.message); continue; }
       if (!res.ok) { log(false, label + ' obfuscate', JSON.stringify(res.error)); continue; }
 
@@ -221,7 +230,7 @@ for (const [file, opts] of REGRESS) {
   const base = path.basename(file, '.luau');
   const label = (base + '/' + opts.seed).padEnd(30);
   let res;
-  try { res = DARK.obfuscate(src, opts); }
+  try { res = obf(src, opts); }
   catch (e) { log(false, label + 'obfuscate', 'threw: ' + e.message); continue; }
   if (!res.ok) { log(false, label + 'obfuscate', JSON.stringify(res.error)); continue; }
   let reErr = null;
@@ -254,7 +263,7 @@ console.log('\n\x1b[1mSoak: 20 random option sets per corpus file stay valid\x1b
   for (const file of corpusFiles) {
     const src = fs.readFileSync(path.join(CORPUS, file), 'utf8');
     for (let i = 0; i < 20; i++) {
-      const res = DARK.obfuscate(src, {
+      const res = obf(src, {
         nameStyle: ['short', 'random', 'confuse'][i % 3],
         minify: i % 4 !== 0,
         junk: i % 3,
@@ -282,7 +291,7 @@ if (fs.existsSync(bigPath)) {
   else {
     log(true, `parse 189KB sample (${Date.now() - t}ms, ${parsed.symbols.length} locals)`);
     t = Date.now();
-    const r = DARK.obfuscate(src, { seed: 5, junk: 1, nameStyle: 'random' });
+    const r = obf(src, { seed: 5, junk: 1, nameStyle: 'random' });
     if (!r.ok) log(false, 'obfuscate 189KB sample', JSON.stringify(r.error));
     else {
       // the real Luau VM must agree the output is syntactically valid: both

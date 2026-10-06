@@ -31,6 +31,7 @@ function findLuau() {
 }
 const LUAU = findLuau();
 const DARK = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
+const HEADLESS = { antiTamper: 0, vmLayers: 1 };
 const CORPUS = path.join(__dirname, 'corpus');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'darkfuzz-'));
 
@@ -88,7 +89,7 @@ if (BIG) {
 for (const entry of files.map(f => ({ abs: path.join(CORPUS, f), name: f })).concat(extra)) {
   const file = entry.name, src = fs.readFileSync(entry.abs, 'utf8');
   if (BUILD_ONLY.has(file)) {
-    const built = DARK.obfuscate(src, { seed: 12345, junk: 2, nameStyle: 'confuse' });
+    const built = DARK.obfuscate(src, Object.assign({}, HEADLESS, { seed: 12345, junk: 2, nameStyle: 'confuse' }));
     total++;
     if (!built.ok || !DARK.validate(built.output).ok) { failures++; console.log(`  FAIL ${file} build :: ${built.error && built.error.message}`); }
     else console.log(`  BUILD-ONLY ${file.padEnd(24)} ${built.output.length.toLocaleString()} chars, ${built.stats.protos} protos`);
@@ -114,7 +115,7 @@ for (const entry of files.map(f => ({ abs: path.join(CORPUS, f), name: f })).con
       seed
     };
     let res;
-    try { res = DARK.obfuscate(src, opts); }
+    try { res = DARK.obfuscate(src, Object.assign({}, HEADLESS, opts)); }
     catch (e) {
       console.log(`  THREW ${file} ${JSON.stringify(opts)} :: ${e.message}`);
       bad++; failures++;

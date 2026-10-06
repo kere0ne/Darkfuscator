@@ -15,7 +15,7 @@ const src = fs.readFileSync(path.join(__dirname, 'corpus', file.endsWith('.luau'
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dbg-'));
 fs.writeFileSync(path.join(tmp, 'orig.luau'), src);
-const res = DARK.obfuscate(src, { preset, seed });
+const res = DARK.obfuscate(src, Object.assign({ preset, seed }, { antiTamper: 0, vmLayers: 1 }));
 if (!res.ok) { console.log('OBFUSCATE FAILED:', JSON.stringify(res.error)); process.exit(1); }
 fs.writeFileSync(path.join(tmp, 'obf.luau'), res.output);
 

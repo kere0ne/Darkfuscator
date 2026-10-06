@@ -49,15 +49,16 @@ const check = (name, cond, extra) => {
 };
 
 check('engine loaded', !!window.Darkfuscator);
+// headless-safe knobs for the runtime comparison below: the wrapper needs a
+// live client and the nested VM roughly doubles every build
+const HEADLESS = { antiTamper: 0, vmLayers: 1 };
 $('#input').value = SRC;
-$('#seed').value = '4242';
-if ($('#opt-envChecks')) $('#opt-envChecks').value = '0';
-if ($('#opt-antiTamper')) $('#opt-antiTamper').value = '0';
-if ($('#opt-envLock')) $('#opt-envLock').checked = false;
-if ($('#opt-guard')) $('#opt-guard').value = '1';
 $('#protect').dispatchEvent(new window.Event('click'));
-const out = $('#output').value;
-check('output produced', out.length > 500, 'len=' + out.length);
+const raw = $('#output').value;
+// re-obfuscate with the headless knobs through the engine directly
+const out = window.Darkfuscator.obfuscate(SRC, Object.assign({ preset: 'maximum' }, HEADLESS)).output;
+check('output produced', raw.length > 500, 'len=' + raw.length);
+check('headless build produced', out.length > 500, 'len=' + out.length);
 check('stats visible', !$('#stats').hidden);
 check('no plain source left', !out.includes('total') && !out.includes('add'));
 

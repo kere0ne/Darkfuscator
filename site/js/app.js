@@ -1,5 +1,6 @@
 /*!
  * app.js — Darkfuscator UI wiring.
+ * Protection is always maximum: no settings, no knobs.
  * Depends on: luau-lexer.js, luau-parser.js, obfuscate.js (window.Darkfuscator)
  */
 (function () {
@@ -17,28 +18,14 @@
     input: $('#input'), output: $('#output'),
     inmeta: $('#inmeta'), outmeta: $('#outmeta'),
     status: $('#status'), error: $('#error'), stats: $('#stats'),
-    seed: $('#seed'),
     file: $('#file'),
     protect: $('#protect'), validate: $('#validate'), clear: $('#clear'),
     copy: $('#copy'), download: $('#download'),
-    paneIn: $('#pane-in'), paneOut: $('#pane-out'), verified: $('#verified-badge'),
-    advanced: $('#advanced')
+    paneIn: $('#pane-in'), verified: $('#verified-badge')
   };
-
-  // only the knobs the bytecode pipeline actually uses
-  var OPTION_CONTROLS = {
-    nameStyle: '#opt-nameStyle', minify: '#opt-minify', junk: '#opt-junk',
-    guard: '#opt-guard', watermark: '#opt-watermark',
-    lockPlace: '#opt-lockPlace', lockUniverse: '#opt-lockUniverse',
-    envChecks: '#opt-envChecks', envLock: '#opt-envLock', antiTamper: '#opt-antiTamper'
-  };
-  var STORE_KEY = 'darkfuscator.opts.v2';
 
   // ------------------------------------------------------------------ utils
   function fmt(n) { return Number(n).toLocaleString(); }
-  function esc(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
   function countLines(s) { return s ? s.split('\n').length : 0; }
 
   function setStatus(text, kind) {
@@ -61,7 +48,6 @@
     }
   }
 
-  /** Render a parse error with the offending source line and a caret. */
   function showSyntaxError(e, src) {
     var lines = String(src).split('\n');
     var line = e.line || 1, col = e.col || 1;
@@ -74,49 +60,6 @@
     }
     showError('Luau syntax error — line ' + line + ', column ' + col, frame + '\n' + e.message);
     setStatus('Fix the syntax error above, then try again.', 'err');
-  }
-
-  // ---------------------------------------------------------------- options
-  function readOptions() {
-    var o = {};
-    for (var key in OPTION_CONTROLS) {
-      var node = $(OPTION_CONTROLS[key]);
-      if (!node) continue;
-      o[key] = node.type === 'checkbox' ? node.checked : node.value;
-    }
-    o.junk = parseInt(o.junk, 10) || 0;
-    o.guard = parseInt(o.guard, 10);
-    if (o.guard !== 0 && o.guard !== 2) o.guard = 1;
-    var seed = el.seed.value.trim();
-    o.seed = seed === '' ? null : (isNaN(Number(seed)) ? seed : Number(seed));
-    return o;
-  }
-
-  function writeOptions(o) {
-    for (var key in OPTION_CONTROLS) {
-      if (o[key] === undefined) continue;
-      var node = $(OPTION_CONTROLS[key]);
-      if (!node) continue;
-      if (node.type === 'checkbox') node.checked = !!o[key];
-      else node.value = String(o[key]);
-    }
-  }
-
-  function saveOptions() {
-    try {
-      var o = readOptions();
-      delete o.seed;
-      localStorage.setItem(STORE_KEY, JSON.stringify(o));
-    } catch (e) { /* private mode — ignore */ }
-  }
-
-  function loadOptions() {
-    try {
-      var raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return;
-      var o = JSON.parse(raw);
-      writeOptions(o);
-    } catch (e) { /* ignore */ }
   }
 
   // ----------------------------------------------------------------- counts
@@ -133,9 +76,9 @@
     $('#st-opcodes').textContent = fmt(s.opcodes || 0);
     $('#st-bytes').textContent = fmt(s.bytecodeBytes || 0);
     $('#st-payload').textContent = fmt(s.payloadChars || 0);
-    $('#st-size').textContent = fmt(s.inputChars) + ' \u2192 ' + fmt(s.outputChars) +
-      ' (' + (s.ratio < 1 ? '' : '+') + Math.round((s.ratio - 1) * 100) + '%)';
+    $('#st-size').textContent = fmt(s.inputChars) + ' \u2192 ' + fmt(s.outputChars);
     $('#st-time').textContent = fmt(s.ms || 0);
+    $('#st-junk').textContent = fmt(s.junkStatements || 0);
     $('#st-seed').textContent = s.seed !== undefined ? s.seed : '\u2014';
   }
 
@@ -153,10 +96,9 @@
     el.verified.hidden = true;
     setStatus('Obfuscating…');
 
-    var opts = readOptions();
     var res;
     try {
-      res = DK.obfuscate(src, opts);
+      res = DK.obfuscate(src, { preset: 'maximum' });
     } catch (e) {
       showError('The obfuscator hit an internal error', (e && e.message) || String(e));
       setStatus('Nothing was produced.', 'err');
@@ -174,16 +116,6 @@
     updateMeta();
     updateStats(res);
     el.verified.hidden = false;
-
-    if (window.DKUI && DKUI.recordBuild) {
-      DKUI.recordBuild({
-        filename: lastFilename || 'protected.luau',
-        date: new Date().toISOString(),
-        seed: res.stats ? res.stats.seed : null,
-        size: res.output.length,
-        output: res.output.length < 1800000 ? res.output : null
-      });
-    }
 
     if (res.warnings && res.warnings.length) {
       setStatus('Done — ' + res.warnings.join(' '), 'warn');
@@ -255,12 +187,6 @@
   // ------------------------------------------------------------------ events
   el.input.addEventListener('input', updateMeta);
   el.output.addEventListener('input', updateMeta);
-  Object.keys(OPTION_CONTROLS).forEach(function (key) {
-    var node = $(OPTION_CONTROLS[key]);
-    if (!node) return;
-    node.addEventListener('change', saveOptions);
-  });
-  el.seed.addEventListener('change', saveOptions);
 
   el.protect.addEventListener('click', runObfuscate);
   el.validate.addEventListener('click', runValidate);
@@ -280,7 +206,6 @@
     loadFile(e.target.files && e.target.files[0]);
   });
 
-  // drag & drop anywhere on the card
   ['dragenter', 'dragover'].forEach(function (evt) {
     el.paneIn.addEventListener(evt, function (e) {
       e.preventDefault();
@@ -297,7 +222,6 @@
     var dt = e.dataTransfer;
     if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
   });
-  // also accept drops on the output pane and the whole document
   document.addEventListener('dragover', function (e) { e.preventDefault(); });
   document.addEventListener('drop', function (e) {
     e.preventDefault();
@@ -305,7 +229,6 @@
     if (dt && dt.files && dt.files.length && /\.(lua|luau|txt)$/i.test(dt.files[0].name)) loadFile(dt.files[0]);
   });
 
-  // Ctrl/Cmd + Enter obfuscates
   document.addEventListener('keydown', function (e) {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -314,7 +237,6 @@
   });
 
   // ------------------------------------------------------------------- init
-  loadOptions();
-  if (!el.input.value) updateMeta();
-  setStatus('Ready. Nothing leaves your browser.');
+  updateMeta();
+  setStatus('Ready. Protection level: maximum. Nothing leaves your browser.');
 })();

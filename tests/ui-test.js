@@ -76,21 +76,12 @@ check('opcodes > 5', Number($('#st-opcodes').textContent.replace(/[^0-9]/g, ''))
 check('bytecode bytes > 0', Number($('#st-bytes').textContent.replace(/[^0-9]/g, '')) > 0, $('#st-bytes').textContent);
 check('no preset control remains', $('#preset') === null);
 check('example picker removed', $('#sample') === null);
+check('no settings panel remains', $('#opt-junk') === null && $('#opt-nameStyle') === null && $('#advanced') === null);
+check('maximum badge shown', /MAXIMUM/i.test(($('.max-badge') || {}).textContent || ''));
 
 // 2. behaviour match is covered by tests/run.js and tests/fuzz.js
-// 3. strength control drives the decoy level
-$('#opt-junk').value = '2';
-$('#opt-junk').dispatchEvent(new window.Event('change'));
-$('#protect').dispatchEvent(new window.Event('click'));
-check('junk=2 still produces valid Luau', window.Darkfuscator.validate($('#output').value).ok);
-check('junk=2 grows the build', $('#output').value.length > out1.length * 0.9, `${$('#output').value.length} vs ${out1.length}`);
 
-// 4. options survive a reload (persisted to localStorage)
-$('#opt-nameStyle').value = 'confuse';
-$('#opt-nameStyle').dispatchEvent(new window.Event('change'));
-check('options persisted', /confuse/.test(window.localStorage.getItem('darkfuscator.opts.v2') || ''));
-
-// 5. syntax errors are surfaced with a line/column
+// 3. syntax errors are surfaced with a line/column
 $('#input').value = 'local x = = 1\n';
 $('#protect').dispatchEvent(new window.Event('click'));
 check('error panel visible', !$('#error').hidden);
@@ -107,16 +98,12 @@ $('#clear').dispatchEvent(new window.Event('click'));
 check('clear empties input', $('#input').value === '');
 check('clear empties output', $('#output').value === '');
 
-// 8. seed reproducibility through the UI
+// 8. per-request randomization through the UI: no two payloads match
 $('#input').value = 'local a = 1\nprint(a)\n';
-$('#seed').value = '777';
 $('#protect').dispatchEvent(new window.Event('click'));
 const first = $('#output').value;
 $('#protect').dispatchEvent(new window.Event('click'));
-check('same seed -> identical output', first === $('#output').value);
-$('#seed').value = '778';
-$('#protect').dispatchEvent(new window.Event('click'));
-check('different seed -> different output', first !== $('#output').value);
+check('every run reshuffles', first !== $('#output').value);
 
 // 9. keyboard shortcut
 $('#output').value = '';
