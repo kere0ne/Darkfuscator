@@ -1,4 +1,4 @@
-import lib from './_lib.js';
+import lib from '../_lib.js';
 
 function json(data, status) {
   return new Response(JSON.stringify(data), {

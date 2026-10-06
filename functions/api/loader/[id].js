@@ -1,4 +1,4 @@
-import lib from './_lib.js';
+import lib from '../_lib.js';
 
 // The runtime endpoint loaders call. NOT admin-authenticated: the loader
 // authenticates with its per-build token (x-dark-token header or ?t=).

@@ -1,5 +1,5 @@
-import DARK from '../../../js/obfuscate.js';
-import PRESETS_MOD from '../../../js/presets.js';
+import DARK from '../../../site/js/obfuscate.js';
+import PRESETS_MOD from '../../../site/js/presets.js';
 var PRESETS = PRESETS_MOD.PRESETS || PRESETS_MOD;
 
 // CPU-safety cap for the serverless build: protect requests larger than this
