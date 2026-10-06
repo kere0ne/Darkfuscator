@@ -4,7 +4,8 @@
  * Turns the bytecode produced by vm-compile.js into a self-contained Luau
  * program shaped like a Luraph/Brander build:
  *
- *   -- This file is protected by Darkfuscator
+ *   -- This file is protected by Darkfuscator and obfuscated by anti tamper
+ *   so it dont get stolen
  *   return ({["aB"]=(function(S,B)…end), … ["pAy"]="<encrypted blob>"}):entry(env)
  *
  * The program is serialised to bytes, encrypted with a per-build key stream and
@@ -377,7 +378,7 @@
     function line(s) { out.push(s); }
 
     // a comment must end with a newline even when the rest is minified
-    if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator\n');
+    if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator and obfuscated by anti tamper so it dont get stolen\n');
     // wrapReturn lets the caller append top-level statements (heavy junk)
     // after the build: `return` is only legal as the last statement of a
     // block, so the whole table-return is wrapped in a do-end

@@ -193,6 +193,11 @@
           break;
         }
       }
+      // the outermost layer always re-emits with its own header off, so
+      // stamp the banner on top of the final source ourselves
+      if (opts.watermark !== false && vmSrc.indexOf('-- This file is protected by Darkfuscator') !== 0) {
+        vmSrc = '-- This file is protected by Darkfuscator and obfuscated by anti tamper so it dont get stolen\n' + vmSrc;
+      }
       result.stats.vms = vms;
       // heavy junk (junk 3): dead `if false` statements appended to the final
       // source, never executed, capped at ~950 KB

@@ -1,104 +1,82 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Darkfuscator — Luau obfuscator with a custom bytecode VM</title>
-<meta name="description" content="Darkfuscator compiles readable Luau into encrypted custom bytecode that runs inside a proprietary VM. No loadstring, nothing to hook.">
-<link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Darkfuscator</title>
+  <meta name="description" content="Darkfuscator: encrypt Luau scripts into randomized custom bytecode with layered anti-tamper and anti-dump protection. Runs entirely in your browser.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <div class="brand-mark"></div>
-      <div class="brand-name">Darkfuscator</div>
-      <div class="brand-sub">luau obfuscator · bytecode vm</div>
-    </div>
-    <nav class="nav">
-      <a class="nav-item active" href="index.html" data-nav="obfuscator">Obfuscator</a>
-      <a class="nav-item" href="docs.html" data-nav="docs">Docs</a>
-      <a class="nav-item" href="docs.html#vm-architecture" data-nav="vm">VM architecture</a>
-      <a class="nav-item" href="docs.html#bytecode-format" data-nav="bc">Bytecode format</a>
-      <a class="nav-item" href="docs.html#security" data-nav="sec">Security model</a>
-    </nav>
-    <div class="sidebar-foot">
-      <div class="ver-chip" id="ver-chip">v6.0.0</div>
-      <div class="foot-note">Everything runs in your browser.<br>Nothing leaves this page.</div>
-    </div>
-  </aside>
-
-  <main class="main">
-    <header class="topbar">
-      <div>
-        <h1 class="page-title">Obfuscator</h1>
-        <p class="page-desc">Paste Luau, get an encrypted custom-bytecode build. Every run reshuffles opcodes, names and structure, so no two payloads match.</p>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand-mark" title="Darkfuscator">DF</div>
+      <a class="side-btn active" href="index.html" title="Home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="side-btn" href="obfuscate.html" title="Obfuscate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+        Obfuscate
+      </a>
+      <div class="sidebar-foot">
+        <div class="ver-chip" id="ver-chip">v6.0.0</div>
+        <div class="foot-note">Everything runs in your browser.<br>Nothing leaves this page.</div>
       </div>
-      <div class="max-badge" title="Protection level is always maximum">MAXIMUM PROTECTION · ALWAYS ON</div>
-    </header>
+    </aside>
 
-    <section class="card">
-      <div class="panes">
-        <div class="pane" id="pane-in">
-          <div class="pane-head">
-            <span class="pane-title">Input</span>
-            <span class="meta" id="inmeta">0 chars · 0 lines</span>
-          </div>
-          <textarea id="input" spellcheck="false" placeholder="-- paste your Luau script here"></textarea>
-          <div class="pane-foot">
-            <label class="file-btn">Load file<input type="file" id="file" accept=".lua,.luau,.txt"></label>
-            <button class="btn" id="validate">Validate</button>
-            <button class="btn" id="clear">Clear</button>
-          </div>
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">DARKFUSCATOR WORKSPACE</p>
+          <h1 class="page-title">Home</h1>
+          <p class="page-desc">Protect your Luau with randomized custom bytecode, layered encryption and anti-tamper that stays silent until something touches it.</p>
         </div>
-        <div class="pane" id="pane-out">
-          <div class="pane-head">
-            <span class="pane-title">Output</span>
-            <span class="meta" id="outmeta">0 chars · 0 lines</span>
-          </div>
-          <textarea id="output" spellcheck="false" readonly></textarea>
-          <div class="pane-foot">
-            <button class="btn" id="copy">Copy</button>
-            <button class="btn" id="download">Download</button>
-            <span class="verified" id="verified-badge" hidden>re-parsed as valid Luau</span>
-          </div>
+        <div class="top-right">
+          <span class="pill">halloween build</span>
+          <a class="btn primary big" href="obfuscate.html">GET STARTED</a>
         </div>
-      </div>
-      <div class="action-row">
-        <button class="btn primary" id="protect">Protect</button>
-        <span class="status" id="status">Ready. Nothing leaves your browser.</span>
-      </div>
-      <div class="error" id="error" hidden></div>
-      <div class="stats" id="stats" hidden>
-        <div class="stat"><span class="stat-k">Protos</span><span class="stat-v" id="st-protos">0</span></div>
-        <div class="stat"><span class="stat-k">Opcodes</span><span class="stat-v" id="st-opcodes">0</span></div>
-        <div class="stat"><span class="stat-k">Bytecode bytes</span><span class="stat-v" id="st-bytes">0</span></div>
-        <div class="stat"><span class="stat-k">Payload chars</span><span class="stat-v" id="st-payload">0</span></div>
-        <div class="stat"><span class="stat-k">Size</span><span class="stat-v" id="st-size">0</span></div>
-        <div class="stat"><span class="stat-k">Time</span><span class="stat-v" id="st-time">0</span></div>
-        <div class="stat"><span class="stat-k">Junk statements</span><span class="stat-v" id="st-junk">0</span></div>
-        <div class="stat"><span class="stat-k">Seed</span><span class="stat-v" id="st-seed">&mdash;</span></div>
-      </div>
-    </section>
+      </header>
 
-    <section class="card feature">
-      <h2 class="card-title">What every build gets</h2>
-      <div class="grid">
-        <div class="cell"><h3>VM compiler</h3><p>Readable Lua is compiled to custom bytecode that runs inside a proprietary VM. No loadstring, nothing to hook.</p></div>
-        <div class="cell"><h3>Obfuscator</h3><p>Variable and function renaming, string encryption, control-flow flattening, dead code injection.</p></div>
-        <div class="cell"><h3>Per-request randomization</h3><p>Opcodes, names and structure shuffle on every run, so no two payloads match.</p></div>
-        <div class="cell"><h3>Anti-tamper</h3><p>Integrity checks detect and reject modified bytecode, with multi-layer encryption and a chunked loader.</p></div>
-        <div class="cell"><h3>Decompiler resistance</h3><p>Standard Lua decompilers output garbage: there is no Lua bytecode to read in the first place.</p></div>
-        <div class="cell"><h3>Heavy junk</h3><p>Up to 100k dead statements (about 900 KB) of arithmetic noise wrap every maximum build.</p></div>
+      <section class="card hero">
+        <h2>Protect your Luau.</h2>
+        <p>Paste a script, press Obfuscate, and get back a self-contained payload: encrypted custom bytecode running on a proprietary VM, wrapped in junk, sealed against tampering and environment logging. No loadstring, nothing for decompilers to read.</p>
+        <a class="btn primary big" href="obfuscate.html">Open the obfuscator &rarr;</a>
+      </section>
+
+      <div class="stat-row">
+        <div class="bignum"><b>5</b><span>stacked VM layers</span></div>
+        <div class="bignum"><b>23</b><span>anti-tamper checks</span></div>
+        <div class="bignum"><b>~900 KB</b><span>junk at maximum</span></div>
+        <div class="bignum"><b>100%</b><span>client-side, always</span></div>
       </div>
-    </section>
-  </main>
-</div>
-<script src="js/luau-lexer.js"></script>
-<script src="js/luau-parser.js"></script>
-<script src="js/vm-compile.js"></script>
-<script src="js/vm-emit.js"></script>
-<script src="js/obfuscate.js"></script>
-<script src="js/app.js"></script>
+
+      <section class="card feature">
+        <h2 class="card-title">What every build gets</h2>
+        <div class="grid">
+          <div class="cell"><h3>VM compiler</h3><p>Readable Lua is compiled to custom bytecode that runs inside a proprietary VM. No loadstring, nothing to hook.</p></div>
+          <div class="cell"><h3>Obfuscator</h3><p>Variable and function renaming, string encryption, control-flow flattening, dead code injection.</p></div>
+          <div class="cell"><h3>Per-request randomization</h3><p>Opcodes, names and structure shuffle on every run, so no two payloads match.</p></div>
+          <div class="cell"><h3>Anti-tamper</h3><p>Integrity checks detect and reject modified bytecode, with multi-layer encryption and a chunked loader.</p></div>
+          <div class="cell"><h3>Decompiler resistance</h3><p>Standard Lua decompilers output garbage: there is no Lua bytecode to read in the first place.</p></div>
+          <div class="cell"><h3>Heavy junk</h3><p>Up to 100k dead statements (about 900 KB) of arithmetic noise wrap every maximum build.</p></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">How it works</h2>
+        <div class="steps">
+          <div class="step"><div class="n">1</div><p>Paste your Luau or load a file on the Obfuscate page. Validate catches syntax errors with line and column.</p></div>
+          <div class="step"><div class="n">2</div><p>Pick a preset or tune the settings: VM layers, junk, anti-tamper, environment locks.</p></div>
+          <div class="step"><div class="n">3</div><p>Obfuscate, then copy or download the payload. Every run reshuffles the whole structure.</p></div>
+        </div>
+      </section>
+
+      <p class="foot-line"><span class="spooky">Happy halloween.</span> Obfuscation makes scripts hard to reverse; it is not a security boundary. Protecting a script does not make it safe to run.</p>
+    </main>
+  </div>
 </body>
 </html>
