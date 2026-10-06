@@ -462,7 +462,7 @@
     }
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
-    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then return {} end');
+    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then error("Darkfuscator integrity check failed",0) end');
 
     line('local ' + L.c + '=' + L.o);
     line('local p=1');
@@ -497,7 +497,7 @@
     // each used opcode gets several *different* bodies (the same semantics,
     // wrapped in provably-dead opaque predicates) and dispatch picks one per
     // call, so a lifted interpreter can never be matched against one body
-    var nVariants = opts.junk >= 3 ? 8 : opts.junk === 2 ? 5 : opts.junk >= 1 ? 3 : 1;
+    var nVariants = opts.junk >= 3 ? 6 : opts.junk === 2 ? 4 : opts.junk >= 1 ? 3 : 1;
     var JUNKS = [
       'if I[1]>65535 then return 0 end',
       'if F.ip<0 then F.d=true end',
@@ -513,12 +513,7 @@
       'do local jz=I[3]*I[3]; if jz<0 then return 0 end end',
       'if F.ip>F.ip+1 then return 0 end',
       'do local jz=bit32.bxor(I[1],I[1]); if jz~=0 then F.d=true end end',
-      'if I[1]>65535 and I[2]<0 then return 0 end',
-      'do local jz=I[2]%7; if jz==7 then return 0 end end',
-      'do local jz=F.ip+1; if jz==F.ip then return 0 end end',
-      'if I[1]~=I[1] then return 0 end',
-      'do local jz=math.abs(I[2])*math.abs(I[3]); if jz>2^53 then F.d=true end end',
-      'do local jz=I[4] or 0; if jz~=jz then return 0 end end'
+      'if I[1]>65535 and I[2]<0 then return 0 end'
     ];
     var VT = {};
     for (i = 0; i < OPS.length; i++) {
@@ -625,12 +620,11 @@
     // properties, LocalPlayer, services, engine data types, environment
     // identity) before decrypting, loading and running it. RunService's
     // Heartbeat re-runs the battery every half second afterwards, so a hook
-    // installed mid-run is caught too. Detection is silent: nothing prints, nothing explains itself. The first
-    // battery failure returns before a byte is decrypted; a failure caught by
-    // the Heartbeat re-run hangs the thread.
+    // installed mid-run is caught too. Detection prints the notice; runtime
+    // detection hangs the thread.
     function wrapAntiTamper(inner, rng) {
       var fast = opts.antiTamper === 1;
-      var nchunks = fast ? 2 : 4 + Math.floor(rng() * 3);
+      var nchunks = fast ? 2 : 3 + Math.floor(rng() * 3);
       var chunkSize = Math.max(1, Math.ceil(inner.length / nchunks));
       var chunks = [], keys = [];
       for (var ci = 0; ci < inner.length; ci += chunkSize) {
@@ -645,31 +639,34 @@
         chunks.push('{' + enc.join(',') + '}');
         keys.push(String(key));
       }
+      var banner = 'Protected using Darkfuscator | https://darkfuscator.pages.dev';
       var w = [];
       function wl(x) { w.push(x); }
-      var cn = '=' + ('DK' + Math.floor(rng() * 1e15).toString(36));
       wl('do');
+      wl('local t0=os.clock()');
+      wl('local MSG=' + JSON.stringify(banner));
       wl('local detected=false');
       wl('local checks={}');
-      wl('local function fail() while true do end end');
-      wl('checks[1]={run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
-      wl('checks[2]={run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
-      wl('checks[3]={run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
-      wl('checks[4]={run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
-      wl('checks[5]={run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
-      wl('checks[6]={run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
-      wl('checks[7]={run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
-      wl('checks[8]={run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
-      wl('checks[9]={run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
-      wl('checks[10]={run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
-      wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true return false end end return true end');
+      wl('local function fail() print(MSG) while true do end end');
+      wl('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
+      wl('checks[1]={name="game_instance",run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
+      wl('checks[2]={name="script_valid",run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
+      wl('checks[3]={name="game_props",run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
+      wl('checks[4]={name="local_player",run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
+      wl('checks[5]={name="character",run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
+      wl('checks[6]={name="services",run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
+      wl('checks[7]={name="data_types",run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
+      wl('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
+      wl('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
+      wl('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
+      wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end return true end');
       wl('runChecks()');
-      wl('if detected then return end');
-      wl('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then detected=true end end)');
-      wl('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then detected=true end end)');
+      wl('if detected then print(MSG) return end');
+      wl('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
+      wl('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then warnf("[DARK AntiTamper] Chat probe inconclusive") end end)');
       wl('local RS=game:GetService("RunService") local last=(tick~=nil and tick() or os.clock())');
       wl('RS.Heartbeat:Connect(function() local now=(tick~=nil and tick() or os.clock()) if now-last>=0.5 then last=now runChecks() if detected then fail() end end end)');
-      wl('do local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then return end end');
+      wl('do local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then print(MSG) return end end');
       wl('local chunks={');
       for (var fi = 0; fi < chunks.length; fi++) wl(chunks[fi] + (fi < chunks.length - 1 ? ',' : ''));
       wl('}');
@@ -681,11 +678,12 @@
       wl('chunks=nil keys=nil parts=nil');
       wl('local loadfunc=load or loadstring');
       wl('if not loadfunc then fail() end');
-      wl('local chunk=loadfunc(original_source,"' + cn + '")');
+      wl('local chunk,err=loadfunc(original_source,"=AntiTamper")');
       wl('original_source=nil');
       wl('if not chunk then fail() end');
       wl('chunk()');
       wl('local lp=game:GetService("Players").LocalPlayer');
+      wl('warnf("Authenticated in "..string.format("%.2f",os.clock()-t0).." seconds! Welcome, "..tostring(lp and lp.Name or "player"))');
       wl('end');
       return w.join('\n') + '\n';
     }
@@ -742,7 +740,7 @@
     line('if ' + P.p + '[2] then local np=' + P.p + '[1]; local na=select("#",...); ' +
       'local v={select(np+1,...)} v.n=(na>np) and na-np or 0 F.V=v end');
     line('local ' + L.c + '=' + P.p + '[5]');
-    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then return end end');
+    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then error("Darkfuscator integrity check failed",0) end end');
     var vtEntries = [];
     for (i = 0; i < OPS.length; i++) {
       if (usedOps[i]) vtEntries.push('[' + i + ']={'+ VT[i].map(function(n) { return P.s + '["' + n + '"]'; }).join(',') + '}');
@@ -762,34 +760,16 @@
       var j2 = Math.floor(rng() * (i + 1));
       var tmp = branches[i]; branches[i] = branches[j2]; branches[j2] = tmp;
     }
-    if (opts.junk >= 1 && rng() < 0.5) {
-      // second dispatch architecture: a scrambled numeric jump table instead
-      // of a compare ladder. Opcode id maps straight to a handler reference,
-      // dead ids included, so dispatch is one table read with no visible
-      // decision structure at all. Builds randomly choose between the two.
-      var usedList = [];
-      for (i = 0; i < OPS.length; i++) { if (usedOps[i]) usedList.push(i); }
-      var jt = ng();
-      line('local ' + jt + '={}');
-      for (i = 0; i < branches.length; i++) {
-        var b3 = branches[i];
-        var oi = b3.dead ? usedList[Math.floor(rng() * usedList.length)] : b3.opidx;
-        var vi = b3.dead ? 1 : 1 + Math.floor(rng() * VT[oi].length);
-        line(jt + '[' + hex(b3.id) + ']=' + vtl + '[' + oi + '][' + vi + ']');
+    var chain = '';
+    for (i = 0; i < branches.length; i++) {
+      var b2 = branches[i];
+      if (b2.dead) {
+        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
+      } else {
+        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local vs=' + vtl + '[' + b2.opidx + ']; nx=vs[((F.ip+F.o)%#vs)+1](' + P.s + ',F,I)';
       }
-      line('local nx=' + jt + '[o](' + P.s + ',F,I)');
-    } else {
-      var chain = '';
-      for (i = 0; i < branches.length; i++) {
-        var b2 = branches[i];
-        if (b2.dead) {
-          chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
-        } else {
-          chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local vs=' + vtl + '[' + b2.opidx + ']; nx=vs[((F.ip+F.o)%#vs)+1](' + P.s + ',F,I)';
-        }
-      }
-      line(chain + ' end');
     }
+    line(chain + ' end');
     line('if F.d then return unpack(F.r,F.o+1,F.o+F.n) end');
     line('F.ip=nx or F.ip+1');
     line('end');
@@ -817,13 +797,13 @@
       if (/^\d+$/.test(lockP)) lockConds.push(gl + '.PlaceId==' + lockP);
       if (/^\d+$/.test(lockU)) lockConds.push(gl + '.GameId==' + lockU);
       line('do local ' + gl + '=game');
-      line('if ' + gl + '~=nil and (' + lockConds.join(' or ') + ') then else return end');
+      line('if ' + gl + '~=nil and (' + lockConds.join(' or ') + ') then else error("Darkfuscator protected program: execution locked",0) end');
       line('end');
     }
     if (glevel === 0) {
       if (elevel >= 1) {
         line('do');
-        sealBinding(line, P.s, 'return');
+        sealBinding(line, P.s, 'error("Darkfuscator protected program: environment audit failed",0)');
         line('end');
       } else {
         line(P.s + '["' + N.seal + '"]=' + blob.seal + ';');
@@ -831,7 +811,7 @@
     }
     if (glevel >= 1) {
       line('local ' + ge + '=' + P.s + '["' + N.guard + '"](' + P.s + ')');
-      line('if ' + ge + ' then return end');
+      line('if ' + ge + ' then error("Darkfuscator protected program: environment audit failed",0) end');
     }
     line('local P=' + P.s + '["' + N.dec + '"](' + P.s + ',' + P.s + '["' + N.blob + '"])');
     line(P.s + '["' + N.blob + '"]=nil; ' + P.s + '["' + N.alpha + '"]=nil; ' + P.s + '["' + N.check1 + '"]=nil; ' + P.s + '["' + N.check2 + '"]=nil; ' + P.s + '["' + N.dec + '"]=nil; ' + P.s + '["' + N.seal + '"]=nil');
