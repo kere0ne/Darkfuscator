@@ -143,7 +143,7 @@ if (sr.ok) {
 }
 
 // 8. version
-ok('version', /5\.0\.0/.test(execFileSync('node', [CLI, '--version'], { encoding: 'utf8' })));
+ok('version', /5\.1\.0/.test(execFileSync('node', [CLI, '--version'], { encoding: 'utf8' })));
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

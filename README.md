@@ -154,6 +154,44 @@ node tools/test-api.js   # loader artifact service (mock storage)
 node tools/test-cli.js   # CLI + presets + compression roundtrip
 ```
 
+## Accounts, API keys and the public API (v5.1)
+
+Every account automatically gets a personal API key (`dk_live_...`). Passwords
+are PBKDF2-SHA-256 hashed (120k iterations, per-user salt) and never stored in
+plaintext. API keys are stored as a SHA-256 lookup hash plus an AES-GCM
+encrypted copy (key derived from the AUTH_SECRET env var), so only the owner
+can reveal their key from the dashboard.
+
+- `POST /api/auth/signup` `{username, email, password}` — creates the account,
+  its API key and a 7-day httpOnly session cookie.
+- `POST /api/auth/login` `{identifier, password}` — username or email.
+- `POST /api/auth/logout`, `GET /api/auth/me` — session lifecycle.
+- `POST /api/auth/account` — change password / email / username (current
+  password required for each).
+- `GET /api/me/key` — your key (masked + full for the owner), created date,
+  last-used, usage counters.
+- `POST /api/me/key/regenerate` — rotates the key; the old key is deleted from
+  the lookup table immediately.
+- `GET /api/me/usage` — usage stats + last 20 requests (status, bytes, ms; no
+  source or key material is ever logged).
+- `POST /api/v1/obfuscate` — the public API: Bearer key auth, per-key rate
+  limits (30/min, 1000/day), body validation, per-user usage accounting.
+  `{source, preset?, options?, seed?}` -> `{success, requestId, preset, bytes,
+  durationMs, result}`.
+- `POST /api/v1/protect` — authenticated alias of `/api/v1/obfuscate`.
+- `GET /api/v1/health` — liveness + version.
+
+The developer documentation lives at `/docs` (docs.html): base URL, auth
+scheme, endpoint reference, options, status codes, rate limits and cURL /
+JavaScript / Python / Lua examples. No real key material appears in the docs.
+
+Backend notes: Cloudflare Pages Functions + KV (`DARKFUSCATOR_KV`); set
+`AUTH_SECRET` (or `ADMIN_TOKEN`) as an environment variable — never hardcode
+secrets into the frontend. CORS is open on `/api/v1/*` (API-key auth) and
+intentionally absent on `/api/auth/*` + `/api/me/*` (same-origin cookies).
+Rate limiting uses short-TTL KV counters; auth endpoints are additionally
+capped per IP (20/min).
+
 ## Docs
 
 - docs/ARCHITECTURE.md — pipeline stages, how the spec maps to files
