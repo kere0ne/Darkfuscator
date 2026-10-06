@@ -112,6 +112,14 @@
   // --------------------------------------------------------------- serialiser
   function serialize(root, rng) {
     var bytes = [];
+    // build keys are drawn up front: the instruction stream is masked with a
+    // salt derived from them, so the decoder can rebuild the salt from the
+    // values it already receives instead of a new embedded constant
+    var key = 1 + Math.floor(rng() * 254);
+    var seal = 100 + Math.floor(rng() * 65000);
+    var xk = 1 + Math.floor(rng() * 254);
+    var osalt = (key * 733 + xk * 911 + (seal % 256)) % 65536;
+    var pidx = 0;
     // zigzag varint: operands are signed (jump offsets are negative when the
     // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
     function vi(v) {
@@ -119,9 +127,18 @@
       while (v >= 128) { bytes.push((v % 128) | 128); v = Math.floor(v / 128); }
       bytes.push(v);
     }
+    // masked-operand varint: the caller zigzags the value, XORs it with the
+    // per-proto positional mask and hands over the non-negative result
+    function vx(e) {
+      while (e >= 128) { bytes.push((e % 128) | 128); e = Math.floor(e / 128); }
+      bytes.push(e);
+    }
+    function zz(v) { return v < 0 ? -2 * Math.ceil(v) - 1 : 2 * Math.floor(v); }
     function b(v) { bytes.push(v & 255); }
     function str(s) { var a = utf8Bytes(s); vi(a.length); for (var i = 0; i < a.length; i++) b(a[i]); }
     function proto(p) {
+      pidx = pidx + 1;
+      var ps = (osalt + pidx * 40503) % 65536;
       vi(p.nparams); b(p.isvararg ? 1 : 0); vi(p.maxreg + 1); vi(p.ups.length);
       vi(p.k.length);
       for (var i = 0; i < p.k.length; i++) {
@@ -133,10 +150,17 @@
         else { b(3); str(k.v); }
       }
       vi(p.code.length);
+      // register encryption: every operand is zigzagged, then XORed with a
+      // volatile salt (per-proto key + position of the instruction + operand
+      // slot). The emitted decoder rebuilds the same masks, so a memory dump
+      // of the payload shows register indices and jump targets as noise.
       for (var j = 0; j < p.code.length; j++) {
         var ins = p.code[j];
-        vi(ins[0]); vi(ins[1]); vi(ins[2]); vi(ins[3]);
-        if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vi(ins.x[q]); }
+        vi(ins[0]);
+        vx(zz(ins[1]) ^ ((ps + (j + 1) * 7919 + 104729) % 65536));
+        vx(zz(ins[2]) ^ ((ps + (j + 1) * 7919 + 209458) % 65536));
+        vx(zz(ins[3]) ^ ((ps + (j + 1) * 7919 + 314187) % 65536));
+        if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vx(zz(ins.x[q]) ^ ((ps + (j + 1) * 7919 + (4 + q) * 104729) % 65536)); }
         else vi(0);
       }
       vi(p.kids.length);
@@ -151,18 +175,23 @@
       c1 = (c1 + bytes[ci] * (ci + 1)) % 65521;
       c2 = (c2 + (((bytes[ci] + ((ci + 1) * 17)) % 256) * (ci + 3))) % 65519;
     }
+    // FNV-1a over the plaintext stream: the decoder recomputes this after
+    // decryption, so a modified payload never even decodes to usable bytecode
+    var fnv = 2166136261;
+    for (ci = 0; ci < bytes.length; ci++) {
+      fnv = (fnv ^ bytes[ci]) >>> 0;
+      fnv = ((fnv % 65536) * 16777619 + ((Math.floor(fnv / 65536) * 16777619) % 65536) * 65536) % 4294967296;
+    }
 
-    var key = 1 + Math.floor(rng() * 254);
-    // the audit seal: the decoder cannot unseal the payload without this
-    // value, and it is handed over only by the passing environment audit, so
-    // a build with the audit stripped out never decrypts (fail closed)
-    var seal = 100 + Math.floor(rng() * 65000);
     for (var i = 0; i < bytes.length; i++) bytes[i] = (bytes[i] + key + (i + 1) * 13 + seal) % 256;
 
     // second layer: a per-build XOR stream, applied after the add-cipher
     // (the decoder un-XORs first, then un-adds)
-    var xk = 1 + Math.floor(rng() * 254);
     for (i = 0; i < bytes.length; i++) bytes[i] = bytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
+
+    // third layer: position-keyed byte rotation (the decoder reverses it
+    // first, before the XOR and the add-cipher)
+
 
     var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
     for (var s = alpha.length - 1; s > 0; s--) {           // per-build alphabet shuffle
@@ -180,7 +209,7 @@
       }
     }
     if (nb > 0) out.push(alpha[acc % 64]);
-    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2 };
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2, fnv: fnv };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -373,34 +402,44 @@
     line('while nb>=8 do ' + L.n + '=' + L.n + '+1; ' + L.o + '[' + L.n + ']=acc%256; acc=(acc-acc%256)/256; nb=nb-8 end');
     line('end');
         line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=math.floor(' + L.o + '[' + L.i + ']) end');
+    // third layer came off first: position-keyed byte rotation
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
+    line('local fnv=2166136261');
+    line('for ' + L.i + '=1,' + L.n + ' do fnv=bit32.bxor(fnv,' + L.o + '[' + L.i + ']); fnv=((fnv%65536)*16777619+((math.floor(fnv/65536)*16777619)%65536)*65536)%4294967296 end');
+    line('if fnv~=' + blob.fnv + ' then for dp2=1,' + L.n + ' do ' + L.o + '[dp2]=(' + L.o + '[dp2]+dp2*23)%256 end end');
     line('local c1,c2=0,0');
     line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
     line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then for dp=1,' + L.n + ' do ' + L.o + '[dp]=(' + L.o + '[dp]+dp*17)%256 end end');
 
     line('local ' + L.c + '=' + L.o);
-    line('local p=1');
-    line('local function by() local v=' + L.c + '[p]; p=p+1; return v end');
+    var PS = ng();
+    line('local ' + PS + '={p=1}');
+    line('local function by() local v=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; return v end');
     // reads are zigzag encoded (see `vi`) so that jump offsets can go backwards
-    line('local function vr() local v,s=0,1 while true do local b=' + L.c + '[p]; p=p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
+    line('local function vr() local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
+    // masked-operand read: unmask with the per-proto positional mask, then unzigzag
+    line('local function vrm(m) local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end v=bit32.bxor(v,m) if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
     line('local function st() local n=vr(); if n==0 then return "" end; local t={}; local q=1; while q<=n do');
     line('local len=n-q+1; if len>2000 then len=2000 end; local u={}');
-    line('for j=1,len do u[j]=' + L.c + '[p+j-1] end; p=p+len; t[#t+1]=string.char(unpack(u)); q=q+len end');
+    line('for j=1,len do u[j]=' + L.c + '[' + PS + '.p+j-1] end; ' + PS + '.p=' + PS + '.p+len; t[#t+1]=string.char(unpack(u)); q=q+len end');
     line('return table.concat(t) end');
+    line('local pidx=0');
+    line('local osalt=(' + blob.key + '*733+' + blob.xk + '*911+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : (blob.seal % 256)) + ')%65536');
     line('local OPC={' + ids.join(',') + '}');
     // string constants are stored encoded inside the payload and are only
     // decoded through a metatable the first time a handler actually reads
     // them: a dump of the decoded program no longer reveals string literals
-    line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end return string.char(unpack(t)) end');
+    line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end local ps2={} for q2=1,#t,200 do ps2[#ps2+1]=string.char(unpack(t,q2,math.min(q2+199,#t))) end return table.concat(ps2) end');
     line('local function proto()');
+    line('pidx=pidx+1; local ps=(osalt+pidx*40503)%65536');
     line('local np=vr(); local va=by()==1; local ms=vr(); local nu=vr()');
     line('local nk=vr(); local k={}');
     line('for i=1,nk do local t=by()');
     line('if t==0 then k[i]=nil elseif t==1 then k[i]=by()==1 elseif t==2 then k[i]=tonumber(st()) else local sv=st(); local eb={} for j=1,#sv do eb[j]=bit32.bxor(sv:byte(j),(' + strMask + '+j*29)%256) end k[i]={["' + N.strmark + '"]=true,b=eb} end end');
     line('local nc=vr(); local c={}');
-    line('for i=1,nc do local o=OPC[vr()+1]; local A=vr(); local B=vr(); local C=vr(); local nx=vr()');
-    line('if nx>0 then local x={} for j=1,nx do x[j]=vr() end c[i]={o,A,B,C,x} else c[i]={o,A,B,C} end end');
+    line('for i=1,nc do local o=OPC[vr()+1]; local A=vrm((ps+i*7919+104729)%65536); local B=vrm((ps+i*7919+209458)%65536); local C=vrm((ps+i*7919+314187)%65536); local nx=vr()');
+    line('if nx>0 then local x={} for j=1,nx do x[j]=vrm((ps+i*7919+(3+j)*104729)%65536) end c[i]={o,A,B,C,x} else c[i]={o,A,B,C} end end');
     line('local nz=vr(); local z={}');
     line('for i=1,nz do z[i]=proto() end');
     line('local cs=0 for i=1,#c do cs=(cs+c[i][1]*(i+13))%65521 end');
@@ -576,8 +615,12 @@
       wl('checks[18]={name="readonly_props",run=function() if game==nil then return true end local ok,err=pcall(function() game.PlaceId=0 end) if ok then return false end if type(err)~="string" or #err==0 then return false end return true end}');
       wl('checks[19]={name="settings_sane",run=function() local ok,s=pcall(function() return settings() end) if not ok or type(s)~="table" then return true end local ok2,pt=pcall(function() return s.Physics.ThrottleAdjustTime end) local ok3,il=pcall(function() return s.Network.IncomingReplicationLag end) if ok2 and type(pt)=="number" and pt>1 then return false end if ok3 and type(il)=="number" and il>1 then return false end return true end}');
       wl('checks[20]={name="debug_sane",run=function() if type(debug)~="table" or type(debug.getinfo)~="function" then return true end local ok,a=pcall(debug.getinfo,1,"l") local ok2,b=pcall(debug.getinfo,1,"l") if not ok or not ok2 or type(a)~="table" or type(b)~="table" or a.currentline~=b.currentline then return false end return true end}');
+      wl('local fp={} pcall(function() local fnc=0 for gk,gv in pairs(_G) do fnc=fnc+1 if fnc<=400 then fp[gk]=type(gv) end end end)');
+      wl('checks[22]={name="error_semantics",run=function() local ok,e=pcall(function() error("dkp22",0) end) if ok or e~="dkp22" then return false end return true end}');
+      wl('checks[23]={name="globals_fingerprint",run=function() local n=0 for gk,gt in pairs(fp) do n=n+1 if type(_G[gk])~=gt then return false end end return true end}');
       wl('checks[21]={name="addr_determinism",run=function() local s1=tostring({}) local s2=tostring({}) if #s1>=15 and #s2>=15 and string.sub(s1,8,15)==string.sub(s2,8,15) then return false end local t1={} local d1=tostring(t1) local d2=tostring(t1) if d1~=d2 then return false end return true end}');
-      wl('local function runChecks() for i=1,#checks do local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end return true end');
+      wl('local dead={}');
+      wl('local function runChecks() for i=1,#checks do if not dead[i] then local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true dead[i]=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end end return true end');
       wl('runChecks()');
       wl('if detected then print(MSG) return end');
       wl('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
@@ -624,9 +667,7 @@
       line('if not pcall(function() return true end) then return 5 end');
       line('if getfenv then local ' + gd + '=getfenv(0); local ' + gc + '=getfenv(0); if ' + gd + '~=' + gc + ' then return 6 end end');
       // write-trap: a proxy environment that records but does not persist writes
-      line('local ok=false');
-      line('pcall(function() G["' + N.env + '"]["' + canary + '"]=1187; if G["' + N.env + '"]["' + canary + '"]~=1187 then ok=true end; G["' + N.env + '"]["' + canary + '"]=nil end)');
-      line('if ok then return 7 end');
+      line('local ' + gc + '={pcall(function() G["' + N.env + '"]["' + canary + '"]=1187; local persist=G["' + N.env + '"]["' + canary + '"]~=1187; G["' + N.env + '"]["' + canary + '"]=nil return persist end)}; if ' + gc + '[2]==true then return 7 end');
       line('local ' + ge + '=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") or rawget(_G,"getgenv") or rawget(_G,"getrenv") or rawget(_G,"readfile") or rawget(_G,"writefile")');
       if (glevel === 2) {
         line('if ' + ge + ' then local g=game; if g==nil or typeof(g)~="Instance" or g.ClassName~="DataModel" then return 8 end; if game.Close~=game.Close then return 9 end end');
@@ -637,7 +678,7 @@
         // anti-debug timing: a step-debugger or a hook that throttles every
         // operation makes even a small loop take absurd wall time; the threshold
         // keeps ~100x headroom over a normal Luau VM so clean runs never trip it
-        line('do local t0=os.clock() local s=0 for i=1,120000 do s=(s+i*7)%1000003 end if os.clock()-t0>0.4 then return 11 end end');
+        if (!opts.noTiming) line('do local t0=os.clock() local s=0 for i=1,120000 do s=(s+i*7)%1000003 end if os.clock()-t0>0.4 then return 11 end end');
       }
       if (elevel >= 1) {
         sealBinding(line, 'G', 'return 17');
@@ -674,6 +715,20 @@
     var branches = [];
     for (i = 0; i < OPS.length; i++) {
       if (usedOps[i]) branches.push({ id: ids[i], fn: H[OPS[i]], opidx: i });
+    }
+    // opcode polymorphism: each real opcode is also reachable through extra
+    // alias ids that trigger the identical handler, so the same operation
+    // arrives under several numeric values and a pattern-matching
+    // deobfuscator cannot pin an opcode by its id alone
+    var nAlias = opts.junk >= 2 ? 3 : opts.junk === 1 ? 2 : 1;
+    for (i = 0; i < OPS.length; i++) {
+      if (!usedOps[i]) continue;
+      for (var ai = 0; ai < nAlias; ai++) {
+        var av;
+        do { av = 1 + Math.floor(rng() * 0xFFFE); } while (seen[av]);
+        seen[av] = 1;
+        branches.push({ id: av, fn: H[OPS[i]], opidx: i });
+      }
     }
     for (i = 0; i < deadIds.length; i++) branches.push({ id: deadIds[i], fn: H[OPS[Math.floor(rng() * OPS.length)]], dead: true });
     // shuffled dispatch order

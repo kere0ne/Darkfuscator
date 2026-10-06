@@ -38,14 +38,14 @@
     envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
     envLock: false,             // refuse to decode outside a genuine Roblox client
     antiTamper: 2,              // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
-    vmLayers: 2                 // 1 | 2 — nested VM: the build runs inside a second VM
+    vmLayers: 5                 // 1..5 — the build runs inside stacked VMs (auto-degrades on huge payloads)
   };
 
   // presets for the CLI and for callers that name one; the UI always uses maximum
   var PRESETS = {
     lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
-    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 1 },
-    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 2 }
+    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2 },
+    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 5 }
   };
 
 
@@ -98,7 +98,9 @@
     opts.junk = Math.max(0, Math.min(3, parseInt(opts.junk, 10) || 0));
     opts.envChecks = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
     opts.antiTamper = opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0;
-    opts.vmLayers = opts.vmLayers === 1 ? 1 : 2;
+    opts.vmLayers = parseInt(opts.vmLayers, 10);
+    if (!(opts.vmLayers >= 1)) opts.vmLayers = 5;
+    if (opts.vmLayers > 5) opts.vmLayers = 5;
 
     var result = {
       ok: false, output: '', error: null, stats: {}, warnings: [], options: opts
@@ -138,7 +140,8 @@
         envChecks: opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2,
         envLock: opts.envLock === true,
         antiTamper: opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0,
-        wrapReturn: opts.junk >= 3
+        wrapReturn: opts.junk >= 3,
+        noTiming: (opts.vmLayers || 1) > 1
       });
     } catch (e) {
       vmErr = e;
@@ -147,23 +150,31 @@
       var vmSrc = vmOut.source;
       if (!/\n$/.test(vmSrc)) vmSrc += '\n';
       var engineName = 'vm';
-      // second VM layer: the first build's source is compiled AGAIN into a
-      // second freshly-randomised VM whose payload carries the whole first
-      // build. Two different opcode maps, two different seals, and a dumper
-      // has to peel both to see anything. Skipped for payloads too large to
-      // nest sensibly (>200 KB), which keeps big scripts on a single strong VM.
-      if (opts.vmLayers === 2 && vmSrc.length <= 200000) {
+      // stacked VM layers: each layer compiles the previous build's source
+      // AGAIN into a freshly-randomised VM whose encrypted payload carries
+      // the whole previous build. Every layer has its own opcode map, its
+      // own cipher keys and its own seal, so a dumper has to peel all of
+      // them, one environment audit at a time. Layers stop on their own
+      // when the payload outgrows sensible nesting, which keeps huge
+      // scripts on the strongest stack that still builds.
+      var layerRng = vmRng, vms = 1;
+      var MAX_LAYER_INPUT = 220000;
+      for (var LN = 2; LN <= opts.vmLayers; LN++) {
+        if (vmSrc.length > MAX_LAYER_INPUT) {
+          result.warnings.push('VM stack capped at ' + vms + ' layer' + (vms === 1 ? '' : 's') + ' (payload too large to nest further)');
+          break;
+        }
         try {
-          var parsed2 = Parser.parse(vmSrc);
-          var prog2 = VMCompile.compile(parsed2.ast, parsed2.refs);
-          var vmRng2 = makeRng((vmRng.seed ^ 0x9E3779B9) >>> 0);
-          var vmOut2 = VMEmit.emit(prog2, {
-            rng: vmRng2,
+          var parsedN = Parser.parse(vmSrc);
+          var progN = VMCompile.compile(parsedN.ast, parsedN.refs);
+          layerRng = makeRng((layerRng.seed ^ (0x9E3779B9 + LN * 0x85EBCA6B)) >>> 0);
+          var vmOutN = VMEmit.emit(progN, {
+            rng: layerRng,
             junk: opts.junk >= 1 ? 1 : 0,
             minify: true,
             nameStyle: opts.nameStyle || 'random',
-            guard: 1,            // the outer build runs the full battery; the
-            captureGlobals: true,// inner one only seals its own payload
+            guard: 1,             // the outer build runs the full battery;
+            captureGlobals: true, // inner layers only seal their own payload
             watermark: false,
             lockPlace: '', lockUniverse: '',
             envChecks: 1,
@@ -171,13 +182,18 @@
             antiTamper: 0,
             wrapReturn: opts.junk >= 3
           });
-          Parser.parse(vmOut2.source);
-          vmSrc = vmOut2.source;
+          Parser.parse(vmOutN.source);
+          vmSrc = vmOutN.source;
           if (!/\n$/.test(vmSrc)) vmSrc += '\n';
-          vmOut = vmOut2; vmRng = vmRng2;
-          engineName = 'nested-vm';
-        } catch (eN) { /* nested pass refused the payload: keep the single VM build */ }
+          vmOut = vmOutN;
+          vms = LN;
+          engineName = 'vm-x' + LN;
+        } catch (eN) {
+          result.warnings.push('VM layer ' + LN + ' refused the payload; stack stopped at ' + vms);
+          break;
+        }
       }
+      result.stats.vms = vms;
       // heavy junk (junk 3): dead `if false` statements appended to the final
       // source, never executed, capped at ~950 KB
       if (opts.junk >= 3) {
