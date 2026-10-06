@@ -21,7 +21,7 @@ const SCRIPTS = ['js/luau-lexer.js', 'js/luau-parser.js', 'js/vm-compile.js',
   'js/vm-emit.js', 'js/obfuscate.js'];
 
 function main() {
-let html = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
+let html = fs.readFileSync(path.join(SITE, 'obfuscate.html'), 'utf8');
 const css = fs.readFileSync(path.join(SITE, 'styles.css'), 'utf8');
 
 // the standalone build is one file: point the sidebar links at itself

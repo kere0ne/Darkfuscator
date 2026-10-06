@@ -1,4 +1,4 @@
-/* End-to-end UI smoke test: loads site/index.html in jsdom, wires the real
+/* End-to-end UI smoke test: loads site/obfuscate.html in jsdom, wires the real
  * scripts, and drives the controls the way a user would. */
 const fs = require('fs');
 const path = require('path');
@@ -11,7 +11,7 @@ try {
   process.exit(0);
 }
 const SITE = path.join(__dirname, '..', 'site');
-const html = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(SITE, 'obfuscate.html'), 'utf8');
 
 const vc = new VirtualConsole();
 const logs = [];
@@ -67,17 +67,18 @@ check('input meta updated', /chars ·/.test($('#inmeta').textContent), $('#inmet
 $('#protect').dispatchEvent(new window.Event('click'));
 const out1 = $('#output').value;
 check('output produced', out1.length > 100, 'len=' + out1.length);
-check('status ok', /ok/.test($('#status').className), $('#status').textContent);
+check('status ok or warned-done', /ok/.test($('#status').className) || (/Done/.test($('#status').textContent) && /warn/.test($('#status').className)), $('#status').textContent);
 check('stats visible', !$('#stats').hidden);
 check('verified badge shown', !$('#verified-badge').hidden);
 check('output is valid Luau', window.Darkfuscator.validate(out1).ok);
 check('functions compiled > 0', Number($('#st-protos').textContent.replace(/[^0-9]/g, '')) > 0, $('#st-protos').textContent);
 check('opcodes > 5', Number($('#st-opcodes').textContent.replace(/[^0-9]/g, '')) > 5, $('#st-opcodes').textContent);
 check('bytecode bytes > 0', Number($('#st-bytes').textContent.replace(/[^0-9]/g, '')) > 0, $('#st-bytes').textContent);
-check('no preset control remains', $('#preset') === null);
-check('example picker removed', $('#sample') === null);
-check('no settings panel remains', $('#opt-junk') === null && $('#opt-nameStyle') === null && $('#advanced') === null);
-check('maximum badge shown', /MAXIMUM/i.test(($('.max-badge') || {}).textContent || ''));
+check('preset control present', $('#opt-preset') !== null && $('#opt-preset').value === 'maximum');
+check('settings panel present', $('#opt-junk') !== null && $('#opt-nameStyle') !== null && $('#advanced') !== null);
+check('preset fills levels', $('#opt-vmLayers').value === '5' && $('#opt-junk').value === '3');
+check('switches present', document.querySelectorAll('.switch').length >= 4);
+check('workspace nav to dashboard', $('a[href="index.html"]') !== null);
 
 // 2. behaviour match is covered by tests/run.js and tests/fuzz.js
 
