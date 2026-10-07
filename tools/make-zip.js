@@ -19,7 +19,7 @@ const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const OUT = path.resolve(process.argv[2] || path.join(ROOT, 'darkfuscator.zip'));
 
-const SKIP_DIRS = new Set(['node_modules', 'domtest', '.git', '__pycache__', 'out', 'dist', '.arena']);
+const SKIP_DIRS = new Set(['node_modules', 'domtest', '.git', '__pycache__', 'out', 'dist', '.arena', '.gh-pages-work']);
 const SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'package.json', 'package-lock.json']);
 const SKIP_EXT = new Set(['.zip']);
 const ROOT_PREFIX = 'darkfuscator/';
