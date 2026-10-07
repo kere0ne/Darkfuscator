@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account — Darkfuscator</title>
+  <meta name="description" content="Sign in to Darkfuscator to save your API keys and track your obfuscations.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand-mark" title="Darkfuscator">DF</div>
+      <a class="side-btn" href="index.html" title="Home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="side-btn" href="obfuscate.html" title="Obfuscate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+        Obfuscate
+      </a>
+      <a class="side-btn" href="api-docs.html" title="API">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg>
+        API
+      </a>
+      <a class="side-btn active" href="account.html" title="Account">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+        Account
+      </a>
+      <div class="sidebar-foot">
+        <div class="ver-chip" id="ver-chip">v6.1.0</div>
+        <div class="foot-note">Everything runs in your browser.<br>Nothing leaves this page.</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">DARKFUSCATOR WORKSPACE</p>
+          <h1 class="page-title">Account</h1>
+          <p class="page-desc">Sign in to save your API keys to your account. The keys on this page are the same ones you use with the REST API.</p>
+        </div>
+        <div class="top-right"><span class="pill">halloween build</span></div>
+      </header>
+
+      <div id="auth-view">
+        <div class="stat-row">
+          <div class="bignum"><b>PBKDF2</b><span>passwords never stored in the clear</span></div>
+          <div class="bignum"><b>dk_live_</b><span>keys saved to your account</span></div>
+          <div class="bignum"><b>30 days</b><span>session length</span></div>
+          <div class="bignum"><b>25</b><span>keys per account</span></div>
+        </div>
+
+        <div class="auth-grid">
+          <section class="card">
+            <h2 class="card-title">Sign up</h2>
+            <div class="field"><label for="su-user">Username</label><input id="su-user" autocomplete="username" placeholder="3-24 letters, numbers, _"></div>
+            <div class="field"><label for="su-pass">Password</label><input id="su-pass" type="password" autocomplete="new-password" placeholder="at least 6 characters"></div>
+            <div class="field"><label for="su-pass2">Repeat password</label><input id="su-pass2" type="password" autocomplete="new-password"></div>
+            <button class="btn primary" id="btn-signup">Create account</button>
+            <p class="auth-msg" id="su-msg"></p>
+          </section>
+          <section class="card">
+            <h2 class="card-title">Log in</h2>
+            <div class="field"><label for="li-user">Username</label><input id="li-user" autocomplete="username"></div>
+            <div class="field"><label for="li-pass">Password</label><input id="li-pass" type="password" autocomplete="current-password"></div>
+            <button class="btn primary" id="btn-login">Log in</button>
+            <p class="auth-msg" id="li-msg"></p>
+          </section>
+        </div>
+      </div>
+
+      <div id="dash-view" hidden>
+        <div class="stat-row">
+          <div class="bignum"><b id="me-name">&mdash;</b><span>signed in</span></div>
+          <div class="bignum"><b id="me-keys">0</b><span>saved API keys</span></div>
+          <div class="bignum"><b id="me-uses">0</b><span>obfuscations run</span></div>
+          <div class="bignum"><b id="me-since">&mdash;</b><span>member since</span></div>
+        </div>
+
+        <section class="card">
+          <h2 class="card-title">Your API keys</h2>
+          <p class="dash-note">Saved keys keep working with the same API. Revoke one and builds using it stop at once.</p>
+          <div class="key-create">
+            <input id="new-key-name" placeholder="key name (optional, e.g. my-bot)">
+            <button class="btn primary" id="btn-new-key">Create API key</button>
+          </div>
+          <p class="auth-msg" id="key-msg"></p>
+          <div class="key-table-wrap">
+            <table class="hist key-table">
+              <thead><tr><th>Name</th><th>Key</th><th>Created</th><th>Uses</th><th>Last used</th><th></th></tr></thead>
+              <tbody id="keys-body"><tr><td colspan="6" class="empty">Loading...</td></tr></tbody>
+            </table>
+          </div>
+          <div class="auth-row">
+            <button class="btn" id="btn-refresh">Refresh</button>
+            <button class="btn danger" id="btn-logout">Log out</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Use a saved key</h2>
+          <pre class="code-block">curl -X POST https://darkfuscator.onrender.com/api/v1/obfuscate \
+  -H "Authorization: Bearer dk_live_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"print(\"hello\")","preset":"maximum"}'</pre>
+          <p class="foot-line">Full docs on the <a href="api-docs.html">API page</a>.</p>
+        </section>
+      </div>
+
+      <p class="foot-line"><span class="spooky">Happy halloween.</span> Sessions live in this browser. Do not share your keys; anyone holding one can build with your rate limits.</p>
+    </main>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var TOKEN_KEY = 'df_session';
+  var base = ''; // same origin
+
+  function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
+  function setToken(t) { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function msg(id, text, bad) {
+    var n = $(id); if (!n) return;
+    n.textContent = text || '';
+    n.className = 'auth-msg' + (bad ? ' bad' : '');
+  }
+
+  function api(path, opts, cb) {
+    opts = opts || {};
+    var headers = { 'Content-Type': 'application/json' };
+    if (token()) headers['Authorization'] = 'Bearer ' + token();
+    fetch(base + path, {
+      method: opts.method || 'GET',
+      headers: headers,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
+        cb(data, r.status);
+      });
+    }).catch(function () { cb({ ok: false, error: 'network error' }, 0); });
+  }
+
+  function fmtDate(s) {
+    try { return new Date(s).toLocaleString(); } catch (e) { return String(s || ''); }
+  }
+  function maskKey(k) {
+    return k.length > 18 ? k.slice(0, 13) + '\u2026' + k.slice(-6) : k;
+  }
+
+  var revealed = {};
+
+  function renderKeys(keys) {
+    var body = $('keys-body');
+    if (!keys || !keys.length) {
+      body.innerHTML = '<tr><td colspan="6" class="empty">No saved keys yet. Create one above.</td></tr>';
+      return;
+    }
+    body.innerHTML = keys.map(function (k) {
+      var shown = revealed[k.key] ? esc(k.key) : esc(maskKey(k.key));
+      return '<tr>' +
+        '<td>' + (esc(k.name) || '<span class="dim">&mdash;</span>') + '</td>' +
+        '<td class="mono">' + shown + '</td>' +
+        '<td>' + esc(fmtDate(k.createdAt)) + '</td>' +
+        '<td>' + (k.total || 0) + '</td>' +
+        '<td>' + (k.lastUsed ? esc(fmtDate(k.lastUsed)) : 'never') + '</td>' +
+        '<td class="key-actions">' +
+          '<button class="btn sm" data-act="reveal" data-key="' + esc(k.key) + '">' + (revealed[k.key] ? 'Hide' : 'Reveal') + '</button>' +
+          '<button class="btn sm" data-act="copy" data-key="' + esc(k.key) + '">Copy</button>' +
+          '<button class="btn danger sm" data-act="revoke" data-key="' + esc(k.key) + '">Revoke</button>' +
+        '</td></tr>';
+    }).join('');
+  }
+
+  $('keys-body').addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    var act = btn.getAttribute('data-act'), key = btn.getAttribute('data-key');
+    if (act === 'reveal') {
+      revealed[key] = !revealed[key];
+      loadMe();
+    } else if (act === 'copy') {
+      if (navigator.clipboard) navigator.clipboard.writeText(key);
+      msg('key-msg', 'Key copied to the clipboard.');
+    } else if (act === 'revoke') {
+      if (!confirm('Revoke this key? Builds using it stop at once.')) return;
+      api('/api/v1/keys/' + encodeURIComponent(key), { method: 'DELETE' }, function (data, status) {
+        if (data && data.ok) { msg('key-msg', 'Key revoked.'); loadMe(); }
+        else msg('key-msg', (data && data.error) || 'Revoke failed (' + status + ')', true);
+      });
+    }
+  });
+
+  function loadMe() {
+    if (!token()) { showAuth(); return; }
+    api('/api/v1/me', {}, function (data, status) {
+      if (status === 401) { setToken(''); showAuth(); return; }
+      if (!data || !data.ok) { msg('key-msg', (data && data.error) || 'Could not load your account', true); return; }
+      $('auth-view').hidden = true;
+      $('dash-view').hidden = false;
+      $('me-name').textContent = data.username;
+      $('me-keys').textContent = data.keyCount || 0;
+      $('me-uses').textContent = data.totalUses || 0;
+      $('me-since').textContent = data.createdAt ? new Date(data.createdAt).toLocaleDateString() : '\u2014';
+      renderKeys(data.keys || []);
+    });
+  }
+  function showAuth() {
+    $('auth-view').hidden = false;
+    $('dash-view').hidden = true;
+  }
+
+  $('btn-signup').addEventListener('click', function () {
+    var u = $('su-user').value.trim(), p = $('su-pass').value, p2 = $('su-pass2').value;
+    if (p !== p2) { msg('su-msg', 'Passwords do not match.', true); return; }
+    msg('su-msg', 'Creating account...');
+    api('/api/v1/signup', { method: 'POST', body: { username: u, password: p } }, function (data, status) {
+      if (data && data.ok) { setToken(data.token); loadMe(); }
+      else msg('su-msg', (data && data.error) || 'Signup failed (' + status + ')', true);
+    });
+  });
+  $('btn-login').addEventListener('click', function () {
+    msg('li-msg', 'Signing in...');
+    api('/api/v1/login', { method: 'POST', body: { username: $('li-user').value.trim(), password: $('li-pass').value } }, function (data, status) {
+      if (data && data.ok) { setToken(data.token); loadMe(); }
+      else msg('li-msg', (data && data.error) || 'Login failed (' + status + ')', true);
+    });
+  });
+  $('btn-logout').addEventListener('click', function () {
+    api('/api/v1/logout', { method: 'POST' }, function () { setToken(''); showAuth(); });
+  });
+  $('btn-refresh').addEventListener('click', loadMe);
+  $('btn-new-key').addEventListener('click', function () {
+    msg('key-msg', 'Creating key...');
+    api('/api/v1/keys', { method: 'POST', body: { name: $('new-key-name').value.trim() } }, function (data, status) {
+      if (data && data.ok) {
+        revealed[data.key] = true;
+        msg('key-msg', 'Key created and saved to your account.');
+        $('new-key-name').value = '';
+        loadMe();
+      } else msg('key-msg', (data && data.error) || 'Key creation failed (' + status + ')', true);
+    });
+  });
+
+  loadMe();
+})();
+</script>
+</body>
+</html>

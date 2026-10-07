@@ -29,7 +29,7 @@
   var DEFAULTS = {
     nameStyle: 'random',        // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
-    junk: 3,                    // 0 | 1 | 2 | 3 — decoys, dead handlers, heavy junk (~900 KB)
+    junk: 3,                    // 0 | 1 | 2 | 3 | 4 — decoys, dead handlers, heavy junk, insane (~2 MB)
     guard: 2,                   // 0 | 1 | 2 — anti-environment audit strength
     captureGlobals: true,       // grab the caller's environment with getfenv()
     watermark: true,            // leading "protected by" comment
@@ -38,14 +38,14 @@
     envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
     envLock: false,             // refuse to decode outside a genuine Roblox client
     antiTamper: 2,              // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
-    vmLayers: 5                 // 1..5 — the build runs inside stacked VMs (auto-degrades on huge payloads)
+    vmLayers: 5                 // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
   };
 
   // presets for the CLI and for callers that name one; the UI always uses maximum
   var PRESETS = {
     lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
     balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2 },
-    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 5 }
+    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 10 }
   };
 
 
@@ -95,12 +95,12 @@
       for (var pk in ps) opts[pk] = ps[pk];
     }
     for (var ok in (options || {})) if (options[ok] !== undefined && ok !== 'preset') opts[ok] = options[ok];
-    opts.junk = Math.max(0, Math.min(3, parseInt(opts.junk, 10) || 0));
+    opts.junk = Math.max(0, Math.min(4, parseInt(opts.junk, 10) || 0));
     opts.envChecks = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
     opts.antiTamper = opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0;
     opts.vmLayers = parseInt(opts.vmLayers, 10);
     if (!(opts.vmLayers >= 1)) opts.vmLayers = 5;
-    if (opts.vmLayers > 5) opts.vmLayers = 5;
+    if (opts.vmLayers > 10) opts.vmLayers = 10;
 
     var result = {
       ok: false, output: '', error: null, stats: {}, warnings: [], options: opts
@@ -158,7 +158,9 @@
       // when the payload outgrows sensible nesting, which keeps huge
       // scripts on the strongest stack that still builds.
       var layerRng = vmRng, vms = 1;
-      var MAX_LAYER_INPUT = 220000;
+      // nesting budget: a layer is only added while the previous build still
+      // fits, which keeps the final output under ~4.5 MB even at 10 layers
+      var MAX_LAYER_INPUT = 3000000;
       for (var LN = 2; LN <= opts.vmLayers; LN++) {
         if (vmSrc.length > MAX_LAYER_INPUT) {
           result.warnings.push('VM stack capped at ' + vms + ' layer' + (vms === 1 ? '' : 's') + ' (payload too large to nest further)');
@@ -170,7 +172,7 @@
           layerRng = makeRng((layerRng.seed ^ (0x9E3779B9 + LN * 0x85EBCA6B)) >>> 0);
           var vmOutN = VMEmit.emit(progN, {
             rng: layerRng,
-            junk: opts.junk >= 1 ? 1 : 0,
+            junk: LN <= 3 ? (opts.junk >= 1 ? 1 : 0) : 0,
             minify: true,
             nameStyle: opts.nameStyle || 'random',
             guard: 1,             // the outer build runs the full battery;
@@ -199,10 +201,10 @@
         vmSrc = '-- This file is protected by Darkfuscator and obfuscated by anti tamper so it dont get stolen\n' + vmSrc;
       }
       result.stats.vms = vms;
-      // heavy junk (junk 3): dead `if false` statements appended to the final
-      // source, never executed, capped at ~950 KB
+      // heavy junk (junk 3, junk 4): dead `if false` statements appended to the final
+      // source, never executed; level 3 ~900 KB, level 4 ~2 MB with wider shapes
       if (opts.junk >= 3) {
-        var jR = heavyJunk(vmSrc, vmRng);
+        var jR = heavyJunk(vmSrc, vmRng, opts.junk);
         vmSrc = jR.src;
         result.stats.junkStatements = jR.stmts;
       }
@@ -248,8 +250,8 @@
   // local-only integers. The runtime skips them entirely, every value stays
   // non-negative so nothing can throw even if it ran, and the only effect is
   // parser noise: ~100k statements or ~950 KB, whichever limit hits first.
-  function heavyJunk(src, rng) {
-    var TARGET = 900000, MAXSTMT = 100000;
+  function heavyJunk(src, rng, level) {
+    var TARGET = level >= 4 ? 2000000 : 900000, MAXSTMT = level >= 4 ? 220000 : 100000;
     var parts = [], stmts = 0, size = 0;
     // two-character locals keep the noise dense: ~9 characters per statement
     // puts the 100k-statement target and the 900 KB target at the same place
@@ -273,8 +275,12 @@
           st = a + '=' + a + '%999983';
         } else if (kind < 91) {
           st = a + '=(' + a + '+' + lit + '-' + c + ')%999983';
-        } else {
+        } else if (kind < 97 || level < 4) {
           st = a + '=bit32.bxor(' + a + ',' + c + ')%2147483647';
+        } else if (kind < 98) {
+          st = a + '=bit32.rshift(bit32.bxor(' + a + ',' + c + '),' + (1 + Math.floor(rng() * 16)) + ')+bit32.band(' + a + ',7)';
+        } else {
+          st = a + '=bit32.bxor(bit32.lshift(' + a + ',' + (1 + Math.floor(rng() * 8)) + '),bit32.bnot(' + c + '))%2147483647';
         }
         b.push(st); stmts++; size += st.length + 1;
       }
@@ -289,6 +295,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '6.0.0'
+    version: '6.1.0'
   };
 });

@@ -587,59 +587,63 @@
         keys.push(String(key));
       }
       var banner = 'Protected using Darkfuscator | https://darkfuscator.pages.dev';
+      // The check battery is its own standalone chunk and is obfuscated with
+      // Darkfuscator itself (one VM layer, no nested anti-tamper), so the
+      // checks, their names and their warn strings never ship readable. The
+      // loader below decrypts the payload only when the battery's per-build
+      // seal global reads true; a tamperer cannot spoof it without reading
+      // the obfuscated battery.
+      var sealG = ng();
+      var batterySrc = buildBattery(banner, sealG);
+      try {
+        var Dk = (typeof module === 'object' && module.exports)
+          ? require('./obfuscate.js')
+          : (typeof globalThis !== 'undefined' ? globalThis.Darkfuscator : null);
+        if (Dk && Dk.obfuscate) {
+          var bRes = Dk.obfuscate(batterySrc, {
+            antiTamper: 0, guard: 0, envChecks: 0, vmLayers: 1, junk: 1,
+            watermark: false, minify: true, captureGlobals: true,
+            envLock: false, lockPlace: '', lockUniverse: '',
+            nameStyle: 'random',
+            seed: ((rng.seed >>> 0) ^ 0xD34DBA5C) >>> 0
+          });
+          if (bRes && bRes.ok && bRes.output) batterySrc = bRes.output;
+        }
+      } catch (eB) { /* battery ships plain if self-obfuscation is unavailable */ }
       var w = [];
       function wl(x) { w.push(x); }
       wl('do');
       wl('local t0=os.clock()');
       wl('local MSG=' + JSON.stringify(banner));
-      wl('local detected=false');
-      wl('local checks={}');
       wl('local function fail() print(MSG) while true do end end');
       wl('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
-      wl('checks[1]={name="game_instance",run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
-      wl('checks[2]={name="script_valid",run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
-      wl('checks[3]={name="game_props",run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
-      wl('checks[4]={name="local_player",run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
-      wl('checks[5]={name="character",run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
-      wl('checks[6]={name="services",run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
-      wl('checks[7]={name="data_types",run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
-      wl('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
-      wl('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
-      wl('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
-      wl('checks[11]={name="env_write",run=function() local cv="_dkcv"..tostring(math.floor((os.clock()%1)*1000000)) local ok2=false pcall(function() getfenv(0)[cv]=1187 if getfenv(0)[cv]==1187 then ok2=true end getfenv(0)[cv]=nil end) if not ok2 then return false end return true end}');
-      wl('checks[12]={name="string_integrity",run=function() if tostring("ab")~="ab" or string.rep("x",2)~="xx" or ("ab"):upper()~="AB" or #"ab"~=2 then return false end return true end}');
-      wl('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end local bad=false if game~=nil then pcall(function() if game.Close~=game.Close then bad=true end end) end local hooked=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") if bad then return false end end if (dn>0 or hooked) and bad then return false end return true end}');
-      wl('checks[14]={name="identity_consistency",run=function() if game==nil or typeof(game)~="Instance" then return true end local ok,L=pcall(game.GetService,game,"Lighting") if ok and L.ClockTime~=L.ClockTime then return false end if workspace.CurrentCamera~=workspace.CurrentCamera then return false end local ok2,a=pcall(game.GetService,game,"Lighting") local ok3,b=pcall(game.GetService,game,"Lighting") if ok2~=ok3 then return false end return true end}');
-      wl('checks[15]={name="json_determinism",run=function() if game==nil then return true end local ok,hs=pcall(game.GetService,game,"HttpService") if not ok or type(hs.JSONEncode)~="function" then return true end local ok2,e1=pcall(hs.JSONEncode,hs,{}) local ok3,e2=pcall(hs.JSONEncode,hs,{}) if not ok2 or not ok3 or e1~=e2 then return false end return true end}');
-      wl('checks[16]={name="clone_locked",run=function() if game==nil then return true end local ok,cl=pcall(game.Clone,game) if ok and cl~=nil then return false end return true end}');
-      wl('checks[17]={name="cframe_math",run=function() local ok,cf=pcall(CFrame.new,50,100,50) if not ok then return true end local ok2,r=pcall(function() return cf*CFrame.Angles(0,math.pi/2,0) end) if not ok2 then return false end if math.abs(r.RightVector.Z)<0.9 or math.abs(r.Position.X-50)>0.1 then return false end return true end}');
-      wl('checks[18]={name="readonly_props",run=function() if game==nil then return true end local ok,err=pcall(function() game.PlaceId=0 end) if ok then return false end if type(err)~="string" or #err==0 then return false end return true end}');
-      wl('checks[19]={name="settings_sane",run=function() local ok,s=pcall(function() return settings() end) if not ok or type(s)~="table" then return true end local ok2,pt=pcall(function() return s.Physics.ThrottleAdjustTime end) local ok3,il=pcall(function() return s.Network.IncomingReplicationLag end) if ok2 and type(pt)=="number" and pt>1 then return false end if ok3 and type(il)=="number" and il>1 then return false end return true end}');
-      wl('checks[20]={name="debug_sane",run=function() if type(debug)~="table" or type(debug.getinfo)~="function" then return true end local ok,a=pcall(debug.getinfo,1,"l") local ok2,b=pcall(debug.getinfo,1,"l") if not ok or not ok2 or type(a)~="table" or type(b)~="table" or a.currentline~=b.currentline then return false end return true end}');
-      wl('local fp={} pcall(function() local fnc=0 for gk,gv in pairs(_G) do fnc=fnc+1 if fnc<=400 then fp[gk]=type(gv) end end end)');
-      wl('checks[22]={name="error_semantics",run=function() local ok,e=pcall(function() error("dkp22",0) end) if ok or e~="dkp22" then return false end return true end}');
-      wl('checks[23]={name="globals_fingerprint",run=function() local n=0 for gk,gt in pairs(fp) do n=n+1 if type(_G[gk])~=gt then return false end end return true end}');
-      wl('checks[21]={name="addr_determinism",run=function() local s1=tostring({}) local s2=tostring({}) if #s1>=15 and #s2>=15 and string.sub(s1,8,15)==string.sub(s2,8,15) then return false end local t1={} local d1=tostring(t1) local d2=tostring(t1) if d1~=d2 then return false end return true end}');
-      wl('local dead={}');
-      wl('local function runChecks() for i=1,#checks do if not dead[i] then local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true dead[i]=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end end return true end');
-      wl('runChecks()');
-      wl('if detected then print(MSG) return end');
-      wl('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
-      wl('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then warnf("[DARK AntiTamper] Chat probe inconclusive") end end)');
-      wl('local RS=game:GetService("RunService") local last=(tick~=nil and tick() or os.clock())');
-      wl('RS.Heartbeat:Connect(function() local now=(tick~=nil and tick() or os.clock()) if now-last>=0.5 then last=now runChecks() if detected then fail() end end end)');
-      wl('do local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then print(MSG) return end end');
+      wl('local function decrypt(data,key) local o={} for i=1,#data do local d=bit32.bxor(data[i],(key+i)%256) o[i]=(d-key-i)%256 end return o end');
+      var bb = [], bkey = fast ? 0 : 40 + Math.floor(rng() * 61);
+      for (var xi = 1; xi <= batterySrc.length; xi++) {
+        var xv = (batterySrc.charCodeAt(xi - 1) + bkey + xi) % 256;
+        xv = xv ^ ((bkey + xi) % 256);
+        bb.push(xv);
+      }
+      wl('local bchunks={{' + bb.join(',') + '}}');
+      wl('local bkeys={' + String(bkey) + '}');
+      wl('local bparts={} for bi2=1,#bchunks do local b2=decrypt(bchunks[bi2],bkeys[bi2]) local cs2={} for k2=1,#b2 do cs2[k2]=string.char(b2[k2]) end bparts[bi2]=table.concat(cs2) end');
+      wl('local bsrc=table.concat(bparts)');
+      wl('bchunks=nil bkeys=nil bparts=nil');
+      wl('local loadfunc=load or loadstring');
+      wl('if not loadfunc then fail() end');
+      wl('local bfunc=loadfunc(bsrc,"=DARK")');
+      wl('bsrc=nil');
+      wl('if not bfunc then fail() end');
+      wl('bfunc()');
+      wl('if _G["' + sealG + '"]~=true then return end');
       wl('local chunks={');
       for (var fi = 0; fi < chunks.length; fi++) wl(chunks[fi] + (fi < chunks.length - 1 ? ',' : ''));
       wl('}');
       wl('local keys={');
       wl(keys.join(',') + '}');
-      wl('local function decrypt(data,key) local o={} for i=1,#data do local d=bit32.bxor(data[i],(key+i)%256) o[i]=(d-key-i)%256 end return o end');
       wl('local parts={} for i=1,#chunks do local b=decrypt(chunks[i],keys[i]) local cs={} for k=1,#b do cs[k]=string.char(b[k]) end parts[i]=table.concat(cs) end');
       wl('local original_source=table.concat(parts)');
       wl('chunks=nil keys=nil parts=nil');
-      wl('local loadfunc=load or loadstring');
-      wl('if not loadfunc then fail() end');
       wl('local chunk,err=loadfunc(original_source,"=AntiTamper")');
       wl('original_source=nil');
       wl('if not chunk then fail() end');
@@ -648,6 +652,58 @@
       wl('warnf("Authenticated in "..string.format("%.2f",os.clock()-t0).." seconds! Welcome, "..tostring(lp and lp.Name or "player"))');
       wl('end');
       return w.join('\n') + '\n';
+    }
+
+    // The anti-tamper check battery: 29 probes (instances, DataModel
+    // properties, LocalPlayer, services, engine data types, environment
+    // identity, dump tooling, executor toolkit, math/string integrity) plus
+    // the PlayerModule gate, a half-second Heartbeat re-run, and the per-build
+    // seal global the wrapper's loader reads. Ships obfuscated by the engine.
+    function buildBattery(banner, sealG) {
+      var b = [];
+      b.push('local detected=false');
+      b.push('local checks={}');
+      b.push('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
+      b.push('checks[1]={name="game_instance",run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
+      b.push('checks[2]={name="script_valid",run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
+      b.push('checks[3]={name="game_props",run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
+      b.push('checks[4]={name="local_player",run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
+      b.push('checks[5]={name="character",run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
+      b.push('checks[6]={name="services",run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
+      b.push('checks[7]={name="data_types",run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
+      b.push('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
+      b.push('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
+      b.push('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
+      b.push('checks[11]={name="env_write",run=function() local cv="_dkcv"..tostring(math.floor((os.clock()%1)*1000000)) local ok2=false pcall(function() getfenv(0)[cv]=1187 if getfenv(0)[cv]==1187 then ok2=true end getfenv(0)[cv]=nil end) if not ok2 then return false end return true end}');
+      b.push('checks[12]={name="string_integrity",run=function() if tostring("ab")~="ab" or string.rep("x",2)~="xx" or ("ab"):upper()~="AB" or #"ab"~=2 then return false end return true end}');
+      b.push('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end local bad=false if game~=nil then pcall(function() if game.Close~=game.Close then bad=true end end) end local hooked=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") if bad then return false end end if (dn>0 or hooked) and bad then return false end return true end}');
+      b.push('checks[14]={name="identity_consistency",run=function() if game==nil or typeof(game)~="Instance" then return true end local ok,L=pcall(game.GetService,game,"Lighting") if ok and L.ClockTime~=L.ClockTime then return false end if workspace.CurrentCamera~=workspace.CurrentCamera then return false end local ok2,a=pcall(game.GetService,game,"Lighting") local ok3,b=pcall(game.GetService,game,"Lighting") if ok2~=ok3 then return false end return true end}');
+      b.push('checks[15]={name="json_determinism",run=function() if game==nil then return true end local ok,hs=pcall(game.GetService,game,"HttpService") if not ok or type(hs.JSONEncode)~="function" then return true end local ok2,e1=pcall(hs.JSONEncode,hs,{}) local ok3,e2=pcall(hs.JSONEncode,hs,{}) if not ok2 or not ok3 or e1~=e2 then return false end return true end}');
+      b.push('checks[16]={name="clone_locked",run=function() if game==nil then return true end local ok,cl=pcall(game.Clone,game) if ok and cl~=nil then return false end return true end}');
+      b.push('checks[17]={name="cframe_math",run=function() local ok,cf=pcall(CFrame.new,50,100,50) if not ok then return true end local ok2,r=pcall(function() return cf*CFrame.Angles(0,math.pi/2,0) end) if not ok2 then return false end if math.abs(r.RightVector.Z)<0.9 or math.abs(r.Position.X-50)>0.1 then return false end return true end}');
+      b.push('checks[18]={name="readonly_props",run=function() if game==nil then return true end local ok,err=pcall(function() game.PlaceId=0 end) if ok then return false end if type(err)~="string" or #err==0 then return false end return true end}');
+      b.push('checks[19]={name="settings_sane",run=function() local ok,s=pcall(function() return settings() end) if not ok or type(s)~="table" then return true end local ok2,pt=pcall(function() return s.Physics.ThrottleAdjustTime end) local ok3,il=pcall(function() return s.Network.IncomingReplicationLag end) if ok2 and type(pt)=="number" and pt>1 then return false end if ok3 and type(il)=="number" and il>1 then return false end return true end}');
+      b.push('checks[20]={name="debug_sane",run=function() if type(debug)~="table" or type(debug.getinfo)~="function" then return true end local ok,a=pcall(debug.getinfo,1,"l") local ok2,b2=pcall(debug.getinfo,1,"l") if not ok or not ok2 or type(a)~="table" or type(b2)~="table" or a.currentline~=b2.currentline then return false end return true end}');
+      b.push('checks[22]={name="error_semantics",run=function() local ok,e=pcall(function() error("dkp22",0) end) if ok or e~="dkp22" then return false end return true end}');
+      b.push('checks[23]={name="globals_fingerprint",run=function() local n=0 for gk,gt in pairs(fp) do n=n+1 if type(_G[gk])~=gt then return false end end return true end}');
+      b.push('checks[21]={name="addr_determinism",run=function() local s1=tostring({}) local s2=tostring({}) if #s1>=15 and #s2>=15 and string.sub(s1,8,15)==string.sub(s2,8,15) then return false end local t1={} local d1=tostring(t1) local d2=tostring(t1) if d1~=d2 then return false end return true end}');
+      b.push('checks[24]={name="executor_globals",run=function() local known={"getgenv","getrenv","getreg","hookmetamethod","cloneref","getcallingscript","setclipboard","request"} local n=0 for _,en in ipairs(known) do if rawget(_G,en)~=nil then n=n+1 end end if n>=4 then warnf("[DARK AntiTamper] heavy toolkit present ("..tostring(n)..")") end return true end}');
+      b.push('checks[25]={name="string_dump_sane",run=function() if type(string.dump)~="function" then return true end local ok,d=pcall(string.dump,function() end) if ok and type(d)~="string" then return false end return true end}');
+      b.push('checks[26]={name="math_consistency",run=function() if math.abs(math.pi-3.141592653589793)>1e-9 then return false end if math.huge<1e300 then return false end if 0/0==0/0 then return false end return true end}');
+      b.push('checks[27]={name="char_roundtrip",run=function() for _,cv in ipairs({0,65,200,255}) do if string.byte(string.char(cv))~=cv then return false end end return true end}');
+      b.push('checks[28]={name="clock_sane",run=function() local t=os.time() if type(t)~="number" or t<1500000000 or t>4000000000 then return false end return true end}');
+      b.push('checks[29]={name="gcinfo_sane",run=function() if type(gcinfo)~="function" then return true end local g=gcinfo() if type(g)~="number" or g<=0 or g>1e9 then return false end return true end}');
+      b.push('local fp={} pcall(function() local fnc=0 for gk,gv in pairs(_G) do fnc=fnc+1 if fnc<=400 then fp[gk]=type(gv) end end end)');
+      b.push('local dead={}');
+      b.push('local function runChecks() for i=1,#checks do if not dead[i] then local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true dead[i]=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end end return true end');
+      b.push('runChecks()');
+      b.push('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
+      b.push('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then warnf("[DARK AntiTamper] Chat probe inconclusive") end end)');
+      b.push('pcall(function() local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then detected=true end end)');
+      b.push('local RS=game:GetService("RunService") local last=(tick~=nil and tick() or os.clock())');
+      b.push('RS.Heartbeat:Connect(function() local now=(tick~=nil and tick() or os.clock()) if now-last>=0.5 then last=now runChecks() if detected then print("' + banner + '") while true do end end end end)');
+      b.push('if detected then print("' + banner + '") _G["' + sealG + '"]=false else _G["' + sealG + '"]=true end');
+      return b.join('\n');
     }
 
     // ----------------------------------------------------------------- guard
