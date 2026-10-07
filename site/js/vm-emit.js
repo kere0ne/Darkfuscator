@@ -301,12 +301,12 @@
       'local t=table.pack(f(s,v)); if t[1]==nil then return F.ip+I[3] end; R[a+2]=t[1]; ' +
       'for i=1,nv do R[a+3+i-1]=t[i] end end',
     CALL: 'do local a,nr,nc=I[2],I[3],I[4]; local na=nr-1; local args={}; ' +
-      'for i=1,na do args[i]=R[a+i] end; local res=table.pack(R[a](unpack(args,1,na))); ' +
+      'for i=1,na do args[i]=R[a+i] end; local res=table.pack(R[a]((unpack or table.unpack)(args,1,na))); ' +
       'if nc==0 then R[a]=setmetatable(res,S.MT) else for i=1,nc-1 do R[a+i-1]=res[i] end end end',
     CALLM: 'do local a,nr,nc=I[2],I[3],I[4]; local na=nr-2; local args={}; ' +
       'for i=1,na do args[i]=R[a+i] end; local t=R[a+nr-1]; local tn=t.n; ' +
       'for i=1,tn do args[na+i]=t[i] end; ' +
-      'local res=table.pack(R[a](unpack(args,1,na+tn))); ' +
+      'local res=table.pack(R[a]((unpack or table.unpack)(args,1,na+tn))); ' +
       'if nc==0 then R[a]=setmetatable(res,S.MT) else for i=1,nc-1 do R[a+i-1]=res[i] end end end',
     // RETURN materializes a compact result vector. A protected VM can use a
     // register proxy for per-proto remapping, while unpack deliberately works
@@ -461,7 +461,7 @@
     line('local function vrm(m) local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end v=bit32.bxor(v,m) if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
     line('local function st() local n=vr(); if n==0 then return "" end; local t={}; local q=1; while q<=n do');
     line('local len=n-q+1; if len>2000 then len=2000 end; local u={}');
-    line('for j=1,len do u[j]=' + L.c + '[' + PS + '.p+j-1] end; ' + PS + '.p=' + PS + '.p+len; t[#t+1]=string.char(unpack(u)); q=q+len end');
+    line('for j=1,len do u[j]=' + L.c + '[' + PS + '.p+j-1] end; ' + PS + '.p=' + PS + '.p+len; t[#t+1]=string.char((unpack or table.unpack)(u)); q=q+len end');
     line('return table.concat(t) end');
     line('local pidx=0');
     line('local osalt=(' + blob.key + '*733+' + blob.xk + '*911+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : (blob.seal % 256)) + ')%65536');
@@ -469,7 +469,7 @@
     // string constants are stored encoded inside the payload and are only
     // decoded through a metatable the first time a handler actually reads
     // them: a dump of the decoded program no longer reveals string literals
-    line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end local ps2={} for q2=1,#t,200 do ps2[#ps2+1]=string.char(unpack(t,q2,math.min(q2+199,#t))) end return table.concat(ps2) end');
+    line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end local ps2={} for q2=1,#t,200 do ps2[#ps2+1]=string.char((unpack or table.unpack)(t,q2,math.min(q2+199,#t))) end return table.concat(ps2) end');
     line('local function proto()');
     line('pidx=pidx+1; local ps=(osalt+pidx*40503)%65536');
     line('local np=vr(); local va=by()==1; local ms=vr(); local rs=vr(); local nu=vr()');
@@ -665,7 +665,7 @@
       }
     }
     line(chain + ' end');
-    line('if F.d then return unpack(F.r,F.o+1,F.o+F.n) end');
+    line('if F.d then return (unpack or table.unpack)(F.r,F.o+1,F.o+F.n) end');
     line('F.ip=nx or F.ip+1');
     line('end');
     line('end),');
