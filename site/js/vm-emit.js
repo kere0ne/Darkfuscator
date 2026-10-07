@@ -584,7 +584,6 @@
       // output. A body that fails to load fails safe (seal scrambled).
       line('["' + N.guard + '"]=(function(G)');
       var gBody = [];
-      gBody.push('["' + N.guard + '"]=(function(G)');
       gBody.push('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
       gBody.push('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
       gBody.push('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
@@ -595,7 +594,6 @@
       gBody.push('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
       emitHidden(line, 'return(function(G)\n' + gBody.join('\n') + '\nend)', 0x4EEDBEEF, function (vH) { return 'return ' + vH + '(G)'; }, 'return true');
       line('end),');
-      gBody.push('end),');
     }
 
     // ------------------------------------------------------------ interpreter
