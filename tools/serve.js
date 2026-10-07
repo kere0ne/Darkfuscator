@@ -92,7 +92,7 @@ function pageRoutes(req, res, pathname) {
   if (pathname === '/index.html') { redirect(res, '/', 301); return true; }
   if (pathname === '/obfuscate.html') { redirect(res, '/obfuscate', 301); return true; }
   if (pathname === '/account.html') { redirect(res, '/account', 301); return true; }
-  if (pathname === '/api-docs.html') { redirect(res, '/docs', 301); return true; }
+  if (pathname === '/api-docs.html') { redirect(res, '/docs/api/protect', 301); return true; }
   if (pathname === '/dashboard.html') { redirect(res, '/dashboard', 301); return true; }
   if (pathname === '/offline' || pathname === '/offline.html') { serveStaticFile(htmlFile('offline'))(req, res); return true; }
 
@@ -129,8 +129,9 @@ function handleApi(req, res, pathname) {
   if (pathname === '/api/v1/health' && req.method === 'GET') {
     const sys = handlers.selfCheck();
     return util.sendJson(res, 200, {
-      ok: true, name: 'Darkfuscator', version: PLATFORM_VERSION, engine: ENGINE_VERSION, time: new Date().toISOString(),
-      engine: sys.engine, database: sys.database
+      ok: !!sys.ok, name: 'Darkfuscator', version: PLATFORM_VERSION, engineVersion: ENGINE_VERSION,
+      time: new Date().toISOString(), engine: sys.engine, api: sys.api,
+      authentication: sys.authentication, database: sys.database
     }, util.corsHeaders(true));
   }
 
@@ -169,10 +170,20 @@ function handleApi(req, res, pathname) {
       const options = {};
       const preset = body && typeof body.preset === 'string' ? body.preset : '';
       const userOpts = body && body.options && typeof body.options === 'object' ? body.options : {};
+      if (preset && ['lightweight', 'balanced', 'maximum'].indexOf(preset) === -1) {
+        return finish(400, { ok: false, error: 'unsupported preset' });
+      }
       if (preset) options.preset = preset;
+      const target = body && typeof body.target === 'string' ? body.target : 'luau';
+      if (target !== 'luau' && target !== 'roblox') {
+        return finish(400, { ok: false, error: 'unsupported target; supported targets are Luau and Roblox Luau' });
+      }
+      const optionIssue = handlers.validateBuildOptions(userOpts);
+      if (optionIssue) return finish(400, { ok: false, error: optionIssue });
+      if (target === 'roblox' && userOpts.antiTamper === undefined) options.antiTamper = 2;
       const engine = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
-      const allowed = ['vmLayers', 'junk', 'guard', 'envChecks', 'antiTamper', 'nameStyle',
-        'seed', 'minify', 'watermark', 'captureGlobals', 'envLock', 'lockPlace', 'lockUniverse'];
+      const allowed = ['vmLayers', 'junk', 'guard', 'antiTamper', 'vmMode', 'ir', 'compression', 'nameStyle',
+        'seed', 'minify', 'watermark', 'captureGlobals', 'lockPlace', 'lockUniverse'];
       for (const a of allowed) if (userOpts[a] !== undefined) options[a] = userOpts[a];
       let result;
       try { result = engine.obfuscate(source, options); }
@@ -180,7 +191,7 @@ function handleApi(req, res, pathname) {
       if (!result || !result.ok) {
         return finish(400, { ok: false, error: (result && result.error) ? result.error : 'obfuscation failed', warnings: (result && result.warnings) || [] });
       }
-      return finish(200, { ok: true, output: result.output, stats: result.stats || {}, warnings: result.warnings || [], version: ENGINE_VERSION });
+      return finish(200, { ok: true, output: result.output, stats: result.stats || {}, warnings: result.warnings || [], target, version: ENGINE_VERSION });
     });
   }
 

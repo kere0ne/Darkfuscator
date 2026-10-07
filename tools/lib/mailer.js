@@ -8,7 +8,7 @@
  *   BASE_URL          public base used in email links
  *   EMAIL_DEV_MODE    when 'false', dev links never appear in API responses
  */
-const BASE_URL = (process.env.BASE_URL || 'https://darkfuscator.onrender.com').replace(/\/+$/, '');
+const BASE_URL = (process.env.BASE_URL || 'http://localhost:' + (process.env.PORT || 3000)).replace(/\/+$/, '');
 const MAIL_FROM = process.env.MAIL_FROM || 'Darkfuscator <onboarding@resend.dev>';
 
 function providerConfigured() {

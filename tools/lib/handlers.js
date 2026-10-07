@@ -14,10 +14,15 @@ const engine = require(path_.join(__dirname, '..', '..', 'site', 'js', 'obfuscat
 
 const ENGINE_VERSION = engine.version || '7.0.0';
 const COOKIE_NAME = 'df_session';
-const SESSION_COOKIE_SECURE = process.env.COOKIE_SECURE !== 'false';
+// Secure cookies are mandatory in production. Local development stays usable
+// over http unless COOKIE_SECURE=true is explicitly set.
+const SESSION_COOKIE_SECURE = process.env.COOKIE_SECURE === 'true' ||
+  (process.env.COOKIE_SECURE !== 'false' && process.env.NODE_ENV === 'production');
 const REMEMBER_DAYS = 30;
 const SHORT_DAYS = 1;
-const DEV_MODE = process.env.EMAIL_DEV_MODE !== 'false';
+// A verification/reset link is only returned for an explicitly enabled local
+// development flow; production never leaks one in an API response.
+const DEV_MODE = process.env.EMAIL_DEV_MODE === 'true';
 const BASE = mailer.BASE_URL;
 const LIMITS = { perMinute: 30, perDay: 1000 };
 
@@ -56,7 +61,7 @@ function sessionFromReq(req) {
   return { session: sess, user: user };
 }
 
-function createSession(user, remember, req) {
+function createSession(res, user, remember, req) {
   const raw = 'df_sess_' + crypto.randomBytes(24).toString('hex');
   const now = Date.now();
   const days = remember ? REMEMBER_DAYS : SHORT_DAYS;
@@ -72,11 +77,9 @@ function createSession(user, remember, req) {
     ua: util.clientUa(req),
     revokedAt: null
   });
-  util.setCookie(res_cookie, COOKIE_NAME, raw, days * 86400000, SESSION_COOKIE_SECURE);
+  util.setCookie(res, COOKIE_NAME, raw, days * 86400000, SESSION_COOKIE_SECURE);
   return raw;
 }
-
-let res_cookie = null; // set per request before createSession is called
 
 function revokeSession(sessionId) {
   return db.update('sessions', (s) => s.id === sessionId, { revokedAt: new Date().toISOString() });
@@ -154,6 +157,22 @@ function publicUser(u) {
   };
 }
 
+function publicBuild(b) {
+  if (!b) return null;
+  return {
+    id: b.id, projectId: b.projectId || null, projectName: b.projectName || null,
+    filename: b.filename, preset: b.preset, target: b.target, status: b.status,
+    error: b.error || null, warnings: b.warnings || [], seed: b.seed == null ? null : b.seed,
+    inputChars: Number(b.inputChars) || 0, outputChars: Number(b.outputChars) || 0,
+    inputSize: Number(b.inputChars) || 0, outputSize: Number(b.outputChars) || 0,
+    processingMs: b.ms == null ? null : Number(b.ms), ms: b.ms == null ? null : Number(b.ms),
+    vmCount: b.vms == null ? null : Number(b.vms), vms: b.vms == null ? null : Number(b.vms),
+    junkStatements: Number(b.junkStatements) || 0, hasSource: !!b.hasSource,
+    hasOutput: !!b.hasOutput, createdAt: b.createdAt,
+    reparsed: b.status === 'success'
+  };
+}
+
 function userStats(userId) {
   const builds = db.where('builds', (b) => b.userId === userId);
   let apiRequests = 0;
@@ -216,8 +235,7 @@ async function handleAuth(req, res, sub) {
     if (!u.verified) {
       return sendJson(res, 403, { ok: false, error: 'verify your email before logging in', code: 'account_not_verified', email: u.email });
     }
-    res_cookie = res;
-    createSession(u, remember, req);
+    createSession(res, u, remember, req);
     audit(u.id, 'login', 'signed in', req);
     return sendJson(res, 200, { ok: true, user: publicUser(u) });
   }
@@ -270,6 +288,30 @@ async function handleAuth(req, res, sub) {
     }
     // never reveal whether the account exists
     return sendJson(res, 200, { ok: true, emailSent: false });
+  }
+
+  if (req.method === 'POST' && sub === '/update-pending-email') {
+    const ip = util.clientIp(req);
+    const rl = util.rateCheck('pending-email:' + ip, 5, 20);
+    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, try again later', retryAfter: rl.retryAfter });
+    const body = util.parseJson(await readBodyP(req)) || {};
+    const username = String(body.username || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    const email = String(body.email || '').trim();
+    const u = db.find('users', (x) => x.usernameLower === username && !x.disabled);
+    if (!u || !verifyPassword(u, password)) return sendJson(res, 401, { ok: false, error: 'invalid account details' });
+    if (u.verified) return sendJson(res, 409, { ok: false, error: 'this email is already verified; change it from account settings' });
+    if (!util.validateEmail(email)) return sendJson(res, 400, { ok: false, error: 'enter a valid email address' });
+    const lower = email.toLowerCase();
+    if (db.find('users', (x) => x.emailLower === lower && x.id !== u.id)) {
+      return sendJson(res, 409, { ok: false, error: 'that email is already registered' });
+    }
+    db.update('users', (x) => x.id === u.id, { email, emailLower: lower });
+    db.update('tokens', (t) => t.userId === u.id && t.kind === 'verify_email' && !t.usedAt, { usedAt: new Date().toISOString() });
+    const raw = createToken('verify_email', u.id, lower);
+    const result = await sendTemplate('verify_email', email, { token: raw });
+    audit(u.id, 'verification_email_changed', 'changed pending verification email', req);
+    return sendJson(res, 200, Object.assign({ ok: true, email, needsVerification: true }, devLink(result, 'verify_email', raw)));
   }
 
   if (req.method === 'POST' && sub === '/forgot-password') {
@@ -340,10 +382,28 @@ async function handlePlatform(req, res, pathname) {
   if (pathname === '/api/v1/me' && req.method === 'GET') {
     const sess = sessionFromReq(req);
     if (!sess) return sendJson(res, 401, { ok: false, error: 'not signed in' }), true;
+    const settings = sess.user.settings || db.defaultSettings();
+    const user = publicUser(sess.user);
+    user.settings = settings;
     return sendJson(res, 200, {
-      ok: true, user: publicUser(sess.user), settings: sess.user.settings || db.defaultSettings(),
-      stats: userStats(sess.user.id)
+      ok: true, user, settings, stats: userStats(sess.user.id)
     }), true;
+  }
+
+  if (pathname === '/api/v1/me/profile' && req.method === 'PATCH') {
+    const sess = sessionFromReq(req);
+    if (!sess) return sendJson(res, 401, { ok: false, error: 'not signed in' }), true;
+    const body = util.parseJson(await readBodyP(req)) || {};
+    const username = String(body.username || '').trim();
+    if (!util.USERNAME_RE.test(username)) return sendJson(res, 400, { ok: false, error: 'username must be 3-24 characters: letters, numbers, underscore' }), true;
+    const lower = username.toLowerCase();
+    if (db.find('users', (u) => u.usernameLower === lower && u.id !== sess.user.id)) {
+      return sendJson(res, 409, { ok: false, error: 'that username is taken' }), true;
+    }
+    db.update('users', (u) => u.id === sess.user.id, { username, usernameLower: lower });
+    audit(sess.user.id, 'profile_changed', 'username updated', req);
+    const updated = db.find('users', (u) => u.id === sess.user.id);
+    return sendJson(res, 200, { ok: true, user: publicUser(updated) }), true;
   }
 
   if (pathname === '/api/v1/me' && req.method === 'PATCH') {
@@ -463,10 +523,12 @@ async function handlePlatform(req, res, pathname) {
       return sendJson(res, 503, { ok: false, error: 'project limit reached (' + MAX_USER_PROJECTS + ')' });
     }
     const body = util.parseJson(await readBodyP(req)) || {};
+    const optionIssue = validateBuildOptions(body.options);
+    if (optionIssue) return sendJson(res, 400, { ok: false, error: optionIssue });
     const name = String(body.name || '').trim();
     if (!name || name.length > 80) return sendJson(res, 400, { ok: false, error: 'project name is required (max 80 chars)' });
     const target = validTarget(body.target) ? body.target : 'roblox';
-    const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset : 'maximum';
+    const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset : 'balanced';
     const project = db.insert('projects', {
       id: util.newId('prj'), userId: sess.user.id, name, description: String(body.description || '').slice(0, 500),
       target, preset, options: sanitizeOptions(body.options),
@@ -489,7 +551,11 @@ async function handlePlatform(req, res, pathname) {
       if (body.description !== undefined) patch.description = String(body.description).slice(0, 500);
       if (body.target !== undefined && validTarget(body.target)) patch.target = body.target;
       if (body.preset !== undefined && ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1) patch.preset = body.preset;
-      if (body.options !== undefined) patch.options = sanitizeOptions(body.options);
+      if (body.options !== undefined) {
+        const optionIssue = validateBuildOptions(body.options);
+        if (optionIssue) return sendJson(res, 400, { ok: false, error: optionIssue }), true;
+        patch.options = sanitizeOptions(body.options);
+      }
       db.update('projects', (x) => x.id === p.id, patch);
       return sendJson(res, 200, { ok: true, project: db.find('projects', (x) => x.id === p.id) }), true;
     }
@@ -522,7 +588,7 @@ async function handlePlatform(req, res, pathname) {
     const total = items.length;
     const limit = Math.min(200, Math.max(1, parseInt(q.limit, 10) || 50));
     const offset = Math.max(0, parseInt(q.offset, 10) || 0);
-    return sendJson(res, 200, { ok: true, items: items.slice(offset, offset + limit), total }), true;
+    return sendJson(res, 200, { ok: true, items: items.slice(offset, offset + limit).map(publicBuild), total }), true;
   }
   if (pathname === '/api/v1/builds' && req.method === 'POST') {
     const sess = sessionFromReq(req);
@@ -538,7 +604,7 @@ async function handlePlatform(req, res, pathname) {
     if (!sess) return sendJson(res, 401, { ok: false, error: 'not signed in' }), true;
     const b = db.find('builds', (x) => x.id === m[1]);
     if (!b || b.userId !== sess.user.id) return sendJson(res, 404, { ok: false, error: 'no such build' }), true;
-    if (req.method === 'GET') return sendJson(res, 200, { ok: true, build: b }), true;
+    if (req.method === 'GET') return sendJson(res, 200, { ok: true, build: publicBuild(b) }), true;
     if (req.method === 'DELETE') {
       db.deleteBlob(b.id + '.out'); db.deleteBlob(b.id + '.src');
       db.remove('builds', (x) => x.id === b.id);
@@ -575,7 +641,7 @@ async function handlePlatform(req, res, pathname) {
     if (!src) return sendJson(res, 409, { ok: false, error: 'source was not stored for this build, open the file and build again' });
     return runBuild(req, res, sess, {
       source: src.toString('utf8'), filename: b.filename, projectId: b.projectId || null,
-      preset: b.preset, target: b.target, options: b.options, rebuildOf: b.id
+      preset: b.preset, target: b.target, options: sanitizeOptions(b.options), rebuildOf: b.id
     }, b), true;
   }
 
@@ -588,8 +654,9 @@ async function handlePlatform(req, res, pathname) {
     return sendJson(res, 200, { ok: true, keys: items }), true;
   }
   if (pathname === '/api/v1/keys' && req.method === 'POST') {
-    const sess = sessionFromReq(req); // optional
-    const rl = util.rateCheck('newkey:' + util.clientIp(req), 10, 50);
+    const sess = sessionFromReq(req);
+    if (!sess) return sendJson(res, 401, { ok: false, error: 'sign in before creating an API key' }), true;
+    const rl = util.rateCheck('newkey:' + sess.user.id, 10, 50);
     if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many key requests', retryAfter: rl.retryAfter });
     const body = util.parseJson(await readBodyP(req)) || {};
     if (sess) {
@@ -599,15 +666,14 @@ async function handlePlatform(req, res, pathname) {
     }
     const raw = 'dk_live_' + crypto.randomBytes(16).toString('hex');
     const rec = db.insert('apiKeys', {
-      id: util.newId('key'), userId: sess ? sess.user.id : null, username: sess ? sess.user.username : null,
+      id: util.newId('key'), userId: sess.user.id, username: sess.user.username,
       prefix: raw.slice(0, 13), name: String(body.name || '').slice(0, 80), hash: util.sha256(raw),
       createdAt: new Date().toISOString(), lastUsed: null, total: 0, revokedAt: null, requests: []
     });
     return sendJson(res, 201, {
       ok: true, id: rec.id, key: raw, name: rec.name, createdAt: rec.createdAt,
-      saved: !!sess, limits: LIMITS,
-      note: sess ? 'Key created and saved to your account. The full key shows once below.'
-        : 'Store this key now. It shows once; sign in first if you want keys saved to an account.'
+      saved: true, limits: LIMITS,
+      note: 'Key created and saved to your account. The full key shows once below.'
     }), true;
   }
   m = pathname.match(/^\/api\/v1\/keys\/([A-Za-z0-9_-]+)\/rename$/);
@@ -677,19 +743,44 @@ function getQuery(req) {
 
 function validTarget(t) { return t === 'luau' || t === 'roblox'; }
 
+const BUILD_OPTION_RANGES = { vmLayers: [1, 10], junk: [0, 4], guard: [0, 2], antiTamper: [0, 2] };
+const BUILD_OPTION_NAMES = new Set(['vmLayers', 'junk', 'guard', 'antiTamper', 'minify', 'watermark', 'captureGlobals', 'compression', 'vmMode', 'ir', 'nameStyle', 'lockPlace', 'lockUniverse', 'seed']);
+
+function validateBuildOptions(o) {
+  if (o === undefined || o === null) return null;
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return 'options must be a JSON object';
+  for (const key of Object.keys(o)) if (!BUILD_OPTION_NAMES.has(key)) return 'unsupported option: ' + key;
+  for (const key of Object.keys(BUILD_OPTION_RANGES)) {
+    if (o[key] === undefined) continue;
+    const n = Number(o[key]); const range = BUILD_OPTION_RANGES[key];
+    if (!Number.isInteger(n) || n < range[0] || n > range[1]) return key + ' must be an integer from ' + range[0] + ' to ' + range[1];
+  }
+  for (const key of ['minify', 'watermark', 'captureGlobals', 'compression']) {
+    if (o[key] !== undefined && typeof o[key] !== 'boolean') return key + ' must be true or false';
+  }
+  if (o.vmMode !== undefined && ['fast', 'balanced', 'secure'].indexOf(o.vmMode) === -1) return 'vmMode must be fast, balanced, or secure';
+  if (o.ir !== undefined && ['none', 'fast', 'balanced', 'secure'].indexOf(o.ir) === -1) return 'ir must be none, fast, balanced, or secure';
+  if (o.nameStyle !== undefined && ['short', 'random', 'confuse'].indexOf(o.nameStyle) === -1) return 'nameStyle must be short, random, or confuse';
+  for (const key of ['lockPlace', 'lockUniverse']) {
+    if (o[key] !== undefined && o[key] !== '' && !/^\d+$/.test(String(o[key]))) return key + ' must be a numeric Roblox ID';
+  }
+  if (o.seed !== undefined && String(o.seed).length > 40) return 'seed is limited to 40 characters';
+  return null;
+}
+
 function sanitizeOptions(o) {
   const out = {};
   if (!o || typeof o !== 'object') return out;
-  for (const k of ['vmLayers', 'junk', 'guard', 'envChecks', 'antiTamper']) {
-    if (o[k] !== undefined) {
-      const v = parseInt(o[k], 10);
-      if (isFinite(v)) out[k] = v;
-    }
+  for (const k of Object.keys(BUILD_OPTION_RANGES)) {
+    if (o[k] !== undefined) out[k] = Number(o[k]);
   }
-  for (const k of ['minify', 'watermark', 'captureGlobals', 'envLock']) {
+  for (const k of ['minify', 'watermark', 'captureGlobals', 'compression']) {
     if (o[k] !== undefined) out[k] = !!o[k];
   }
-  for (const k of ['nameStyle', 'lockPlace', 'lockUniverse', 'seed']) {
+  if (['fast', 'balanced', 'secure'].indexOf(o.vmMode) !== -1) out.vmMode = o.vmMode;
+  if (['none', 'fast', 'balanced', 'secure'].indexOf(o.ir) !== -1) out.ir = o.ir;
+  if (['short', 'random', 'confuse'].indexOf(o.nameStyle) !== -1) out.nameStyle = o.nameStyle;
+  for (const k of ['lockPlace', 'lockUniverse', 'seed']) {
     if (o[k] !== undefined && o[k] !== '') out[k] = String(o[k]).slice(0, 40);
   }
   return out;
@@ -717,6 +808,9 @@ function sanitizeSettings(next, cur) {
     out.obfuscationDefaults = Object.assign({}, out.obfuscationDefaults);
     if (validTarget(next.obfuscationDefaults.target)) out.obfuscationDefaults.target = next.obfuscationDefaults.target;
     if (['lightweight', 'balanced', 'maximum'].indexOf(next.obfuscationDefaults.preset) !== -1) out.obfuscationDefaults.preset = next.obfuscationDefaults.preset;
+    if (['none', 'fast', 'balanced', 'secure'].indexOf(next.obfuscationDefaults.ir) !== -1) out.obfuscationDefaults.ir = next.obfuscationDefaults.ir;
+    if (['fast', 'balanced', 'secure'].indexOf(next.obfuscationDefaults.vmMode) !== -1) out.obfuscationDefaults.vmMode = next.obfuscationDefaults.vmMode;
+    if (next.obfuscationDefaults.compression !== undefined) out.obfuscationDefaults.compression = !!next.obfuscationDefaults.compression;
   }
   if (next.notifications) {
     out.notifications = Object.assign({}, out.notifications);
@@ -734,41 +828,57 @@ function runBuild(req, res, sess, body, rebuildOf) {
   if (source.length > MAX_SOURCE_CHARS) return sendJson(res, 400, { ok: false, error: 'source too large: ' + source.length + ' chars (max ' + MAX_SOURCE_CHARS + ')' });
 
   const d = sess.user.settings && sess.user.settings.obfuscationDefaults || db.defaultSettings().obfuscationDefaults;
+  const optionIssue = validateBuildOptions(body.options);
+  if (optionIssue) return sendJson(res, 400, { ok: false, error: optionIssue });
+  let project = null;
+  if (body.projectId) {
+    project = db.find('projects', (p) => p.id === body.projectId && p.userId === sess.user.id);
+    if (!project) return sendJson(res, 404, { ok: false, error: 'no such project' });
+  }
+  if (body.preset !== undefined && ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) === -1) {
+    return sendJson(res, 400, { ok: false, error: 'unsupported preset' });
+  }
+  if (body.target !== undefined && !validTarget(body.target)) {
+    return sendJson(res, 400, { ok: false, error: 'unsupported target; supported targets are Luau and Roblox Luau' });
+  }
+  const projectOptions = project ? sanitizeOptions(project.options) : {};
+  const requestOptions = sanitizeOptions(body.options);
   const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset
-    : (['lightweight', 'balanced', 'maximum'].indexOf(d.preset) !== -1 ? d.preset : 'maximum');
-  const target = validTarget(body.target) ? body.target : (validTarget(d.target) ? d.target : 'roblox');
-  const options = sanitizeOptions(body.options);
-  // Roblox-specific sanity: the anti-tamper battery only runs in Roblox
+    : (project && ['lightweight', 'balanced', 'maximum'].indexOf(project.preset) !== -1 ? project.preset
+      : (['lightweight', 'balanced', 'maximum'].indexOf(d.preset) !== -1 ? d.preset : 'balanced'));
+  const target = validTarget(body.target) ? body.target
+    : (project && validTarget(project.target) ? project.target : (validTarget(d.target) ? d.target : 'roblox'));
+  const options = Object.assign({}, projectOptions, requestOptions);
+  // Roblox Luau defaults to full decoder integrity, not a destructive loader.
   if (target === 'roblox' && options.antiTamper === undefined) options.antiTamper = 2;
+  const storeSource = body.storeSource !== false;
 
   let result;
   try { result = engine.obfuscate(source, Object.assign({ preset: preset }, options)); }
   catch (e) { return sendJson(res, 500, { ok: false, error: 'engine crashed: ' + e.message }); }
 
   const now = new Date().toISOString();
-  let buildId = util.newId('dfb');
+  const buildId = util.newId('dfb');
+  // Blob writes are attempted before metadata is made visible. The recorded
+  // flags describe what is actually retrievable, never what we hoped to save.
+  const sourceStored = storeSource ? db.writeBlob(buildId + '.src', source) : false;
+  const outputStored = result.ok ? db.writeBlob(buildId + '.out', result.output) : false;
   const base = {
-    id: buildId, userId: sess.user.id, projectId: body.projectId || null,
-    projectName: null, filename: String(body.filename || 'script.lua').replace(/[^\w .-]/g, '').slice(0, 80) || 'script.lua',
+    id: buildId, userId: sess.user.id, projectId: project ? project.id : null,
+    projectName: project ? project.name : null, filename: String(body.filename || 'script.lua').replace(/[^\w .-]/g, '').slice(0, 80) || 'script.lua',
     preset, target, options, status: result.ok ? 'success' : 'failed',
     error: result.ok ? null : result.error, warnings: result.ok ? (result.warnings || []) : [],
     seed: result.ok ? result.stats.seed : null,
     inputChars: source.length, outputChars: result.ok ? result.output.length : 0,
     ms: result.ok ? result.stats.ms : null, vms: result.ok ? result.stats.vms : null,
     junkStatements: result.ok ? (result.stats.junkStatements || 0) : 0,
-    hasSource: true, hasOutput: !!result.ok,
+    hasSource: sourceStored, hasOutput: outputStored,
     createdAt: now
   };
   db.insert('builds', base);
-  db.writeBlob(buildId + '.src', source);
-  if (result.ok) db.writeBlob(buildId + '.out', result.output);
   trimBuilds(sess.user.id);
-  if (body.projectId) {
-    const p = db.find('projects', (x) => x.id === body.projectId && x.userId === sess.user.id);
-    if (p) {
-      db.update('projects', (x) => x.id === p.id, { buildCount: (p.buildCount || 0) + 1, lastBuildAt: now, updatedAt: now });
-      db.update('builds', (x) => x.id === buildId, { projectName: p.name });
-    }
+  if (project) {
+    db.update('projects', (x) => x.id === project.id, { buildCount: (project.buildCount || 0) + 1, lastBuildAt: now, updatedAt: now });
   }
   if (base.status === 'failed') {
     const err = base.error || {};
@@ -777,9 +887,11 @@ function runBuild(req, res, sess, body, rebuildOf) {
       error: { name: err.name || 'LuauSyntaxError', message: err.message || 'the build failed', line: err.line, col: err.col }
     });
   }
+  const saved = db.find('builds', (b) => b.id === buildId) || base;
   return sendJson(res, 200, {
-    ok: true, buildId: buildId, output: result.output, stats: result.stats || {},
-    warnings: result.warnings || [], preset, target, filename: base.filename, version: ENGINE_VERSION
+    ok: true, build: publicBuild(saved), buildId: buildId, output: result.output,
+    stats: result.stats || {}, warnings: result.warnings || [],
+    preset, target, filename: base.filename, version: ENGINE_VERSION
   });
 }
 
@@ -801,14 +913,16 @@ function selfCheck() {
   let engineOk = false, selfTestMs = 0;
   try {
     const t0 = Date.now();
-    const r = engine.obfuscate('print("sys")', { junk: 0, guard: 0, envChecks: 0, antiTamper: 0, vmLayers: 1, seed: 1 });
+    const r = engine.obfuscate('print("sys")', { junk: 0, guard: 0, antiTamper: 1, vmMode: 'fast', vmLayers: 1, seed: 1 });
     engineOk = !!(r && r.ok); selfTestMs = Date.now() - t0;
   } catch (e) { engineOk = false; }
+  const databaseOk = db.writable();
   selfCheckCache = {
+    ok: engineOk && databaseOk,
     engine: { ok: engineOk, version: ENGINE_VERSION, selfTestMs },
     api: { ok: true },
     authentication: { ok: true },
-    database: { ok: db.writable(), kind: 'file-store' },
+    database: { ok: databaseOk, kind: 'file-store' },
     checkedAt: new Date().toISOString()
   };
   const t = setTimeout(() => { selfCheckCache = null; }, 60000);
@@ -836,6 +950,6 @@ function logKeyRequest(k, pathname, status, ms) {
 
 module.exports = {
   handleAuth, handlePlatform, sessionFromReq, createSession, revokeSession,
-  keyFromReq, logKeyRequest, selfCheck, ENGINE_VERSION, LIMITS,
+  keyFromReq, logKeyRequest, selfCheck, validateBuildOptions, ENGINE_VERSION, LIMITS,
   COOKIE_NAME, SESSION_COOKIE_SECURE
 };

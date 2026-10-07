@@ -9,7 +9,7 @@
  *        ->  Luau emission (structured, or a randomized dispatch state machine
  *            with block splitting and opaque predicates at the secure level)
  *        ->  fresh Luau source, re-parsed by the caller and compiled into the
- *            encrypted VM build as before.
+ *            encoded VM build as before.
  *
  * Everything here is semantics-preserving. Regions never flatten loops or
  * closures (they stay real Luau constructs with their own nested regions), so
@@ -573,7 +573,7 @@
         // mixed number/string comparisons are type mismatches, never equal
         if ((e.op === '==' || e.op === '~=') &&
             ((a !== undefined && bs2 !== undefined) || (as2 !== undefined && b2 !== undefined))) {
-          ctx.stats.folded++; return mkBool(e.op === '~='); 
+          ctx.stats.folded++; return mkBool(e.op === '~=');
         }
         return e;
       }

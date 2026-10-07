@@ -129,64 +129,93 @@
   if (document.body) document.body.appendChild(palette);
 
   let paletteItems = [];
+  let paletteShown = [];
   let paletteSel = 0;
-  let paletteSource = null; // async item provider
+  let paletteSource = null; // optional async item provider
+  let paletteRequest = 0;
 
-  function paletteOpen(items) {
+  function paletteOpen(items, source) {
     palette.classList.add('open');
     const input = palette.querySelector('input');
     input.value = '';
-    paletteItems = items || [];
+    paletteSource = typeof source === 'function' ? source : null;
+    paletteItems = Array.isArray(items) ? items : [];
     paletteSel = 0;
     paletteRender('');
+    if (paletteSource) paletteLoad('');
     input.focus();
   }
-  function paletteClose() { palette.classList.remove('open'); }
+  function paletteClose() {
+    palette.classList.remove('open');
+    paletteRequest++;
+  }
   function paletteRender(q) {
     const list = palette.querySelector('.palette-list');
     const needle = String(q || '').toLowerCase();
-    const items = paletteItems.filter(function (it) {
+    paletteShown = paletteItems.filter(function (it) {
       return !needle || it.label.toLowerCase().includes(needle) || (it.hint || '').toLowerCase().includes(needle);
     }).slice(0, 12);
-    paletteItems = items;
-    paletteSel = Math.min(paletteSel, Math.max(0, items.length - 1));
-    list.innerHTML = items.length
-      ? items.map(function (it, i) {
+    paletteSel = Math.min(paletteSel, Math.max(0, paletteShown.length - 1));
+    list.innerHTML = paletteShown.length
+      ? paletteShown.map(function (it, i) {
           return '<a class="palette-item' + (i === paletteSel ? ' sel' : '') + '" href="' + esc(it.href || '#') + '" data-i="' + i + '">' +
             '<span class="pi-ico">' + esc(it.ico || '') + '</span><span>' + esc(it.label) +
             (it.hint ? ' <span class="dim">&middot; ' + esc(it.hint) + '</span>' : '') + '</span></a>';
         }).join('')
       : '<div class="empty">Nothing matches.</div>';
   }
+  function paletteLoad(query) {
+    if (!paletteSource) return;
+    const request = ++paletteRequest;
+    Promise.resolve(paletteSource(query)).then(function (items) {
+      if (request !== paletteRequest || !palette.classList.contains('open')) return;
+      paletteItems = Array.isArray(items) ? items : [];
+      paletteSel = 0;
+      paletteRender(query);
+    }).catch(function () {
+      if (request !== paletteRequest) return;
+      paletteItems = [];
+      paletteRender(query);
+    });
+  }
+  function paletteActivate(index, event) {
+    const item = paletteShown[index];
+    if (!item) return;
+    if (item.onClick) {
+      if (event) event.preventDefault();
+      paletteClose();
+      item.onClick();
+      return;
+    }
+    paletteClose();
+  }
 
   palette.addEventListener('click', function (e) {
-    if (e.target.classList.contains('modal-backdrop')) paletteClose();
+    if (e.target.classList.contains('modal-backdrop')) { paletteClose(); return; }
     const item = e.target.closest('.palette-item');
-    if (item) { paletteClose(); }
+    if (item) paletteActivate(Number(item.dataset.i), e);
   });
-  palette.querySelector('input').addEventListener('input', function () {
-    if (paletteSource) {
-      const self = this;
-      paletteSource(self.value).then(function (items) { paletteItems = items; paletteSel = 0; paletteRender(self.value); });
-    } else paletteRender(this.value);
+  const paletteInput = palette.querySelector('input');
+  paletteInput.addEventListener('input', function () {
+    paletteSel = 0;
+    if (paletteSource) paletteLoad(this.value);
+    else paletteRender(this.value);
+  });
+  paletteInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); paletteActivate(paletteSel, e); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); paletteSel = Math.min(paletteShown.length - 1, paletteSel + 1); paletteRender(this.value); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); paletteSel = Math.max(0, paletteSel - 1); paletteRender(this.value); }
   });
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       if (palette.classList.contains('open')) paletteClose();
-      else if (root.PaletteSource) paletteOpen([]), (paletteSource = root.PaletteSource);
+      else paletteOpen([], root.PaletteSource);
       return;
     }
-    if (palette.classList.contains('open')) {
-      if (e.key === 'Escape') { paletteClose(); e.preventDefault(); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); paletteSel = Math.min(paletteItems.length - 1, paletteSel + 1); paletteRender(palette.querySelector('input').value); }
-      if (e.key === 'ArrowUp') { e.preventDefault(); paletteSel = Math.max(0, paletteSel - 1); paletteRender(palette.querySelector('input').value); }
-    }
-  });
-  palette.querySelector('.palette-list').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
-      const item = paletteItems[paletteSel];
-      if (item) { paletteClose(); if (item.onClick) item.onClick(); else location.href = item.href; }
+    if (palette.classList.contains('open') && e.key === 'Escape') {
+      paletteClose();
+      e.preventDefault();
     }
   });
 

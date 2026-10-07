@@ -1,16 +1,23 @@
 {
   "name": "darkfuscator",
-  "version": "1.0.0",
-  "description": "**Open `index.html`** \u2014 it is a self-contained build: double-click it, no server, no install. **Upload the `site/` folder** to Cloudflare Pages to publish it (no build step).",
+  "version": "7.0.0",
+  "description": "Luau protection platform and custom-VM engine with a local standalone workspace.",
   "main": "index.js",
   "directories": {
     "test": "tests"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node tools/serve.js"
+    "test": "node tests/run.js && node tests/run-ir.js && node tests/fuzz.js 20 && node tests/ui-test.js && node tests/run-antitamper.js && node tests/run-auth.js",
+    "start": "node tools/serve.js",
+    "build:standalone": "node tools/build-standalone.js",
+    "verify:standalone": "node tools/verify-standalone.js"
   },
-  "keywords": [],
+  "keywords": [
+    "luau",
+    "roblox",
+    "obfuscation",
+    "custom-vm"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

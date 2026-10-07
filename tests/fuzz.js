@@ -72,10 +72,10 @@ const norm = s => String(s).replace(/^.*\.(luau|lua):(\d+):/gm, 'FILE:$2:').repl
 function pick(rng, arr) { return arr[Math.floor(rng() * arr.length)]; }
 
 let total = 0, failures = 0;
-// The Brander reference build cannot run outside Roblox (it dies on task.defer)
-// and its loader asserts on setfenv()/getfenv() identity, which a bytecode VM
-// does not emulate (see README, "Known limits"). Still valuable as a build
-// stress test — tests/run.js obfuscates it and re-parses the result.
+// This legacy Roblox-oriented corpus fixture cannot run in the standalone Luau
+// command-line runtime because it uses client-only APIs. It remains a useful
+// build and parser stress case, while differential execution covers portable
+// corpus programs.
 const BUILD_ONLY = new Set(['protected-sample.luau']);
 let files = fs.readdirSync(CORPUS).filter(f => f.endsWith('.luau')).sort();
 const extra = [];

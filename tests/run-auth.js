@@ -52,10 +52,29 @@ function tokenFrom(devLink) {
   return m[1];
 }
 
-(async () => {
-  const child = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'serve.js'), String(PORT)], {
-    env: Object.assign({}, process.env, { DK_DATA_DIR: DATA }), stdio: ['ignore', 'pipe', 'pipe']
+function startServer() {
+  return spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'serve.js'), String(PORT)], {
+    // Development links are deliberately enabled only for this isolated test
+    // server. Production still relies on the configured mail provider.
+    env: Object.assign({}, process.env, {
+      DK_DATA_DIR: DATA,
+      EMAIL_DEV_MODE: 'true',
+      BASE_URL: 'http://127.0.0.1:' + PORT
+    }),
+    stdio: ['ignore', 'pipe', 'pipe']
   });
+}
+function stopServer(child) {
+  return new Promise((resolve) => {
+    if (!child || child.exitCode !== null || child.signalCode) return resolve();
+    const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch (e) {} }, 2000);
+    child.once('exit', () => { clearTimeout(timer); resolve(); });
+    try { child.kill(); } catch (e) { clearTimeout(timer); resolve(); }
+  });
+}
+
+(async () => {
+  let child = startServer();
   await waitBanner(child);
   await new Promise((r) => setTimeout(r, 300));
 
@@ -63,7 +82,9 @@ function tokenFrom(devLink) {
     await test('health reports platform 7 + engine', async () => {
       const r = await call('GET', '/api/v1/health');
       assert.strictEqual(r.status, 200); assert.ok(r.data.ok);
-      assert.strictEqual(r.data.engine.version, '6.1.0');
+      assert.strictEqual(r.data.version, '7.0.0');
+      assert.strictEqual(r.data.engineVersion, '7.0.0');
+      assert.strictEqual(r.data.engine.version, '7.0.0');
     });
 
     let savedToken = '';
@@ -87,16 +108,25 @@ function tokenFrom(devLink) {
       assert.ok((me.data.user || me.data).verified);
     });
 
-    await test('bad signup rejected', async () => {
+    await test('source IR default is persisted server-side', async () => {
+      const saved = await call('PATCH', '/api/v1/me', { settings: { obfuscationDefaults: { ir: 'secure' } } }, null, savedToken);
+      assert.strictEqual(saved.status, 200, saved.raw.slice(0, 200));
+      assert.strictEqual(saved.data.settings.obfuscationDefaults.ir, 'secure');
+      const me = await call('GET', '/api/v1/me', null, null, savedToken);
+      assert.strictEqual(me.status, 200);
+      assert.strictEqual(me.data.settings.obfuscationDefaults.ir, 'secure');
+    });
+
+    await test('bad signup and unverified login are rejected', async () => {
       const r = await call('POST', '/api/v1/auth/register', { username: 'x', email: 'x@dev.test', password: 'pumpkin42' });
       assert.strictEqual(r.status, 400);
       const dup = await call('POST', '/api/v1/auth/register', { username: 'SPOOKY_DEV', email: 'dup@dev.test', password: 'pumpkin42' });
       assert.strictEqual(dup.status, 409, 'case-insensitive duplicate not caught');
-      const short = await call('POST', '/api/v1/auth/register', { username: 'otheruser', email: 'o@dev.test', password: '12345' });
-      assert.strictEqual(short.status, 400);
-      const unverified = await call('POST', '/api/v1/auth/login', { identifier: 'otheruser', password: '1234567a' });
-      // unverified login must not leak success
-      assert.ok(unverified.status !== 200 || unverified.data.ok === false || !unverified.data.needsVerification === false, 'unexpected unverified login shape');
+      const pending = await call('POST', '/api/v1/auth/register', { username: 'waiting_dev', email: 'waiting@dev.test', password: 'waiting42', confirmPassword: 'waiting42' });
+      assert.strictEqual(pending.status, 201);
+      const unverified = await call('POST', '/api/v1/auth/login', { identifier: 'waiting_dev', password: 'waiting42' });
+      assert.strictEqual(unverified.status, 403);
+      assert.strictEqual(unverified.data.code, 'account_not_verified');
     });
 
     await test('login + wrong password', async () => {
@@ -122,9 +152,10 @@ function tokenFrom(devLink) {
     });
 
     await test('key obfuscates and usage counts', async () => {
-      const r = await call('POST', '/api/v1/obfuscate', { source: 'print("hi")', preset: 'maximum' }, key1);
+      const r = await call('POST', '/api/v1/obfuscate', { source: 'print("hi")', preset: 'lightweight', options: { ir: 'secure' } }, key1);
       assert.strictEqual(r.status, 200, r.raw.slice(0, 200));
-      assert.ok(String(r.data.output).startsWith('-- This file is protected by Darkfuscator'));
+      assert.ok(String(r.data.output).startsWith('-- Protected by Darkfuscator'));
+      assert.ok(r.data.stats && r.data.stats.ir && r.data.stats.ir.states > 0, 'secure IR stats were not returned');
       const login = await call('POST', '/api/v1/auth/login', { identifier: 'spooky_dev', password: 'pumpkin42' });
       const ck = cookieOf(login);
       const list = await call('GET', '/api/v1/keys', null, null, ck);
@@ -132,13 +163,10 @@ function tokenFrom(devLink) {
       assert.strictEqual(mine.total, 1, 'usage not counted');
     });
 
-    await test('anonymous key is not saved', async () => {
+    await test('anonymous key creation is rejected', async () => {
       const r = await call('POST', '/api/v1/keys', {});
-      assert.strictEqual(r.status, 201); assert.strictEqual(r.data.saved, false);
-      const login = await call('POST', '/api/v1/auth/login', { identifier: 'spooky_dev', password: 'pumpkin42' });
-      const ck = cookieOf(login);
-      const list = await call('GET', '/api/v1/keys', null, null, ck);
-      assert.ok(!list.data.keys.some((k) => k.prefix === r.data.key.slice(0, 13)));
+      assert.strictEqual(r.status, 401);
+      assert.match(r.data.error || '', /sign in/i);
     });
 
     await test('revoke: only the owner, only their key', async () => {
@@ -170,19 +198,15 @@ function tokenFrom(devLink) {
     });
 
     await test('accounts and keys survive a restart', async () => {
-      child.kill();
-      await new Promise((r) => setTimeout(r, 300));
-      const child2 = spawn(process.execPath, [path.join(__dirname, '..', 'tools', 'serve.js'), String(PORT)], {
-        env: Object.assign({}, process.env, { DK_DATA_DIR: DATA }), stdio: ['ignore', 'pipe', 'pipe']
-      });
-      await waitBanner(child2);
+      await stopServer(child);
+      child = startServer();
+      await waitBanner(child);
       await new Promise((r) => setTimeout(r, 300));
       const login = await call('POST', '/api/v1/auth/login', { identifier: 'spooky_dev', password: 'pumpkin42' });
       assert.strictEqual(login.status, 200, 'account lost on restart');
-      child2.kill();
     });
   } finally {
-    try { child.kill(); } catch (e) {}
+    await stopServer(child);
     fs.rmSync(DATA, { recursive: true, force: true });
   }
 

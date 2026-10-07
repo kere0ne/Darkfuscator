@@ -2,20 +2,16 @@
  * Darkfuscator — VM emitter.
  *
  * Turns the bytecode produced by vm-compile.js into a self-contained Luau
- * program shaped like a Luraph/Brander build:
+ * program with a build-specific serialized payload and custom interpreter:
  *
- *   -- This file is protected by Darkfuscator and obfuscated by anti tamper
- *   so it dont get stolen
- *   return ({["aB"]=(function(S,B)…end), … ["pAy"]="<encrypted blob>"}):entry(env)
+ *   return ({["aB"]=(function(S,B) ... end), ... ["pAy"]="<encoded payload>"}):entry(env)
  *
- * The program is serialised to bytes, encrypted with a per-build key stream and
- * packed six bits to the character. One table slot holds one opcode handler, so
- * there is no single interpreter function to read: control flow only exists in
- * the dispatch chain and inside the handlers.
+ * The program is serialized to bytes, encoded with per-build variation, and
+ * packed six bits to a character. One table slot holds one opcode handler, so
+ * the interpreter layout and dispatch structure vary across builds.
  *
- * Every operation is carried out by a native Luau operator, so metamethods,
- * coercion, integer semantics, coroutines, pcall and error messages behave
- * exactly as they do in the original script.
+ * Every operation is carried out by native Luau operators, preserving the
+ * language semantics implemented by the compiler and VM.
  */
 ;(function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -54,9 +50,20 @@
   // these would be shadowed by that local — e.g. a program table called `I`
   // disappears behind `local I=code[F.ip]`, and every handler call turns into
   // "attempt to call a nil value". Reserve them, plus every one-letter name.
+  //
+  // This list also reserves globals called directly by emitted code. Generated
+  // parameters are lexical locals, so a name such as `math` or `bit32` would
+  // otherwise hide the standard library it needs. Keep this list exhaustive
+  // whenever a literal identifier is added to an emitted Lua fragment.
   var RESERVED = ('a b c d e f g h i j k l m n o p q r s t u v w x y z ' +
     'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z ' +
     'acc args by ip it len li ms mt na nb nc nk np nr nu nv nx nz q res st tn va value vr ' +
+    // Fixed helper locals used by decoder, verifier, handlers, and the run loop.
+    // Generated table/parameter names must not shadow any of these at runtime.
+    'rr rs undefined vs cs cd c1 c2 fnv pidx ps osalt sdec ps2 q2 kr sv eb rt rn ri jz ' +
+    'zn cnt val cn last proto vrm ok ' +
+    // Global bindings that emitted decoder, VM, and handler fragments invoke.
+    'math bit32 string table type tonumber unpack setmetatable getmetatable rawget rawset pcall select getfenv game ' +
     'OPC _ENV _G __iter').split(' ');
 
   function nameGen(rng, taken, style) {
@@ -111,7 +118,7 @@
   }
 
   // --------------------------------------------------------------- serialiser
-  function serialize(root, rng) {
+  function serialize(root, rng, compression, vmMode) {
     var bytes = [];
     // build keys are drawn up front: the instruction stream is masked with a
     // salt derived from them, so the decoder can rebuild the salt from the
@@ -140,7 +147,12 @@
     function proto(p) {
       pidx = pidx + 1;
       var ps = (osalt + pidx * 40503) % 65536;
-      vi(p.nparams); b(p.isvararg ? 1 : 0); vi(p.maxreg + 1); vi(p.ups.length);
+      // A per-proto register shift is applied by the runtime register view.
+      // It preserves contiguous ranges used by loops while changing the
+      // backing layout for every non-fast build.
+      var registerShift = vmMode === 'secure' ? 8 + Math.floor(rng() * 40) :
+        vmMode === 'balanced' ? 1 + Math.floor(rng() * 8) : 0;
+      vi(p.nparams); b(p.isvararg ? 1 : 0); vi(p.maxreg + 1); vi(registerShift); vi(p.ups.length);
       vi(p.k.length);
       for (var i = 0; i < p.k.length; i++) {
         var k = p.k[i];
@@ -151,10 +163,10 @@
         else { b(3); str(k.v); }
       }
       vi(p.code.length);
-      // register encryption: every operand is zigzagged, then XORed with a
-      // volatile salt (per-proto key + position of the instruction + operand
-      // slot). The emitted decoder rebuilds the same masks, so a memory dump
-      // of the payload shows register indices and jump targets as noise.
+      // register encoding: every operand is zigzagged, then XORed with a
+      // per-proto positional mask. The emitted decoder rebuilds the same
+      // masks, so a byte-level dump shows register indices and jump targets
+      // as noise rather than direct operands.
       for (var j = 0; j < p.code.length; j++) {
         var ins = p.code[j];
         vi(ins[0]);
@@ -184,24 +196,40 @@
       fnv = ((fnv % 65536) * 16777619 + ((Math.floor(fnv / 65536) * 16777619) % 65536) * 65536) % 4294967296;
     }
 
-    for (var i = 0; i < bytes.length; i++) bytes[i] = (bytes[i] + key + (i + 1) * 13 + seal) % 256;
+    // Optional RLE compression is a size pass, not an integrity mechanism.
+    // 255 is an escape marker: [255,0,255] encodes a literal 255 and
+    // [255,count,value] encodes a run. We only retain it when it wins.
+    function rle(input) {
+      var packed = [], i2 = 0;
+      while (i2 < input.length) {
+        var value = input[i2], run = 1;
+        while (i2 + run < input.length && input[i2 + run] === value && run < 255) run++;
+        if (run >= 4) { packed.push(255, run, value); i2 += run; continue; }
+        for (var rr = 0; rr < run; rr++) {
+          if (value === 255) packed.push(255, 0, 255); else packed.push(value);
+        }
+        i2 += run;
+      }
+      return packed;
+    }
+    var plainBytes = bytes.slice();
+    var packedBytes = compression ? rle(plainBytes) : plainBytes.slice();
+    var compressed = !!(compression && packedBytes.length < plainBytes.length);
+    if (!compressed) packedBytes = plainBytes.slice();
 
-    // second layer: a per-build XOR stream, applied after the add-cipher
-    // (the decoder un-XORs first, then un-adds)
-    for (i = 0; i < bytes.length; i++) bytes[i] = bytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
+    for (var i = 0; i < packedBytes.length; i++) packedBytes[i] = (packedBytes[i] + key + (i + 1) * 13 + seal) % 256;
 
-    // third layer: position-keyed byte rotation (the decoder reverses it
-    // first, before the XOR and the add-cipher)
-
+    // Second layer: a per-build XOR transformation, applied after byte shifting.
+    for (i = 0; i < packedBytes.length; i++) packedBytes[i] = packedBytes[i] ^ ((xk + (i + 1) * 37 + seal) % 256);
 
     var alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('');
-    for (var s = alpha.length - 1; s > 0; s--) {           // per-build alphabet shuffle
+    for (var s = alpha.length - 1; s > 0; s--) {
       var r = Math.floor(rng() * (s + 1));
       var t = alpha[s]; alpha[s] = alpha[r]; alpha[r] = t;
     }
     var acc = 0, nb = 0, out = [];
-    for (i = 0; i < bytes.length; i++) {
-      acc += bytes[i] * Math.pow(2, nb);
+    for (i = 0; i < packedBytes.length; i++) {
+      acc += packedBytes[i] * Math.pow(2, nb);
       nb += 8;
       while (nb >= 6) {
         out.push(alpha[acc % 64]);
@@ -210,7 +238,9 @@
       }
     }
     if (nb > 0) out.push(alpha[acc % 64]);
-    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal, bytes: bytes.length, check1: c1, check2: c2, fnv: fnv };
+    return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal,
+      bytes: plainBytes.length, packedBytes: packedBytes.length, compressed: compressed,
+      check1: c1, check2: c2, fnv: fnv };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -278,9 +308,10 @@
       'for i=1,tn do args[na+i]=t[i] end; ' +
       'local res=table.pack(R[a](unpack(args,1,na+tn))); ' +
       'if nc==0 then R[a]=setmetatable(res,S.MT) else for i=1,nc-1 do R[a+i-1]=res[i] end end end',
-    // RETURN A B: results are R[A] .. R[A+B-2] (B is nresults+1); F.o is the
-    // index *before* the first result, which is what the loop's unpack uses
-    RETURN: 'F.d=true;F.r=R;F.o=I[2]-1;F.n=I[3]-1',
+    // RETURN materializes a compact result vector. A protected VM can use a
+    // register proxy for per-proto remapping, while unpack deliberately works
+    // on a plain array at the call boundary.
+    RETURN: 'do local rt={}; local rn=I[3]-1; for ri=1,rn do rt[ri]=R[I[2]+ri-1] end F.d=true;F.r=rt;F.o=0;F.n=rn end',
     RETURNT: 'do local t=R[I[2]]; F.d=true; F.r=t; F.o=0; F.n=t.n end',
     // RETURN A B: R[A]..R[A+B-2] plus the multi-value tuple in R[A+B-1] —
     // `return x, ...` and `return x, f()` keep every result of the expansion
@@ -305,13 +336,12 @@
   function emit(program, opts) {
     opts = opts || {};
     var rng = opts.rng || Math.random;
-    // 0 = off, 1 = standard sanity audit, 2 = strict (adds injector-toolkit
-    // detection, an environment write-trap and runtime bytecode checksums)
+    // Runtime validation only checks ordinary primitives required by the VM.
+    // It has no executor, debugger, or game-client detection behavior.
     var glevel = opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1;
-    // anti-environment level: 0 = off, 1 = environment-derived seal,
-    // 2 = full probe battery (identity contradictions + service signatures)
-    var elevel = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
-    if (opts.envLock && elevel < 2) elevel = 2;
+    // `antiTamper` is an integrity level. Decoder failures safely return before
+    // reconstructing or running the protected program.
+    var integrityLevel = opts.antiTamper === 2 ? 2 : opts.antiTamper === 1 ? 1 : 0;
     var ng = nameGen(rng, null, opts.nameStyle);
     var usedOps = Object.create(null);
     (function walk(p) {
@@ -339,7 +369,8 @@
         program.k.push({ t: 's', v: dp });
       }
     }
-    var blob = serialize(program, rng);
+    var vmMode = opts.vmMode === 'secure' ? 'secure' : opts.vmMode === 'fast' ? 'fast' : 'balanced';
+    var blob = serialize(program, rng, opts.compression === true, vmMode);
     // silent-failure scramble value: any detected tamper rewrites the seal
     // to this instead of raising a patchable, brandable error message
     var scrG = String((blob.seal + 91 + (blob.key % 89)) % 256);
@@ -378,7 +409,7 @@
     function line(s) { out.push(s); }
 
     // a comment must end with a newline even when the rest is minified
-    if (opts.watermark !== false) out.push('-- This file is protected by Darkfuscator and obfuscated by anti tamper so it dont get stolen\n');
+    if (opts.watermark !== false) out.push('-- Protected by Darkfuscator. Obfuscation raises reverse-engineering cost; it is not impossible to defeat.\n');
     // wrapReturn lets the caller append top-level statements (heavy junk)
     // after the build: `return` is only legal as the last statement of a
     // block, so the whole table-return is wrapped in a do-end
@@ -406,12 +437,19 @@
     // third layer came off first: position-keyed byte rotation
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=bit32.bxor(' + L.o + '[' + L.i + '],(' + blob.xk + '+(' + L.i + '*37)+' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256) end');
     line('for ' + L.i + '=1,' + L.n + ' do ' + L.o + '[' + L.i + ']=(' + L.o + '[' + L.i + ']-' + blob.key + '-' + L.i + '*13-' + (glevel >= 1 ? P.s + '["' + N.seal + '"]' : blob.seal) + ')%256 end');
-    line('local fnv=2166136261');
-    line('for ' + L.i + '=1,' + L.n + ' do fnv=bit32.bxor(fnv,' + L.o + '[' + L.i + ']); fnv=((fnv%65536)*16777619+((math.floor(fnv/65536)*16777619)%65536)*65536)%4294967296 end');
-    line('if fnv~=' + blob.fnv + ' then for dp2=1,' + L.n + ' do ' + L.o + '[dp2]=(' + L.o + '[dp2]+dp2*23)%256 end end');
-    line('local c1,c2=0,0');
-    line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
-    line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then for dp=1,' + L.n + ' do ' + L.o + '[dp]=(' + L.o + '[dp]+dp*17)%256 end end');
+    if (blob.compressed) {
+      line('do local z,zn,q={},0,1 while q<=' + L.n + ' do local v=' + L.o + '[q] if v==255 then local cnt=' + L.o + '[q+1] local val=' + L.o + '[q+2] if cnt==0 then zn=zn+1 z[zn]=val else for ri=1,cnt do zn=zn+1 z[zn]=val end end q=q+3 else zn=zn+1 z[zn]=v q=q+1 end end ' + L.o + '=z ' + L.n + '=zn end');
+    }
+    if (integrityLevel >= 1) {
+      line('local fnv=2166136261');
+      line('for ' + L.i + '=1,' + L.n + ' do fnv=bit32.bxor(fnv,' + L.o + '[' + L.i + ']); fnv=((fnv%65536)*16777619+((math.floor(fnv/65536)*16777619)%65536)*65536)%4294967296 end');
+      line('if fnv~=' + blob.fnv + ' then return nil end');
+    }
+    if (integrityLevel >= 2) {
+      line('local c1,c2=0,0');
+      line('for ' + L.i + '=1,' + L.n + ' do c1=(c1+' + L.o + '[' + L.i + ']*' + L.i + ')%65521; c2=(c2+(((' + L.o + '[' + L.i + ']+(' + L.i + '*17))%256)*(' + L.i + '+2)))%65519 end');
+      line('if c1~=' + P.s + '["' + N.check1 + '"] or c2~=' + P.s + '["' + N.check2 + '"] then return nil end');
+    }
 
     line('local ' + L.c + '=' + L.o);
     var PS = ng();
@@ -434,7 +472,7 @@
     line('local function sdec(e) local t={} for j=1,#e.b do t[j]=bit32.bxor(e.b[j],(' + strMask + '+j*29)%256) end local ps2={} for q2=1,#t,200 do ps2[#ps2+1]=string.char(unpack(t,q2,math.min(q2+199,#t))) end return table.concat(ps2) end');
     line('local function proto()');
     line('pidx=pidx+1; local ps=(osalt+pidx*40503)%65536');
-    line('local np=vr(); local va=by()==1; local ms=vr(); local nu=vr()');
+    line('local np=vr(); local va=by()==1; local ms=vr(); local rs=vr(); local nu=vr()');
     line('local nk=vr(); local k={}');
     line('for i=1,nk do local t=by()');
     line('if t==0 then k[i]=nil elseif t==1 then k[i]=by()==1 elseif t==2 then k[i]=tonumber(st()) else local sv=st(); local eb={} for j=1,#sv do eb[j]=bit32.bxor(sv:byte(j),(' + strMask + '+j*29)%256) end k[i]={["' + N.strmark + '"]=true,b=eb} end end');
@@ -444,7 +482,7 @@
     line('local nz=vr(); local z={}');
     line('for i=1,nz do z[i]=proto() end');
     line('local cs=0 for i=1,#c do cs=(cs+c[i][1]*(i+13))%65521 end');
-    line('local kr=k; k={}; setmetatable(k,{__index=function(t,i) local v=rawget(t,i) if v~=nil then return v end local e=kr[i] if e==nil then return nil end if type(e)=="table" and e["' + N.strmark + '"] then v=sdec(e) else v=e end rawset(t,i,v) kr[i]=nil return v end}) return {np,va,nu,k,c,z,ms,cs} end');
+    line('local kr=k; k={}; setmetatable(k,{__index=function(t,i) local v=rawget(t,i) if v~=nil then return v end local e=kr[i] if e==nil then return nil end if type(e)=="table" and e["' + N.strmark + '"] then v=sdec(e) else v=e end rawset(t,i,v) kr[i]=nil return v end}) return {np,va,nu,k,c,z,ms,cs,rs} end');
     line('return proto()');
     line('end),');
 
@@ -499,256 +537,31 @@
       VT[i] = names;
     }
 
-    var canary = '_dk' + Math.floor(rng() * 0xFFFFFFF).toString(36) + Math.floor(rng() * 0xFFFFFFF).toString(36);
-
-    // ------------------------------------------------ environment-derived seal
-    // At anti-env level >= 1 the unseal key is no longer a constant in the
-    // file: the audit computes it from environment probes (genuine Luau
-    // builtins, a persistent environment, a genuine DataModel, service
-    // behaviour signatures only a live client reproduces). A static extractor
-    // or a replay environment that fakes any probe derives the wrong key and
-    // unseals the payload into garbage, with no signal about which probe
-    // disagreed. Contradiction probes respond the same way: the seal is
-    // quietly scrambled and decode produces junk, instead of a loud error a
-    // cracker could patch out.
-    function sealBinding(push, G, noGameStmt) {
-      // Delta binding: the guard sets the seal to (encodeSeal - expected + sum)
-      // % 256, where sum is rebuilt from the same probes the file just ran. A
-      // clean environment reproduces expected exactly and decode succeeds; any
-      // hooked or faked probe shifts the key and the payload unseals to junk.
-      // expected mirrors the sum a clean target produces: structural bits only
-      // (tostring identity 4, write persistence 2, getfenv identity 8, string
-      // ops 16) when the build is not locked; when envLock is on the build is
-      // only ever decoded in a genuine client, so the DataModel bit (1) and
-      // the five service-signature weights are part of the expected sum too.
-      var expected = opts.envLock ? 68 : 30;
-      var scr = String((blob.seal + 91 + (blob.key % 89)) % 256);
-      var b1 = ng(), b2 = ng(), b3 = ng(), b4 = ng(), b5 = ng();
-      var okw = ng(), okc = ng();
-      var n6 = ng(), n7 = ng(), n8 = ng(), n9 = ng(), n10 = ng();
-      var hv = ng(), jn = ng(), spv = ng(), ptv = ng();
-      var struct = b2 + '*2+' + b3 + '*4+' + b4 + '*8+' + b5 + '*16';
-      push('local ' + b1 + ',' + b2 + ',' + b3 + ',' + b4 + ',' + b5 + '=0,0,0,0,0');
-      push('pcall(function() if typeof(game)=="Instance" and game.ClassName=="DataModel" then ' + b1 + '=1 end end)');
-      push('pcall(function() ' + G + '["' + N.env + '"]["' + canary + '"]=1187 if ' + G + '["' + N.env + '"]["' + canary + '"]==1187 then ' + b2 + '=1 end ' + G + '["' + N.env + '"]["' + canary + '"]=nil end)');
-      push('if tostring({})~=tostring({}) then ' + b3 + '=1 end');
-      push('local ' + b4 + '=1 if getfenv then pcall(function() if getfenv(0)~=getfenv(0) then ' + b4 + '=0 end end) end');
-      push('local ' + b5 + '=1 pcall(function() if #tostring("ab")~=2 or ("abc"):sub(2,2)~="b" or table.concat({"a","b"})~="ab" then ' + b5 + '=0 end end)');
-      push('if ' + b1 + '==1 then');
-      push('local ' + okc + '=true');
-      push('pcall(function() if game.Close~=game.Close then ' + okc + '=false end if typeof(game:GetService("Lighting"))~="Instance" then ' + okc + '=false end if game:GetService("Lighting").ClockTime~=game:GetService("Lighting").ClockTime then ' + okc + '=false end end)');
-      push('if ' + okc + ' then');
-      if (elevel >= 2) {
-        push('local ' + n6 + ',' + n7 + ',' + n8 + ',' + n9 + ',' + n10 + '=0,0,0,0,0');
-        push('pcall(function() local ' + hv + '=game:GetService("HapticService") if typeof(' + hv + ':IsVibrationSupported(Enum.UserInputType.Gamepad1))=="boolean" then ' + n6 + '=1 end end)');
-        push('pcall(function() local ' + jn + '=game:GetService("HttpService") if typeof(' + jn + ':JSONEncode({}))=="string" then ' + n7 + '=1 end end)');
-        push('pcall(function() local ' + spv + '=game:GetService("StarterPlayer") if ' + spv + ':FindFirstChild("StarterPlayerScripts") then ' + n8 + '=1 end end)');
-        push('pcall(function() local ' + ptv + '=Instance.new("Part") if typeof(' + ptv + '.Position)=="Vector3" then ' + n9 + '=1 end end)');
-        push('pcall(function() if settings~=nil and settings().Physics~=nil then ' + n10 + '=1 end end)');
-      }
-      if (opts.envLock) {
-        push('if (' + n6 + '+' + n7 + '+' + n8 + '+' + n9 + '+' + n10 + ')<3 then ' + G + '["' + N.seal + '"]=' + scr + ' else ' + G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + b1 + '+' + struct + '+' + n6 + '*64+' + n7 + '*128+' + n8 + '*173+' + n9 + '*211+' + n10 + '*229)%256 end');
-      } else {
-        push(G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + struct + ')%256');
-      }
-      push('else');
-      push(G + '["' + N.seal + '"]=' + scr);
-      push('end');
-      push('else');
-      if (opts.envLock) push(noGameStmt);
-      else push(G + '["' + N.seal + '"]=(' + blob.seal + '-' + expected + '+' + struct + ')%256');
-      push('end');
-    }
-
-    // ----------------------------------------------------- anti-tamper loader
-    // Wraps the finished build in a chunked loader: the source is split, each
-    // chunk stored as a numeric byte table (encrypted with a per-chunk key at
-    // full strength), and a wrapper verifies the client (instances, DataModel
-    // properties, LocalPlayer, services, engine data types, environment
-    // identity) before decrypting, loading and running it. RunService's
-    // Heartbeat re-runs the battery every half second afterwards, so a hook
-    // installed mid-run is caught too. Detection prints the notice; runtime
-    // detection hangs the thread.
-    function wrapAntiTamper(inner, rng) {
-      var fast = opts.antiTamper === 1;
-      var nchunks = fast ? 2 : 3 + Math.floor(rng() * 3);
-      var chunkSize = Math.max(1, Math.ceil(inner.length / nchunks));
-      var chunks = [], keys = [];
-      for (var ci = 0; ci < inner.length; ci += chunkSize) {
-        var part = inner.substr(ci, chunkSize);
-        var key = fast ? 0 : 50 + Math.floor(rng() * 101);
-        var enc = [];
-        for (var bi = 1; bi <= part.length; bi++) {
-          var v = (part.charCodeAt(bi - 1) + key + bi) % 256;
-          v = v ^ ((key + bi) % 256);
-          enc.push(v);
-        }
-        chunks.push('{' + enc.join(',') + '}');
-        keys.push(String(key));
-      }
-      var banner = 'Protected using Darkfuscator | https://darkfuscator.pages.dev';
-      // The check battery is its own standalone chunk and is obfuscated with
-      // Darkfuscator itself (one VM layer, no nested anti-tamper), so the
-      // checks, their names and their warn strings never ship readable. The
-      // loader below decrypts the payload only when the battery's per-build
-      // seal global reads true; a tamperer cannot spoof it without reading
-      // the obfuscated battery.
-      var sealG = ng();
-      var batterySrc = buildBattery(banner, sealG);
-      try {
-        var Dk = (typeof module === 'object' && module.exports)
-          ? require('./obfuscate.js')
-          : (typeof globalThis !== 'undefined' ? globalThis.Darkfuscator : null);
-        if (Dk && Dk.obfuscate) {
-          var bRes = Dk.obfuscate(batterySrc, {
-            antiTamper: 0, guard: 0, envChecks: 0, vmLayers: 1, junk: 1,
-            watermark: false, minify: true, captureGlobals: true,
-            envLock: false, lockPlace: '', lockUniverse: '',
-            nameStyle: 'random',
-            seed: ((rng.seed >>> 0) ^ 0xD34DBA5C) >>> 0
-          });
-          if (bRes && bRes.ok && bRes.output) batterySrc = bRes.output;
-        }
-      } catch (eB) { /* battery ships plain if self-obfuscation is unavailable */ }
-      var w = [];
-      function wl(x) { w.push(x); }
-      wl('do');
-      wl('local t0=os.clock()');
-      wl('local MSG=' + JSON.stringify(banner));
-      wl('local function fail() print(MSG) while true do end end');
-      wl('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
-      wl('local function decrypt(data,key) local o={} for i=1,#data do local d=bit32.bxor(data[i],(key+i)%256) o[i]=(d-key-i)%256 end return o end');
-      var bb = [], bkey = fast ? 0 : 40 + Math.floor(rng() * 61);
-      for (var xi = 1; xi <= batterySrc.length; xi++) {
-        var xv = (batterySrc.charCodeAt(xi - 1) + bkey + xi) % 256;
-        xv = xv ^ ((bkey + xi) % 256);
-        bb.push(xv);
-      }
-      wl('local bchunks={{' + bb.join(',') + '}}');
-      wl('local bkeys={' + String(bkey) + '}');
-      wl('local bparts={} for bi2=1,#bchunks do local b2=decrypt(bchunks[bi2],bkeys[bi2]) local cs2={} for k2=1,#b2 do cs2[k2]=string.char(b2[k2]) end bparts[bi2]=table.concat(cs2) end');
-      wl('local bsrc=table.concat(bparts)');
-      wl('bchunks=nil bkeys=nil bparts=nil');
-      wl('local loadfunc=load or loadstring');
-      wl('if not loadfunc then fail() end');
-      wl('local bfunc=loadfunc(bsrc,"=DARK")');
-      wl('bsrc=nil');
-      wl('if not bfunc then fail() end');
-      wl('bfunc()');
-      wl('if _G["' + sealG + '"]~=true then return end');
-      wl('local chunks={');
-      for (var fi = 0; fi < chunks.length; fi++) wl(chunks[fi] + (fi < chunks.length - 1 ? ',' : ''));
-      wl('}');
-      wl('local keys={');
-      wl(keys.join(',') + '}');
-      wl('local parts={} for i=1,#chunks do local b=decrypt(chunks[i],keys[i]) local cs={} for k=1,#b do cs[k]=string.char(b[k]) end parts[i]=table.concat(cs) end');
-      wl('local original_source=table.concat(parts)');
-      wl('chunks=nil keys=nil parts=nil');
-      wl('local chunk,err=loadfunc(original_source,"=AntiTamper")');
-      wl('original_source=nil');
-      wl('if not chunk then fail() end');
-      wl('chunk()');
-      wl('local lp=game:GetService("Players").LocalPlayer');
-      wl('warnf("Authenticated in "..string.format("%.2f",os.clock()-t0).." seconds! Welcome, "..tostring(lp and lp.Name or "player"))');
-      wl('end');
-      return w.join('\n') + '\n';
-    }
-
-    // The anti-tamper check battery: 29 probes (instances, DataModel
-    // properties, LocalPlayer, services, engine data types, environment
-    // identity, dump tooling, executor toolkit, math/string integrity) plus
-    // the PlayerModule gate, a half-second Heartbeat re-run, and the per-build
-    // seal global the wrapper's loader reads. Ships obfuscated by the engine.
-    function buildBattery(banner, sealG) {
-      var b = [];
-      b.push('local detected=false');
-      b.push('local checks={}');
-      b.push('local function warnf(m) if warn~=nil then warn(m) else print(m) end end');
-      b.push('checks[1]={name="game_instance",run=function() if typeof(game)~="Instance" or typeof(workspace)~="Instance" then return false end return true end}');
-      b.push('checks[2]={name="script_valid",run=function() if typeof(script)~="Instance" or not script:IsA("LuaSourceContainer") then return false end return true end}');
-      b.push('checks[3]={name="game_props",run=function() if type(game.PlaceId)~="number" then return false end if type(game.JobId)~="string" or #game.JobId==0 then return false end return true end}');
-      b.push('checks[4]={name="local_player",run=function() local ok,ps=pcall(game.GetService,game,"Players") if not ok or typeof(ps)~="Instance" then return false end local lp=ps.LocalPlayer if not lp or not lp:IsA("Player") then return false end return true end}');
-      b.push('checks[5]={name="character",run=function() local lp=game:GetService("Players").LocalPlayer local char=lp.Character or lp.CharacterAdded:Wait(5) if not char then return false end local hrp=char:FindFirstChild("HumanoidRootPart") if not hrp or not hrp:IsA("BasePart") then return false end return true end}');
-      b.push('checks[6]={name="services",run=function() local needed={"RunService","ReplicatedStorage","UserInputService","TweenService"} for _,nm in ipairs(needed) do local ok,sv=pcall(game.GetService,game,nm) if not ok or typeof(sv)~="Instance" then return false end end return true end}');
-      b.push('checks[7]={name="data_types",run=function() if typeof(Vector3.new(0,0,0))~="Vector3" or typeof(CFrame.new())~="CFrame" or typeof(Color3.new())~="Color3" or typeof(UDim2.new())~="UDim2" or typeof(Vector2.new())~="Vector2" then return false end return true end}');
-      b.push('checks[8]={name="getfenv_check",run=function() local ok1,e1=pcall(getfenv,0) local ok2,e2=pcall(getfenv,1) if not ok1 or not ok2 or type(e1)~="table" or type(e2)~="table" then return false end if e1.game==nil and e2.game==nil then return false end if e1.workspace==nil and e2.workspace==nil then return false end return true end}');
-      b.push('checks[9]={name="getenv_check",run=function() local env=getfenv(0) if type(env)~="table" then return false end if type(env.print)~="function" or type(env.pcall)~="function" or type(env.typeof)~="function" or type(env.tick)~="function" then return false end return true end}');
-      b.push('checks[10]={name="runservice",run=function() local ok,rs=pcall(game.GetService,game,"RunService") if not ok or typeof(rs)~="Instance" then return false end local ok2=pcall(function() return rs:IsClient() end) local ok3=pcall(function() return rs:IsServer() end) if not ok2 and not ok3 then return false end return true end}');
-      b.push('checks[11]={name="env_write",run=function() local cv="_dkcv"..tostring(math.floor((os.clock()%1)*1000000)) local ok2=false pcall(function() getfenv(0)[cv]=1187 if getfenv(0)[cv]==1187 then ok2=true end getfenv(0)[cv]=nil end) if not ok2 then return false end return true end}');
-      b.push('checks[12]={name="string_integrity",run=function() if tostring("ab")~="ab" or string.rep("x",2)~="xx" or ("ab"):upper()~="AB" or #"ab"~=2 then return false end return true end}');
-      b.push('checks[13]={name="dump_tools",run=function() local dn=0 for _,df in ipairs({getgc,getloadedmodules,getsenv,(type(debug)=="table" and debug.getupvalue or nil)}) do if type(df)=="function" then dn=dn+1 end end local bad=false if game~=nil then pcall(function() if game.Close~=game.Close then bad=true end end) end local hooked=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") if dn>0 then warnf("[DARK AntiTamper] dump tooling present ("..tostring(dn)..")") if bad then return false end end if (dn>0 or hooked) and bad then return false end return true end}');
-      b.push('checks[14]={name="identity_consistency",run=function() if game==nil or typeof(game)~="Instance" then return true end local ok,L=pcall(game.GetService,game,"Lighting") if ok and L.ClockTime~=L.ClockTime then return false end if workspace.CurrentCamera~=workspace.CurrentCamera then return false end local ok2,a=pcall(game.GetService,game,"Lighting") local ok3,b=pcall(game.GetService,game,"Lighting") if ok2~=ok3 then return false end return true end}');
-      b.push('checks[15]={name="json_determinism",run=function() if game==nil then return true end local ok,hs=pcall(game.GetService,game,"HttpService") if not ok or type(hs.JSONEncode)~="function" then return true end local ok2,e1=pcall(hs.JSONEncode,hs,{}) local ok3,e2=pcall(hs.JSONEncode,hs,{}) if not ok2 or not ok3 or e1~=e2 then return false end return true end}');
-      b.push('checks[16]={name="clone_locked",run=function() if game==nil then return true end local ok,cl=pcall(game.Clone,game) if ok and cl~=nil then return false end return true end}');
-      b.push('checks[17]={name="cframe_math",run=function() local ok,cf=pcall(CFrame.new,50,100,50) if not ok then return true end local ok2,r=pcall(function() return cf*CFrame.Angles(0,math.pi/2,0) end) if not ok2 then return false end if math.abs(r.RightVector.Z)<0.9 or math.abs(r.Position.X-50)>0.1 then return false end return true end}');
-      b.push('checks[18]={name="readonly_props",run=function() if game==nil then return true end local ok,err=pcall(function() game.PlaceId=0 end) if ok then return false end if type(err)~="string" or #err==0 then return false end return true end}');
-      b.push('checks[19]={name="settings_sane",run=function() local ok,s=pcall(function() return settings() end) if not ok or type(s)~="table" then return true end local ok2,pt=pcall(function() return s.Physics.ThrottleAdjustTime end) local ok3,il=pcall(function() return s.Network.IncomingReplicationLag end) if ok2 and type(pt)=="number" and pt>1 then return false end if ok3 and type(il)=="number" and il>1 then return false end return true end}');
-      b.push('checks[20]={name="debug_sane",run=function() if type(debug)~="table" or type(debug.getinfo)~="function" then return true end local ok,a=pcall(debug.getinfo,1,"l") local ok2,b2=pcall(debug.getinfo,1,"l") if not ok or not ok2 or type(a)~="table" or type(b2)~="table" or a.currentline~=b2.currentline then return false end return true end}');
-      b.push('checks[22]={name="error_semantics",run=function() local ok,e=pcall(function() error("dkp22",0) end) if ok or e~="dkp22" then return false end return true end}');
-      b.push('checks[23]={name="globals_fingerprint",run=function() local n=0 for gk,gt in pairs(fp) do n=n+1 if type(_G[gk])~=gt then return false end end return true end}');
-      b.push('checks[21]={name="addr_determinism",run=function() local s1=tostring({}) local s2=tostring({}) if #s1>=15 and #s2>=15 and string.sub(s1,8,15)==string.sub(s2,8,15) then return false end local t1={} local d1=tostring(t1) local d2=tostring(t1) if d1~=d2 then return false end return true end}');
-      b.push('checks[24]={name="executor_globals",run=function() local known={"getgenv","getrenv","getreg","hookmetamethod","cloneref","getcallingscript","setclipboard","request"} local n=0 for _,en in ipairs(known) do if rawget(_G,en)~=nil then n=n+1 end end if n>=4 then warnf("[DARK AntiTamper] heavy toolkit present ("..tostring(n)..")") end return true end}');
-      b.push('checks[25]={name="string_dump_sane",run=function() if type(string.dump)~="function" then return true end local ok,d=pcall(string.dump,function() end) if ok and type(d)~="string" then return false end return true end}');
-      b.push('checks[26]={name="math_consistency",run=function() if math.abs(math.pi-3.141592653589793)>1e-9 then return false end if math.huge<1e300 then return false end if 0/0==0/0 then return false end return true end}');
-      b.push('checks[27]={name="char_roundtrip",run=function() for _,cv in ipairs({0,65,200,255}) do if string.byte(string.char(cv))~=cv then return false end end return true end}');
-      b.push('checks[28]={name="clock_sane",run=function() local t=os.time() if type(t)~="number" or t<1500000000 or t>4000000000 then return false end return true end}');
-      b.push('checks[29]={name="gcinfo_sane",run=function() if type(gcinfo)~="function" then return true end local g=gcinfo() if type(g)~="number" or g<=0 or g>1e9 then return false end return true end}');
-      b.push('local fp={} pcall(function() local fnc=0 for gk,gv in pairs(_G) do fnc=fnc+1 if fnc<=400 then fp[gk]=type(gv) end end end)');
-      b.push('local dead={}');
-      b.push('local function runChecks() for i=1,#checks do if not dead[i] then local ok,res=pcall(checks[i].run) if not ok or res==false then detected=true dead[i]=true warnf("[DARK AntiTamper] check "..tostring(i).." ("..tostring(checks[i].name)..") failed") return false end end end return true end');
-      b.push('runChecks()');
-      b.push('pcall(function() local nc=game:GetService("NetworkClient") if nc==nil or not nc:FindFirstChild("ClientReplicator") then warnf("[DARK AntiTamper] NetworkClient probe inconclusive") end end)');
-      b.push('pcall(function() local ch=game:GetService("Chat") if ch==nil or ch.Parent==nil or ch.Parent.Name~="Ugc" then warnf("[DARK AntiTamper] Chat probe inconclusive") end end)');
-      b.push('pcall(function() local lp=game:GetService("Players").LocalPlayer local psc=lp:FindFirstChild("PlayerScripts") if not psc or not psc:FindFirstChild("PlayerModule") or not psc:FindFirstChild("RbxCharacterSounds") then detected=true end end)');
-      b.push('local RS=game:GetService("RunService") local last=(tick~=nil and tick() or os.clock())');
-      b.push('RS.Heartbeat:Connect(function() local now=(tick~=nil and tick() or os.clock()) if now-last>=0.5 then last=now runChecks() if detected then print("' + banner + '") while true do end end end end)');
-      b.push('if detected then print("' + banner + '") _G["' + sealG + '"]=false else _G["' + sealG + '"]=true end');
-      return b.join('\n');
-    }
+    // ------------------------------------------------------- integrity policy
+    // The encoded payload is validated in the decoder. Failed validation or
+    // a missing VM prerequisite returns safely; the emitter never generates a
+    // source loader, a destructive loop, or target/executor probes.
 
     // ----------------------------------------------------------------- guard
-    // The audit runs before the payload is decoded: if the environment is
-    // tampered with (stubbed builtins, a proxy environment that does not
-    // persist writes, an injector toolkit over a fake DataModel), the program
-    // refuses to run and nothing is ever decrypted.
+    // Guard levels validate only ordinary Luau primitives used by the VM. A
+    // mismatch changes the decoder seal and causes a safe early return.
     if (glevel >= 1) {
-      var ga = ng(), gb = ng(), gc = ng(), gd = ng(), ge = ng();
+      var ge = ng();
       line('["' + N.guard + '"]=(function(G)');
-      line('local ' + ga + ',live1={},{}; local ' + gb + ',live2={},{}');
-      line('local ' + gc + ',tostr=' + ga + ',tostring');
-      line('if tostr(live1)==tostr(live2) then return 1 end');
-      line('if #tostring("ab")~=2 or string.rep("ab",3)~="ababab" or table.concat({"a","b"})~="ab" or ("abc"):sub(2,2)~="b" then return 2 end');
-      line('local ' + gd + ',' + gc + '=pcall(error,"Dk")');
-      line('if ' + gd + '~=false or ' + gc + '~="Dk" then return 3 end');
-      line('if math.floor(1.5)~=1 or tonumber("10")~=10 or math.max(3,7)~=7 then return 4 end');
-      line('if not pcall(function() return true end) then return 5 end');
-      line('if getfenv then local ' + gd + '=getfenv(0); local ' + gc + '=getfenv(0); if ' + gd + '~=' + gc + ' then return 6 end end');
-      // write-trap: a proxy environment that records but does not persist writes
-      line('local ' + gc + '={pcall(function() G["' + N.env + '"]["' + canary + '"]=1187; local persist=G["' + N.env + '"]["' + canary + '"]~=1187; G["' + N.env + '"]["' + canary + '"]=nil return persist end)}; if ' + gc + '[2]==true then return 7 end');
-      line('local ' + ge + '=rawget(_G,"hookfunction") or rawget(_G,"newcclosure") or rawget(_G,"getgenv") or rawget(_G,"getrenv") or rawget(_G,"readfile") or rawget(_G,"writefile")');
+      line('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
+      line('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
+      line('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
       if (glevel === 2) {
-        line('if ' + ge + ' then local g=game; if g==nil or typeof(g)~="Instance" or g.ClassName~="DataModel" then return 8 end; if game.Close~=game.Close then return 9 end end');
-        line('if game ~= nil and typeof(game)=="Instance" and (typeof(workspace)~="Instance" or typeof(game.GetService)~="function") then return 10 end');
-        line('do local okc,cf=pcall(function() return CFrame.new(50,100,50)*CFrame.Angles(0,math.pi/2,0) end); if okc and (math.abs(cf.RightVector.Z)<0.9 or math.abs(cf.Position.X-50)>0.1) then return 12 end end');
-        line('if game ~= nil and typeof(game)=="Instance" then local okk,cl=pcall(function() return game.Clone(game) end); if okk and cl~=nil then return 13 end; local okj,e1=pcall(function() return game:GetService("HttpService"):JSONEncode({}) end); local okj2,e2=pcall(function() return game:GetService("HttpService"):JSONEncode({}) end); if okj and okj2 and e1~=e2 then return 14 end; local okp,pe=pcall(function() game.PlaceId=0 end); if okp then return 15 end end');
-        line('if type(debug)=="table" and type(debug.getinfo)=="function" then local okd,a=pcall(function() return debug.getinfo(1,"l").currentline end); local okd2,b=pcall(function() return debug.getinfo(1,"l").currentline end); if okd and okd2 and a~=b then return 16 end end');
-        // anti-debug timing: a step-debugger or a hook that throttles every
-        // operation makes even a small loop take absurd wall time; the threshold
-        // keeps ~100x headroom over a normal Luau VM so clean runs never trip it
-        if (!opts.noTiming) line('do local t0=os.clock() local s=0 for i=1,120000 do s=(s+i*7)%1000003 end if os.clock()-t0>0.4 then return 11 end end');
+        line('if #string.rep("ab",3)~=6 or table.concat({"a","b"})~="ab" or math.floor(1.5)~=1 then return true end');
+        line('local ok,v=pcall(function() return (17*19)%23 end); if not ok or v~=1 then return true end');
       }
-      if (elevel >= 1) {
-        sealBinding(line, 'G', 'return 17');
-      } else {
-        line('G["' + N.seal + '"]=' + blob.seal + ';');
-      }
-      line('return false');
+      line('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
       line('end),');
     }
 
     // ------------------------------------------------------------ interpreter
     line('["' + N.run + '"]=(function(' + P.s + ',' + P.p + ',' + P.u + ',...)');
-    line('local ' + L.r + '={}');
+    line('local rr={} local rs=' + P.p + '[9] or 0 local ' + L.r + '=rs>0 and setmetatable({},{__index=function(_,i) return rr[i+rs] end,__newindex=function(_,i,v) rr[i+rs]=v end}) or rr');
     line('local np=' + P.p + '[1]');
     line('if np>0 or ' + P.p + '[2] then local a={...}');
     line('for i=1,np do ' + L.r + '[i-1]=a[i] end');
@@ -759,7 +572,14 @@
     line('if ' + P.p + '[2] then local np=' + P.p + '[1]; local na=select("#",...); ' +
       'local v={select(np+1,...)} v.n=(na>np) and na-np or 0 F.V=v end');
     line('local ' + L.c + '=' + P.p + '[5]');
-    if (glevel >= 2) line('do local cs=0; local cd=' + P.p + '[5]; for i=1,#cd do cs=(cs+cd[i][1]*(i+13))%65521 end; if cs~=' + P.p + '[8] then F.d=true;F.n=0;F.o=0 end end');
+    if (glevel >= 2) {
+      // Keep both verification locals distinct from generated parameters and
+      // from each other. Reusing a name here can shadow the prototype or turn
+      // the numeric accumulator into the code table.
+      var verifySum = ng();
+      var verifyCode = ng();
+      line('do local ' + verifySum + '=0; local ' + verifyCode + '=' + P.p + '[5]; for i=1,#' + verifyCode + ' do ' + verifySum + '=(' + verifySum + '+' + verifyCode + '[i][1]*(i+13))%65521 end; if ' + verifySum + '~=' + P.p + '[8] then F.d=true;F.n=0;F.o=0 end end');
+    }
     var vtEntries = [];
     for (i = 0; i < OPS.length; i++) {
       if (usedOps[i]) vtEntries.push('[' + i + ']={'+ VT[i].map(function(n) { return P.s + '["' + n + '"]'; }).join(',') + '}');
@@ -793,13 +613,16 @@
       var j2 = Math.floor(rng() * (i + 1));
       var tmp = branches[i]; branches[i] = branches[j2]; branches[j2] = tmp;
     }
+    // This is generated rather than named `vs`: a literal local could shadow
+    // the generated program-table parameter inside a dispatch branch.
+    var variantList = ng();
     var chain = '';
     for (i = 0; i < branches.length; i++) {
       var b2 = branches[i];
       if (b2.dead) {
         chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
       } else {
-        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local vs=' + vtl + '[' + b2.opidx + ']; nx=vs[((F.ip+F.o)%#vs)+1](' + P.s + ',F,I)';
+        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local ' + variantList + '=' + vtl + '[' + b2.opidx + ']; nx=' + variantList + '[((F.ip+F.o)%#' + variantList + ')+1](' + P.s + ',F,I)';
       }
     }
     line(chain + ' end');
@@ -830,17 +653,11 @@
       if (/^\d+$/.test(lockP)) lockConds.push(gl + '.PlaceId==' + lockP);
       if (/^\d+$/.test(lockU)) lockConds.push(gl + '.GameId==' + lockU);
       line('do local ' + gl + '=game');
-      line('if ' + gl + '~=nil and (' + lockConds.join(' or ') + ') then else error("Darkfuscator protected program: execution locked",0) end');
+      line('if ' + gl + '==nil or not (' + lockConds.join(' or ') + ') then return nil end');
       line('end');
     }
     if (glevel === 0) {
-      if (elevel >= 1) {
-        line('do');
-        sealBinding(line, P.s, P.s + '["' + N.seal + '"]=' + scrG);
-        line('end');
-      } else {
-        line(P.s + '["' + N.seal + '"]=' + blob.seal + ';');
-      }
+      line(P.s + '["' + N.seal + '"]=' + (blob.seal % 256) + ';');
     }
     if (glevel >= 1) {
       line('local ' + ge + '=' + P.s + '["' + N.guard + '"](' + P.s + ')');
@@ -848,15 +665,9 @@
     }
     line('local P=' + P.s + '["' + N.dec + '"](' + P.s + ',' + P.s + '["' + N.blob + '"])');
     line(P.s + '["' + N.blob + '"]=nil; ' + P.s + '["' + N.alpha + '"]=nil; ' + P.s + '["' + N.check1 + '"]=nil; ' + P.s + '["' + N.check2 + '"]=nil; ' + P.s + '["' + N.dec + '"]=nil; ' + P.s + '["' + N.seal + '"]=nil; ' + P.s + '["' + N.guard + '"]=nil');
+    line('if not P then return nil end');
 
     line('local f=' + P.s + '["' + N.mk + '"](' + P.s + ',P,{})');
-    // anti-dump re-audit: the battery runs again one scheduler step after the
-    // payload starts; a hook installed mid-run (a dumper that grabs the
-    // decoded program table) trips it and the interpreter material is
-    // destroyed. Legit runs never touch the wipe branch.
-    if (elevel >= 1) {
-      line('if task~=nil and typeof(task)=="table" and task.defer~=nil then task.defer(function() local bad=false pcall(function() if game~=nil and typeof(game)=="Instance" and (game.Close~=game.Close or typeof(game:GetService("Lighting"))~="Instance") then bad=true end end) if bad then ' + P.s + '["' + N.run + '"]=nil ' + P.s + '["' + N.mk + '"]=nil end end) end');
-    }
     line('return f()');
     line('end)');
 
@@ -871,11 +682,11 @@
 
     // statements must stay separated even when minified — a space is enough
     var src = out.join(opts.minify === false ? '\n' : ' ');
-    if (opts.antiTamper) src = wrapAntiTamper(src, rng);
     return {
       source: src,
       ids: ids,
-      stats: { bytes: blob.bytes, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+      stats: { bytes: blob.bytes, packedBytes: blob.packedBytes, compressed: blob.compressed,
+        integrity: integrityLevel, vmMode: vmMode, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
     };
   }
 
