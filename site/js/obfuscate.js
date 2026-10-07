@@ -187,6 +187,7 @@
         nameStyle: opts.nameStyle || 'random',
         guard: opts.guard === 2 ? 2 : opts.guard === 0 ? 0 : 1,
         captureGlobals: opts.captureGlobals !== false,
+        buildId: opts.buildId,
         watermark: opts.watermark !== false,
         lockPlace: opts.lockPlace || '',
         lockUniverse: opts.lockUniverse || '',
@@ -280,6 +281,7 @@
         result.stats.integrity = vmOut.stats.integrity || 0;
         result.stats.vmMode = vmOut.stats.vmMode || opts.vmMode;
         result.stats.payloadChars = vmOut.stats.payload;
+        result.stats.watermark = vmOut.stats.watermark || null;
         result.stats.opcodes = vmOut.stats.opcodes;
         result.stats.protos = countProtos(prog);
         result.stats.pipeline = { ast: pipelineStats || { folded: 0, passes: [] }, bytecode: bytecodeStats || { passes: [] } };
@@ -354,6 +356,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '7.2.0'
+    version: '7.3.0'
   };
 });

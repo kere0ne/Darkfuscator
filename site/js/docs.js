@@ -22,7 +22,7 @@
         '<h2>Payload protection</h2>',
         '<p>Each emitted payload receives a randomized alphabet, keyed byte transformations, encoded string constants, shuffled opcode identifiers, and generated handler layout. Optional RLE compression is only retained when it makes the serialized payload smaller.</p>',
         '<h2>Integrity verification</h2>',
-        '<p>The <span class="mono">antiTamper</span> compatibility option represents integrity verification: level 0 is off, level 1 validates the decoded payload with FNV, and level 2 adds independent bytecode checksums. A failed verification returns before reconstructed bytecode runs; it does not intentionally hang or damage the runtime.</p>'
+        '<p>The <span class="mono">antiTamper</span> compatibility option represents integrity verification: level 0 is off, level 1 validates the decoded payload with FNV, and level 2 adds independent bytecode checksums, and also ships per-proto chunk checksums that the interpreter re-verifies as execution crosses chunk boundaries, so a patched instruction fails closed mid-run rather than only at decode time. Every build also carries a hidden per-build watermark identifier (reported as <span class="mono">watermark</span> in build stats) that traces a leaked script back to the build that produced it. A failed verification returns before reconstructed bytecode runs; it does not intentionally hang or damage the runtime.</p>'
       ].join('')
     },
     workspace: {

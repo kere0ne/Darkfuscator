@@ -29,7 +29,7 @@ const ROOT = path.join(__dirname, '..', 'site');
 const PORT = Number(process.env.PORT) || Number(process.argv[2]) || 3000;
 
 const ENGINE_VERSION = handlers.ENGINE_VERSION;
-const PLATFORM_VERSION = '7.2.0';
+const PLATFORM_VERSION = '7.3.0';
 const LIMITS = handlers.LIMITS;
 
 // ------------------------------------------------------------------- routing

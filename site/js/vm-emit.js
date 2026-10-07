@@ -118,7 +118,7 @@
   }
 
   // --------------------------------------------------------------- serialiser
-  function serialize(root, rng, compression, vmMode) {
+  function serialize(root, rng, compression, vmMode, ids, chunkOn) {
     var bytes = [];
     // build keys are drawn up front: the instruction stream is masked with a
     // salt derived from them, so the decoder can rebuild the salt from the
@@ -176,6 +176,17 @@
         if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vx(zz(ins.x[q]) ^ ((ps + (j + 1) * 7919 + (4 + q) * 104729) % 65536)); }
         else vi(0);
       }
+      if (chunkOn) {
+        var CL = 48 + Math.floor(rng() * 80);
+        var nch = p.code.length ? Math.ceil(p.code.length / CL) : 0;
+        vi(CL); vi(nch);
+        for (var ch = 0; ch < nch; ch++) {
+          var csum = 0;
+          var cj0 = ch * CL, cj1 = Math.min(p.code.length, (ch + 1) * CL);
+          for (var cj = cj0; cj < cj1; cj++) csum = (csum + ids[p.code[cj][0]] * (cj + 14)) % 65521;
+          vi(csum);
+        }
+      } else { vi(0); vi(0); }
       vi(p.kids.length);
       for (var m = 0; m < p.kids.length; m++) proto(p.kids[m]);
     }
@@ -370,13 +381,12 @@
       }
     }
     var vmMode = opts.vmMode === 'secure' ? 'secure' : opts.vmMode === 'fast' ? 'fast' : 'balanced';
-    var blob = serialize(program, rng, opts.compression === true, vmMode);
-    // silent-failure scramble value: any detected tamper rewrites the seal
-    // to this instead of raising a patchable, brandable error message
-    var scrG = String((blob.seal + 91 + (blob.key % 89)) % 256);
-    // per-build mask for the lazy string-constant layer
-    var strMask = 1 + Math.floor(rng() * 254);
-    var vtl = ng();
+    // per-build watermark: this build's identifier ships as an unreferenced
+    // string constant inside the encrypted payload, so a leaked script can
+    // be traced back to the build (and account) that produced it
+    var wmId = opts.buildId ? String(opts.buildId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) : '';
+    if (!wmId) { wmId = 'wm-'; for (var wi = 0; wi < 10; wi++) wmId += Math.floor(rng() * 16).toString(16); }
+    program.k.push({ t: 's', v: wmId });
 
     // random 16-bit opcode ids, one per opcode, unique
     var ids = [], seen = Object.create(null), i;
@@ -393,6 +403,20 @@
       seen[dv] = 1;
       deadIds.push(dv);
     }
+
+    // runtime instruction-stream verification: with the deep battery
+    // enabled, each proto's code array ships pre-chunked checksums the
+    // interpreter re-verifies as execution crosses chunk boundaries, so a
+    // patched instruction fails closed mid-run, not only at decode time
+    var chunkOn = glevel >= 2 || integrityLevel >= 2;
+
+    var blob = serialize(program, rng, opts.compression === true, vmMode, ids, chunkOn);
+    // silent-failure scramble value: any detected tamper rewrites the seal
+    // to this instead of raising a patchable, brandable error message
+    var scrG = String((blob.seal + 91 + (blob.key % 89)) % 256);
+    // per-build mask for the lazy string-constant layer
+    var strMask = 1 + Math.floor(rng() * 254);
+    var vtl = ng();
 
     var N = {
       blob: ng(), alpha: ng(), dec: ng(), mk: ng(), run: ng(), entry: ng(),
@@ -479,10 +503,12 @@
     line('local nc=vr(); local c={}');
     line('for i=1,nc do local o=OPC[vr()+1]; local A=vrm((ps+i*7919+104729)%65536); local B=vrm((ps+i*7919+209458)%65536); local C=vrm((ps+i*7919+314187)%65536); local nx=vr()');
     line('if nx>0 then local x={} for j=1,nx do x[j]=vrm((ps+i*7919+(3+j)*104729)%65536) end c[i]={o,A,B,C,x} else c[i]={o,A,B,C} end end');
+    line('local VC2=vr() local NS2=vr() local SM2');
+    line('if NS2>0 then SM2={} for i=1,NS2 do SM2[i]=vr() end end');
     line('local nz=vr(); local z={}');
     line('for i=1,nz do z[i]=proto() end');
     line('local cs=0 for i=1,#c do cs=(cs+c[i][1]*(i+13))%65521 end');
-    line('local kr=k; k={}; setmetatable(k,{__index=function(t,i) local v=rawget(t,i) if v~=nil then return v end local e=kr[i] if e==nil then return nil end if type(e)=="table" and e["' + N.strmark + '"] then v=sdec(e) else v=e end rawset(t,i,v) kr[i]=nil return v end}) return {np,va,nu,k,c,z,ms,cs,rs} end');
+    line('local kr=k; k={}; setmetatable(k,{__index=function(t,i) local v=rawget(t,i) if v~=nil then return v end local e=kr[i] if e==nil then return nil end if type(e)=="table" and e["' + N.strmark + '"] then v=sdec(e) else v=e end rawset(t,i,v) kr[i]=nil return v end}) return {np,va,nu,k,c,z,ms,cs,rs,(NS2>0 and {VC2,SM2} or nil)} end');
     line('return proto()');
     line('end),');
 
@@ -625,6 +651,7 @@
     line('if ' + P.p + '[2] then local np=' + P.p + '[1]; local na=select("#",...); ' +
       'local v={select(np+1,...)} v.n=(na>np) and na-np or 0 F.V=v end');
     line('local ' + L.c + '=' + P.p + '[5]');
+    if (chunkOn) line('if ' + P.p + '[10] then F.C=' + P.p + '[10][1] F.S=' + P.p + '[10][2] F.vc=1 F.vk=1 end');
     if (glevel >= 2) {
       // Keep both verification locals distinct from generated parameters and
       // from each other. Reusing a name here can shadow the prototype or turn
@@ -638,7 +665,12 @@
       if (usedOps[i]) vtEntries.push('[' + i + ']={'+ VT[i].map(function(n) { return P.s + '["' + n + '"]'; }).join(',') + '}');
     }
     line('local ' + vtl + '={' + vtEntries.join(',') + '}');
-    line('while true do');
+    var loopForm = rng() < 0.5 ? 0 : 1;
+    line(loopForm === 0 ? 'while true do' : 'repeat');
+    if (chunkOn) {
+      var vsum = ng(), vhi = ng();
+      line('while F.S and F.ip>=F.vc do local ' + vsum + '=0 local ' + vhi + '=F.vc+F.C-1 if ' + vhi + '>#' + L.c + ' then ' + vhi + '=#' + L.c + ' end for j=F.vc,' + vhi + ' do ' + vsum + '=' + vsum + '+' + L.c + '[j][1]*(j+13) ' + vsum + '=' + vsum + '%65521 end if ' + vsum + '~=F.S[F.vk] then F.d=true F.n=0 F.o=0 end F.vc=' + vhi + '+1 F.vk=F.vk+1 end');
+    }
     line('local I=' + L.c + '[F.ip]');
     line('local o=I[1]');
     line('local nx');
@@ -650,7 +682,7 @@
     // alias ids that trigger the identical handler, so the same operation
     // arrives under several numeric values and a pattern-matching
     // deobfuscator cannot pin an opcode by its id alone
-    var nAlias = opts.junk >= 2 ? 3 : opts.junk === 1 ? 2 : 1;
+    var nAlias = opts.junk === 0 ? 1 : (opts.junk >= 2 ? 3 : 2) + Math.floor(rng() * 2);
     for (i = 0; i < OPS.length; i++) {
       if (!usedOps[i]) continue;
       for (var ai = 0; ai < nAlias; ai++) {
@@ -669,19 +701,33 @@
     // This is generated rather than named `vs`: a literal local could shadow
     // the generated program-table parameter inside a dispatch branch.
     var variantList = ng();
-    var chain = '';
-    for (i = 0; i < branches.length; i++) {
-      var b2 = branches[i];
-      if (b2.dead) {
-        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
-      } else {
-        chain += (i === 0 ? 'if' : ' elseif') + ' o==' + hex(b2.id) + ' then local ' + variantList + '=' + vtl + '[' + b2.opidx + ']; nx=' + variantList + '[((F.ip+F.o)%#' + variantList + ')+1](' + P.s + ',F,I)';
-      }
+    function bodyFor(b2) {
+      if (b2.dead) return 'nx=' + P.s + '["' + b2.fn + '"](' + P.s + ',F,I)';
+      return 'local ' + variantList + '=' + vtl + '[' + b2.opidx + ']; nx=' + variantList + '[((F.ip+F.o)%#' + variantList + ')+1](' + P.s + ',F,I)';
     }
-    line(chain + ' end');
+    // per-build dispatcher shape: instead of one flat, recognisable if/elseif
+    // chain, branch groups are recursively partitioned by opcode-id range,
+    // so the dispatch tree's depth and split points differ build to build
+    var splitK = 5 + Math.floor(rng() * 6);
+    function chainFor(bs, depth) {
+      var s = '', ci;
+      if (bs.length <= splitK || depth >= 3) {
+        for (ci = 0; ci < bs.length; ci++) s += (ci === 0 ? 'if' : ' elseif') + ' o==' + hex(bs[ci].id) + ' then ' + bodyFor(bs[ci]);
+        return s + ' end';
+      }
+      var mid = bs[Math.floor(bs.length / 2)].id;
+      var A = [], B = [];
+      for (ci = 0; ci < bs.length; ci++) (bs[ci].id < mid ? A : B).push(bs[ci]);
+      if (!A.length || !B.length) {
+        for (ci = 0; ci < bs.length; ci++) s += (ci === 0 ? 'if' : ' elseif') + ' o==' + hex(bs[ci].id) + ' then ' + bodyFor(bs[ci]);
+        return s + ' end';
+      }
+      return 'if o<' + hex(mid) + ' then ' + chainFor(A, depth + 1) + ' else ' + chainFor(B, depth + 1) + ' end';
+    }
+    line(chainFor(branches, 0));
     line('if F.d then return (unpack or table.unpack)(F.r,F.o+1,F.o+F.n) end');
     line('F.ip=nx or F.ip+1');
-    line('end');
+    line(loopForm === 0 ? 'end' : 'until false');
     line('end),');
 
     // ---------------------------------------------------------- closure maker
@@ -739,7 +785,7 @@
       source: src,
       ids: ids,
       stats: { bytes: blob.bytes, packedBytes: blob.packedBytes, compressed: blob.compressed,
-        integrity: integrityLevel, vmMode: vmMode, payload: blob.payload.length, opcodes: Object.keys(usedOps).length }
+        integrity: integrityLevel, vmMode: vmMode, payload: blob.payload.length, opcodes: Object.keys(usedOps).length, watermark: wmId }
     };
   }
 

@@ -677,12 +677,12 @@ function runBuild(req, res, sess, body, rebuildOf) {
   if (target === 'roblox' && options.antiTamper === undefined) options.antiTamper = 2;
   const storeSource = body.storeSource !== false;
 
+  const buildId = util.newId('dfb');
   let result;
-  try { result = engine.obfuscate(source, Object.assign({ preset: preset }, options)); }
+  try { result = engine.obfuscate(source, Object.assign({ preset: preset, buildId: buildId }, options)); }
   catch (e) { return sendJson(res, 500, { ok: false, error: 'engine crashed: ' + e.message }); }
 
   const now = new Date().toISOString();
-  const buildId = util.newId('dfb');
   // Blob writes are attempted before metadata is made visible. The recorded
   // flags describe what is actually retrievable, never what we hoped to save.
   const sourceStored = storeSource ? db.writeBlob(buildId + '.src', source) : false;
@@ -693,6 +693,7 @@ function runBuild(req, res, sess, body, rebuildOf) {
     preset, target, options, status: result.ok ? 'success' : 'failed',
     error: result.ok ? null : result.error, warnings: result.ok ? (result.warnings || []) : [],
     seed: result.ok ? result.stats.seed : null,
+    watermark: result.ok ? (result.stats.watermark || null) : null,
     inputChars: source.length, outputChars: result.ok ? result.output.length : 0,
     ms: result.ok ? result.stats.ms : null, vms: result.ok ? result.stats.vms : null,
     junkStatements: result.ok ? (result.stats.junkStatements || 0) : 0,
