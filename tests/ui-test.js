@@ -28,7 +28,7 @@ const dom = new JSDOM(html, {
 const { window } = dom;
 const { document } = window;
 for (const file of [
-  'js/luau-lexer.js', 'js/luau-parser.js', 'js/pipeline.js', 'js/vm-compile.js',
+  'js/luau-lexer.js', 'js/luau-parser.js', 'js/ir.js', 'js/pipeline.js', 'js/vm-compile.js',
   'js/vm-emit.js', 'js/obfuscate.js', 'js/offline.js', 'js/editor.js'
 ]) {
   const script = document.createElement('script');
@@ -86,12 +86,12 @@ check('output is valid Luau', window.Darkfuscator.validate(output).ok);
 check('at least one VM layer reported', Number($('#st-vms').textContent) > 0, $('#st-vms').textContent);
 check('bytecode size reported', /\d/.test($('#st-bytes').textContent), $('#st-bytes').textContent);
 check('balanced preset starts selected', $('#opt-preset').value === 'balanced');
-check('real setting controls are present', $('#opt-junk') && $('#opt-vm-mode') && $('#opt-integrity') && $('#local-settings-title'));
+check('real setting controls are present', $('#opt-ir') && $('#opt-junk') && $('#opt-vm-mode') && $('#opt-integrity') && $('#local-settings-title'));
 check('checkbox controls are present', $('#opt-compression').type === 'checkbox' && $('#opt-minify').type === 'checkbox');
 
 $('#opt-preset').value = 'maximum';
 $('#opt-preset').dispatchEvent(new window.Event('change'));
-check('preset applies actual engine options', $('#opt-vm-layers').value === '4' && $('#opt-junk').value === '2' && $('#opt-integrity').value === '2');
+check('preset applies actual engine options', $('#opt-ir').value === 'secure' && $('#opt-vm-layers').value === '4' && $('#opt-junk').value === '2' && $('#opt-integrity').value === '2');
 
 $('#input').value = 'local x = = 1\n';
 $('#protect').dispatchEvent(new window.Event('click'));

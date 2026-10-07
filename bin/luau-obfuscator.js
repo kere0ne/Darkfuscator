@@ -16,7 +16,7 @@ const DARK = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
 const VERSION = '7.0.0';
 const PRESETS = new Set(['lightweight', 'balanced', 'maximum']);
 const OPTION_KEYS = new Set([
-  'preset', 'seed', 'junk', 'guard', 'antiTamper', 'vmLayers', 'vmMode',
+  'preset', 'seed', 'junk', 'guard', 'antiTamper', 'vmLayers', 'vmMode', 'ir',
   'nameStyle', 'minify', 'watermark', 'captureGlobals', 'compression',
   'lockPlace', 'lockUniverse'
 ]);
@@ -35,6 +35,7 @@ function usage() {
   console.log('  --integrity <0-2>      payload verification: off | fast | full');
   console.log('  --vm-layers <1-10>     independently randomized stacked VMs');
   console.log('  --vm-mode <mode>       fast | balanced | secure');
+  console.log('  --ir <level>           none | fast | balanced | secure source-level IR pass');
   console.log('  --name-style <style>   short | random | confuse');
   console.log('  --compression           use the optional payload size pass');
   console.log('  --no-compression        disable the optional payload size pass');
@@ -98,6 +99,7 @@ function parseArgs(args) {
     if (token === '--integrity') { explicit.antiTamper = integer(value, '--integrity', 0, 2); continue; }
     if (token === '--vm-layers') { explicit.vmLayers = integer(value, '--vm-layers', 1, 10); continue; }
     if (token === '--vm-mode') { explicit.vmMode = value; continue; }
+    if (token === '--ir') { explicit.ir = value; continue; }
     if (token === '--name-style') { explicit.nameStyle = value; continue; }
     if (token === '--lock-place') { explicit.lockPlace = numericId(value, '--lock-place'); continue; }
     if (token === '--lock-universe') { explicit.lockUniverse = numericId(value, '--lock-universe'); continue; }
@@ -120,6 +122,9 @@ function validateOptions(input) {
   if (options.vmLayers !== undefined) options.vmLayers = integer(options.vmLayers, 'vmLayers', 1, 10);
   if (options.vmMode !== undefined && !['fast', 'balanced', 'secure'].includes(options.vmMode)) {
     fail('vmMode must be fast, balanced, or secure');
+  }
+  if (options.ir !== undefined && !['none', 'fast', 'balanced', 'secure'].includes(options.ir)) {
+    fail('ir must be none, fast, balanced, or secure');
   }
   if (options.nameStyle !== undefined && !['short', 'random', 'confuse'].includes(options.nameStyle)) {
     fail('nameStyle must be short, random, or confuse');

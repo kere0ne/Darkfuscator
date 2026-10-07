@@ -187,7 +187,7 @@ function defaultSettings() {
   return {
     appearance: { theme: 'dark', accent: 'orange', compact: false },
     editor: { fontSize: 13, tabSize: 4, wordWrap: false, lineNumbers: true, highlighting: true },
-    obfuscationDefaults: { target: 'roblox', preset: 'balanced', vmMode: 'balanced', compression: true },
+    obfuscationDefaults: { target: 'roblox', preset: 'balanced', ir: 'balanced', vmMode: 'balanced', compression: true },
     notifications: { buildCompletion: true, securityAlerts: true }
   };
 }

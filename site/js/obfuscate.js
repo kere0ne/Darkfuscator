@@ -15,10 +15,11 @@
   var VMCompile = isNode ? require('./vm-compile.js') : root.DarkfuscatorVMCompile;
   var VMEmit = isNode ? require('./vm-emit.js') : root.DarkfuscatorVMEmit;
   var Pipeline = isNode ? require('./pipeline.js') : root.DarkfuscatorPipeline;
-  var api = factory(Lexer, Parser, VMCompile, VMEmit, Pipeline);
+  var IR = isNode ? require('./ir.js') : root.DarkfuscatorIR;
+  var api = factory(Lexer, Parser, VMCompile, VMEmit, Pipeline, IR);
   if (isNode) module.exports = api;
   if (root) root.Darkfuscator = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit, Pipeline) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit, Pipeline, IR) {
   'use strict';
 
   var bytesToStr = Lexer.bytesToStr;
@@ -39,14 +40,16 @@
     antiTamper: 2,              // 0 | 1 | 2 — decoder integrity: off | fast | full
     vmMode: 'balanced',         // fast | balanced | secure runtime layout
     compression: false,         // optional RLE payload size pass
-    vmLayers: 5                 // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
+    vmLayers: 5,                // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
+    ir: 'fast'                  // none | fast | balanced | secure — source-level IR pass before the VM
   };
 
-  // presets for the CLI and for callers that name one; the UI always uses maximum
+  // Presets select real compiler, IR, payload, and VM settings. The UI and
+  // API expose the same bounded values rather than environment-specific probes.
   var PRESETS = {
-    lightweight: { junk: 0, guard: 0, antiTamper: 0, vmMode: 'fast', compression: false, vmLayers: 1 },
-    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 2 },
-    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 4 }
+    lightweight: { junk: 0, guard: 0, antiTamper: 0, vmMode: 'fast', compression: false, vmLayers: 1, ir: 'fast' },
+    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 2, ir: 'balanced' },
+    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 4, ir: 'secure' }
   };
 
 
@@ -125,6 +128,7 @@
     opts.antiTamper = opts.antiTamper === 1 || opts.antiTamper === '1' ? 1 : opts.antiTamper === 2 || opts.antiTamper === '2' ? 2 : 0;
     opts.vmMode = opts.vmMode === 'fast' || opts.vmMode === 'secure' ? opts.vmMode : 'balanced';
     opts.compression = opts.compression === true || opts.compression === 'true';
+    opts.ir = ['none', 'fast', 'balanced', 'secure'].indexOf(opts.ir) !== -1 ? opts.ir : 'fast';
     opts.vmLayers = parseInt(opts.vmLayers, 10);
     if (!(opts.vmLayers >= 1)) opts.vmLayers = 5;
     if (opts.vmLayers > 10) opts.vmLayers = 10;
@@ -146,6 +150,25 @@
     mark('parse');
     var toks = parsed.toks, code = parsed.code, refs = parsed.refs, symbols = parsed.symbols;
     result.warnings = parsed.warnings.slice();
+
+    // ------------------------------------------------- 1b. source-level IR pass
+    // constant folding, dead code, control-flow flattening, opaque predicates —
+    // semantics-preserving and differentially tested against the real Luau VM.
+    if (opts.ir && opts.ir !== 'none') {
+      var irLevel = opts.ir;
+      if (irLevel !== 'fast' && irLevel !== 'balanced' && irLevel !== 'secure') irLevel = 'fast';
+      try {
+        // The IR stage needs parser metadata (references and directives), not
+        // only the AST root. It emits fresh Luau that is parsed again below.
+        var irOut = IR.emitProgram(parsed, { rng: makeRng((seedNumber(opts.seed) ^ 0x5F3759DF) >>> 0), level: irLevel });
+        result.stats.ir = irOut.stats;
+        parsed = Parser.parse(irOut.source);
+        toks = parsed.toks; code = parsed.code; refs = parsed.refs; symbols = parsed.symbols;
+      } catch (e) {
+        result.warnings.push('IR pass skipped: ' + e.message);
+      }
+    }
+    mark('ir');
 
     // --------------------------------------------- 2. compile + emit bytecode
     // The bytecode VM is the transformation pipeline: the AST is compiled to

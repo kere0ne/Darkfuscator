@@ -7,10 +7,10 @@
     'getting-started': {
       title: 'Getting started',
       body: [
-        '<p>Darkfuscator is a Luau obfuscation platform. A successful build is produced by the real compiler pipeline: lexer and parser, AST optimization, custom bytecode compilation, protected serialization, and a generated custom VM loader.</p>',
+        '<p>Darkfuscator is a Luau obfuscation platform. A successful build is produced by the real compiler pipeline: lexer and parser, semantic analysis, a configurable source-level IR pass, AST and bytecode optimization, protected serialization, and a generated custom VM loader.</p>',
         '<p>Start by creating an account, verifying its email, and opening the <a class="link" href="/obfuscate">protection workspace</a>. The workspace validates source before it calls the authenticated backend; build output and history are returned by that backend, not manufactured in the browser.</p>',
         '<h2>Choose a preset</h2>',
-        '<ul><li><b>Lightweight</b> uses the FAST VM layout and keeps runtime overhead lower.</li><li><b>Balanced</b> adds payload compression when it reduces size, register remapping, dispatch variation, and standard integrity verification.</li><li><b>Maximum</b> uses the SECURE VM layout, stronger standard variation, and full integrity verification.</li></ul>',
+        '<ul><li><b>Lightweight</b> uses FAST source IR and VM layouts and keeps runtime overhead lower.</li><li><b>Balanced</b> selects BALANCED source IR, adds payload compression when it reduces size, register remapping, dispatch variation, and standard integrity verification.</li><li><b>Maximum</b> selects SECURE source IR and VM layouts, stronger standard variation, and full integrity verification.</li></ul>',
         '<p>Use a deterministic seed only when you need reproducible build structure. Otherwise each build receives a fresh build-specific seed.</p>'
       ].join('')
     },
@@ -18,7 +18,7 @@
       title: 'Protection pipeline',
       body: [
         '<p>Darkfuscator does not turn source into renamed source and call that protection. The supported pipeline is:</p>',
-        '<ol><li><b>Lex and parse</b> Luau into syntax and scope information.</li><li><b>Optimize conservatively</b> with semantics-preserving AST literal folding and bytecode optimizations.</li><li><b>Compile</b> supported source to custom register bytecode.</li><li><b>Serialize</b> bytecode with per-build layout, opcode, string, and payload variation.</li><li><b>Verify and decode</b> in a generated custom VM loader.</li></ol>',
+        '<ol><li><b>Lex and parse</b> Luau into syntax, reference, and scope information.</li><li><b>Lower through a source-level IR</b> with bounded, semantics-preserving optimization and control-flow transforms. FAST, BALANCED, and SECURE select progressively more variation; <span class="mono">none</span> opts out.</li><li><b>Optimize conservatively</b> with AST literal folding and bytecode optimizations.</li><li><b>Compile</b> supported source to custom register bytecode.</li><li><b>Serialize</b> bytecode with per-build layout, opcode, string, and payload variation.</li><li><b>Verify and decode</b> in a generated custom VM loader.</li></ol>',
         '<h2>Payload protection</h2>',
         '<p>Each emitted payload receives a randomized alphabet, keyed byte transformations, encoded string constants, shuffled opcode identifiers, and generated handler layout. Optional RLE compression is only retained when it makes the serialized payload smaller.</p>',
         '<h2>Integrity verification</h2>',
@@ -44,7 +44,7 @@
         '<h2>POST /api/v1/obfuscate</h2>',
         '<pre class="code-block">curl -X POST ' + apiBase() + '/api/v1/obfuscate \\\n  -H "Authorization: Bearer dk_live_YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"source":"print(1)","preset":"balanced","target":"luau"}\'</pre>',
         '<h2>Request body</h2>',
-        '<ul><li><span class="mono">source</span> is required Luau source (up to 200,000 characters).</li><li><span class="mono">preset</span> is <span class="mono">lightweight</span>, <span class="mono">balanced</span>, or <span class="mono">maximum</span>.</li><li><span class="mono">target</span> is <span class="mono">luau</span> or <span class="mono">roblox</span>.</li><li><span class="mono">options</span> may include <span class="mono">vmLayers</span> (1–10), <span class="mono">junk</span> (0–4), <span class="mono">guard</span> (0–2), <span class="mono">antiTamper</span> / integrity verification (0–2), <span class="mono">vmMode</span>, <span class="mono">compression</span>, <span class="mono">seed</span>, and documented loader options.</li></ul>',
+        '<ul><li><span class="mono">source</span> is required Luau source (up to 200,000 characters).</li><li><span class="mono">preset</span> is <span class="mono">lightweight</span>, <span class="mono">balanced</span>, or <span class="mono">maximum</span>.</li><li><span class="mono">target</span> is <span class="mono">luau</span> or <span class="mono">roblox</span>.</li><li><span class="mono">options</span> may include <span class="mono">ir</span> (<span class="mono">none</span>, <span class="mono">fast</span>, <span class="mono">balanced</span>, or <span class="mono">secure</span>), <span class="mono">vmLayers</span> (1–10), <span class="mono">junk</span> (0–4), <span class="mono">guard</span> (0–2), <span class="mono">antiTamper</span> / integrity verification (0–2), <span class="mono">vmMode</span>, <span class="mono">compression</span>, <span class="mono">seed</span>, and documented loader options.</li></ul>',
         '<h2>Response</h2>',
         '<pre class="code-block">{\n  "ok": true,\n  "output": "-- Protected by Darkfuscator...",\n  "stats": { "vms": 2, "seed": 12345, "vmMode": "balanced" },\n  "warnings": [],\n  "target": "luau"\n}</pre>',
         '<p>The API returns actual engine output directly. It does not create a build-history entry; use the cookie-authenticated workspace build endpoint when you need stored history.</p>'

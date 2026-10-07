@@ -108,6 +108,15 @@ function stopServer(child) {
       assert.ok((me.data.user || me.data).verified);
     });
 
+    await test('source IR default is persisted server-side', async () => {
+      const saved = await call('PATCH', '/api/v1/me', { settings: { obfuscationDefaults: { ir: 'secure' } } }, null, savedToken);
+      assert.strictEqual(saved.status, 200, saved.raw.slice(0, 200));
+      assert.strictEqual(saved.data.settings.obfuscationDefaults.ir, 'secure');
+      const me = await call('GET', '/api/v1/me', null, null, savedToken);
+      assert.strictEqual(me.status, 200);
+      assert.strictEqual(me.data.settings.obfuscationDefaults.ir, 'secure');
+    });
+
     await test('bad signup and unverified login are rejected', async () => {
       const r = await call('POST', '/api/v1/auth/register', { username: 'x', email: 'x@dev.test', password: 'pumpkin42' });
       assert.strictEqual(r.status, 400);
@@ -143,9 +152,10 @@ function stopServer(child) {
     });
 
     await test('key obfuscates and usage counts', async () => {
-      const r = await call('POST', '/api/v1/obfuscate', { source: 'print("hi")', preset: 'maximum' }, key1);
+      const r = await call('POST', '/api/v1/obfuscate', { source: 'print("hi")', preset: 'lightweight', options: { ir: 'secure' } }, key1);
       assert.strictEqual(r.status, 200, r.raw.slice(0, 200));
       assert.ok(String(r.data.output).startsWith('-- Protected by Darkfuscator'));
+      assert.ok(r.data.stats && r.data.stats.ir && r.data.stats.ir.states > 0, 'secure IR stats were not returned');
       const login = await call('POST', '/api/v1/auth/login', { identifier: 'spooky_dev', password: 'pumpkin42' });
       const ck = cookieOf(login);
       const list = await call('GET', '/api/v1/keys', null, null, ck);

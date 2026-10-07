@@ -7,7 +7,7 @@
     "test": "tests"
   },
   "scripts": {
-    "test": "node tests/run.js && node tests/fuzz.js 20 && node tests/ui-test.js && node tests/run-antitamper.js && node tests/run-auth.js",
+    "test": "node tests/run.js && node tests/run-ir.js && node tests/fuzz.js 20 && node tests/ui-test.js && node tests/run-antitamper.js && node tests/run-auth.js",
     "start": "node tools/serve.js",
     "build:standalone": "node tools/build-standalone.js",
     "verify:standalone": "node tools/verify-standalone.js"

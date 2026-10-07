@@ -744,7 +744,7 @@ function getQuery(req) {
 function validTarget(t) { return t === 'luau' || t === 'roblox'; }
 
 const BUILD_OPTION_RANGES = { vmLayers: [1, 10], junk: [0, 4], guard: [0, 2], antiTamper: [0, 2] };
-const BUILD_OPTION_NAMES = new Set(['vmLayers', 'junk', 'guard', 'antiTamper', 'minify', 'watermark', 'captureGlobals', 'compression', 'vmMode', 'nameStyle', 'lockPlace', 'lockUniverse', 'seed']);
+const BUILD_OPTION_NAMES = new Set(['vmLayers', 'junk', 'guard', 'antiTamper', 'minify', 'watermark', 'captureGlobals', 'compression', 'vmMode', 'ir', 'nameStyle', 'lockPlace', 'lockUniverse', 'seed']);
 
 function validateBuildOptions(o) {
   if (o === undefined || o === null) return null;
@@ -759,6 +759,7 @@ function validateBuildOptions(o) {
     if (o[key] !== undefined && typeof o[key] !== 'boolean') return key + ' must be true or false';
   }
   if (o.vmMode !== undefined && ['fast', 'balanced', 'secure'].indexOf(o.vmMode) === -1) return 'vmMode must be fast, balanced, or secure';
+  if (o.ir !== undefined && ['none', 'fast', 'balanced', 'secure'].indexOf(o.ir) === -1) return 'ir must be none, fast, balanced, or secure';
   if (o.nameStyle !== undefined && ['short', 'random', 'confuse'].indexOf(o.nameStyle) === -1) return 'nameStyle must be short, random, or confuse';
   for (const key of ['lockPlace', 'lockUniverse']) {
     if (o[key] !== undefined && o[key] !== '' && !/^\d+$/.test(String(o[key]))) return key + ' must be a numeric Roblox ID';
@@ -777,6 +778,7 @@ function sanitizeOptions(o) {
     if (o[k] !== undefined) out[k] = !!o[k];
   }
   if (['fast', 'balanced', 'secure'].indexOf(o.vmMode) !== -1) out.vmMode = o.vmMode;
+  if (['none', 'fast', 'balanced', 'secure'].indexOf(o.ir) !== -1) out.ir = o.ir;
   if (['short', 'random', 'confuse'].indexOf(o.nameStyle) !== -1) out.nameStyle = o.nameStyle;
   for (const k of ['lockPlace', 'lockUniverse', 'seed']) {
     if (o[k] !== undefined && o[k] !== '') out[k] = String(o[k]).slice(0, 40);
@@ -806,6 +808,7 @@ function sanitizeSettings(next, cur) {
     out.obfuscationDefaults = Object.assign({}, out.obfuscationDefaults);
     if (validTarget(next.obfuscationDefaults.target)) out.obfuscationDefaults.target = next.obfuscationDefaults.target;
     if (['lightweight', 'balanced', 'maximum'].indexOf(next.obfuscationDefaults.preset) !== -1) out.obfuscationDefaults.preset = next.obfuscationDefaults.preset;
+    if (['none', 'fast', 'balanced', 'secure'].indexOf(next.obfuscationDefaults.ir) !== -1) out.obfuscationDefaults.ir = next.obfuscationDefaults.ir;
     if (['fast', 'balanced', 'secure'].indexOf(next.obfuscationDefaults.vmMode) !== -1) out.obfuscationDefaults.vmMode = next.obfuscationDefaults.vmMode;
     if (next.obfuscationDefaults.compression !== undefined) out.obfuscationDefaults.compression = !!next.obfuscationDefaults.compression;
   }

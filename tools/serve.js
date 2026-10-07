@@ -182,7 +182,7 @@ function handleApi(req, res, pathname) {
       if (optionIssue) return finish(400, { ok: false, error: optionIssue });
       if (target === 'roblox' && userOpts.antiTamper === undefined) options.antiTamper = 2;
       const engine = require(path.join(__dirname, '..', 'site', 'js', 'obfuscate.js'));
-      const allowed = ['vmLayers', 'junk', 'guard', 'antiTamper', 'vmMode', 'compression', 'nameStyle',
+      const allowed = ['vmLayers', 'junk', 'guard', 'antiTamper', 'vmMode', 'ir', 'compression', 'nameStyle',
         'seed', 'minify', 'watermark', 'captureGlobals', 'lockPlace', 'lockUniverse'];
       for (const a of allowed) if (userOpts[a] !== undefined) options[a] = userOpts[a];
       let result;

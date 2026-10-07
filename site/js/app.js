@@ -38,7 +38,7 @@
     return state.user.settings || {};
   }
   function defaults() {
-    return settings().obfuscationDefaults || { target: 'roblox', preset: 'balanced', vmMode: 'balanced', compression: true };
+    return settings().obfuscationDefaults || { target: 'roblox', preset: 'balanced', ir: 'balanced', vmMode: 'balanced', compression: true };
   }
   function editorPrefs() {
     const fallback = { fontSize: 13, tabSize: 4, wordWrap: false, lineNumbers: true, highlighting: true };
@@ -262,6 +262,12 @@
   }
 
   // -------------------------------------------------------- obfuscation view
+  const IR_MODES = [
+    ['none', 'None — compile parsed source directly'],
+    ['fast', 'Fast — conservative source-level lowering'],
+    ['balanced', 'Balanced — additional bounded control-flow variation'],
+    ['secure', 'Secure — strongest supported source-level variation']
+  ];
   const PROTECTION_MODES = [
     ['fast', 'Fast — minimal runtime overhead'],
     ['balanced', 'Balanced — remapped registers and shuffled dispatch'],
@@ -286,6 +292,7 @@
     const opts = Object.assign({
       target: project ? project.target : (d.target || 'roblox'),
       preset: project ? project.preset : (d.preset || 'balanced'),
+      ir: projectOptions.ir || d.ir || 'balanced',
       vmMode: projectOptions.vmMode || d.vmMode || 'balanced',
       compression: projectOptions.compression !== undefined ? !!projectOptions.compression : d.compression !== false,
       vmLayers: projectOptions.vmLayers || '', junk: projectOptions.junk || '', guard: projectOptions.guard || '',
@@ -306,7 +313,8 @@
       '<section class="settings-panel"><div class="panel-head"><div><h2>Protection settings</h2><p>Every control below is passed to the backend engine; unsupported target/runtime combinations are not shown.</p></div></div>' +
       '<div class="settings-columns"><div><h3>General</h3>' +
         settingRow('opt-target', 'Target', 'Implemented and tested targets only.', '<select id="opt-target"><option value="luau">Luau</option><option value="roblox">Roblox Luau</option></select>') +
-        settingRow('opt-preset', 'Preset', 'Presets select real compiler and VM settings. Fine-tuning below overrides the preset.', '<select id="opt-preset">' + selectOptions(['lightweight', 'balanced', 'maximum'], opts.preset) + '</select>') +
+        settingRow('opt-preset', 'Preset', 'Presets select real compiler, source IR, and VM settings. Fine-tuning below overrides the preset.', '<select id="opt-preset">' + selectOptions(['lightweight', 'balanced', 'maximum'], opts.preset) + '</select>') +
+        settingRow('opt-ir', 'Source IR', 'A bounded semantics-preserving lowering pass before custom-bytecode compilation. None skips this optional stage.', '<select id="opt-ir">' + selectOptions(IR_MODES, opts.ir) + '</select>') +
         settingRow('opt-vm-mode', 'VM mode', 'Fast avoids register indirection; secure increases runtime layout variation.', '<select id="opt-vm-mode">' + selectOptions(PROTECTION_MODES, opts.vmMode) + '</select>') +
         '<div class="fixed-capability"><strong>Custom bytecode & VM</strong><p>Always enabled. Darkfuscator does not return renamed source as “protected output.”</p><span>Included</span></div>' +
         '<div class="fixed-capability"><strong>Constant & string protection</strong><p>Constants are reorganized, encoded, and decoded lazily by the VM when needed.</p><span>Included</span></div>' +
@@ -332,6 +340,7 @@
     function setOptionsInView() {
       $('#opt-target').value = opts.target;
       $('#opt-preset').value = opts.preset;
+      $('#opt-ir').value = opts.ir;
       $('#opt-vm-mode').value = opts.vmMode;
       $('#opt-integrity').value = opts.antiTamper === '' ? '' : String(opts.antiTamper);
       $('#opt-junk').value = opts.junk === '' ? '' : String(opts.junk);
@@ -363,6 +372,7 @@
     }
     function optionsBody() {
       const out = {
+        ir: opts.ir,
         vmMode: opts.vmMode,
         compression: !!opts.compression,
         minify: opts.minify !== false,
@@ -417,9 +427,10 @@
     $('#opt-target').addEventListener('change', function () { opts.target = this.value; $('#roblox-locks').hidden = opts.target !== 'roblox'; });
     $('#opt-preset').addEventListener('change', function () {
       opts.preset = this.value;
-      const maps = { lightweight: { vmMode: 'fast', compression: false, antiTamper: 0, junk: 0, guard: 0 }, balanced: { vmMode: 'balanced', compression: true, antiTamper: 1, junk: 1, guard: 1 }, maximum: { vmMode: 'secure', compression: true, antiTamper: 2, junk: 2, guard: 2 } };
+      const maps = { lightweight: { ir: 'fast', vmMode: 'fast', compression: false, antiTamper: 0, junk: 0, guard: 0 }, balanced: { ir: 'balanced', vmMode: 'balanced', compression: true, antiTamper: 1, junk: 1, guard: 1 }, maximum: { ir: 'secure', vmMode: 'secure', compression: true, antiTamper: 2, junk: 2, guard: 2 } };
       Object.assign(opts, maps[opts.preset]); setOptionsInView();
     });
+    $('#opt-ir').addEventListener('change', function () { opts.ir = this.value; });
     $('#opt-vm-mode').addEventListener('change', function () { opts.vmMode = this.value; });
     $('#opt-integrity').addEventListener('change', function () { opts.antiTamper = this.value === '' ? '' : Number(this.value); });
     $('#opt-junk').addEventListener('change', function () { opts.junk = this.value === '' ? '' : Number(this.value); });
@@ -461,7 +472,7 @@
     $('#protect-button').addEventListener('click', protect);
     $('#save-defaults').addEventListener('click', async () => {
       try {
-        const next = { obfuscationDefaults: { target: opts.target, preset: opts.preset, vmMode: opts.vmMode, compression: !!opts.compression } };
+        const next = { obfuscationDefaults: { target: opts.target, preset: opts.preset, ir: opts.ir, vmMode: opts.vmMode, compression: !!opts.compression } };
         await saveSettings(next);
         notify('ok', 'Build defaults saved', formatTarget(opts.target) + ' · ' + formatPreset(opts.preset));
       } catch (error) { notify('bad', 'Could not save defaults', error.message); }
@@ -622,7 +633,7 @@
       '<section class="settings-section"><div class="section-head"><div><h2>Security</h2><p>Review access and take action on every session.</p></div></div><div class="content-grid two-one"><article class="panel"><div class="panel-head"><div><h3>Active sessions</h3><p>Sessions expire automatically. You can revoke any device.</p></div><button class="btn sm danger" id="logout-all" type="button">Logout all</button></div>' + sessionList(sessionsR.sessions || []) + '</article><aside class="panel"><h3>Password</h3><p class="muted">Changing your password signs out other active sessions.</p><button class="btn" id="change-password" type="button">Change password</button><div class="line"></div><h3>Security events</h3><button class="text-link button-link" id="show-events" type="button">View recent activity</button></aside></div></section>' +
       '<section class="settings-section"><div class="section-head"><div><h2>Appearance</h2><p>Preferences are saved to your account and applied immediately.</p></div></div><div class="panel settings-inline-grid"><div class="field"><label for="set-theme">Theme</label><select id="set-theme"><option value="dark"' + (a.theme !== 'light' ? ' selected' : '') + '>Dark</option><option value="light"' + (a.theme === 'light' ? ' selected' : '') + '>Light</option></select></div><div class="field"><label for="set-accent">Accent</label><select id="set-accent"><option value="orange"' + (a.accent !== 'purple' ? ' selected' : '') + '>Orange</option><option value="purple"' + (a.accent === 'purple' ? ' selected' : '') + '>Purple</option></select></div><div class="toggle-setting"><span><strong>Compact mode</strong><small>Tighter spacing in the app shell.</small></span><button class="toggle-control" id="set-compact" type="button"><span></span></button></div></div></section>' +
       '<section class="settings-section"><div class="section-head"><div><h2>Editor</h2><p>These settings control the source editor used by the workspace.</p></div></div><div class="panel settings-inline-grid"><div class="field"><label for="set-font-size">Font size</label><select id="set-font-size">' + selectOptions([11, 12, 13, 14, 16, 18], ed.fontSize) + '</select></div><div class="field"><label for="set-tab-size">Tab size</label><select id="set-tab-size">' + selectOptions([2, 4, 8], ed.tabSize) + '</select></div>' + toggleSetting('set-wrap', 'Word wrap', 'Wrap long editor lines.', !!ed.wordWrap) + toggleSetting('set-line-numbers', 'Line numbers', 'Show a line-number gutter.', ed.lineNumbers !== false) + toggleSetting('set-highlighting', 'Syntax highlighting', 'Highlight supported Luau syntax.', ed.highlighting !== false) + '</div></section>' +
-      '<section class="settings-section"><div class="section-head"><div><h2>Obfuscation defaults</h2><p>Applied to a new workspace unless a project overrides them.</p></div></div><div class="panel settings-inline-grid"><div class="field"><label for="set-default-target">Target</label><select id="set-default-target"><option value="roblox"' + (ob.target === 'roblox' ? ' selected' : '') + '>Roblox Luau</option><option value="luau"' + (ob.target === 'luau' ? ' selected' : '') + '>Luau</option></select></div><div class="field"><label for="set-default-preset">Preset</label><select id="set-default-preset">' + selectOptions(['lightweight', 'balanced', 'maximum'], ob.preset) + '</select></div><div class="field"><label for="set-default-mode">VM mode</label><select id="set-default-mode">' + selectOptions(PROTECTION_MODES, ob.vmMode || 'balanced') + '</select></div>' + toggleSetting('set-default-compression', 'Compress payload', 'Run the optional output size pass.', ob.compression !== false) + '</div></section>' +
+      '<section class="settings-section"><div class="section-head"><div><h2>Obfuscation defaults</h2><p>Applied to a new workspace unless a project overrides them.</p></div></div><div class="panel settings-inline-grid"><div class="field"><label for="set-default-target">Target</label><select id="set-default-target"><option value="roblox"' + (ob.target === 'roblox' ? ' selected' : '') + '>Roblox Luau</option><option value="luau"' + (ob.target === 'luau' ? ' selected' : '') + '>Luau</option></select></div><div class="field"><label for="set-default-preset">Preset</label><select id="set-default-preset">' + selectOptions(['lightweight', 'balanced', 'maximum'], ob.preset) + '</select></div><div class="field"><label for="set-default-ir">Source IR</label><select id="set-default-ir">' + selectOptions(IR_MODES, ob.ir || 'balanced') + '</select></div><div class="field"><label for="set-default-mode">VM mode</label><select id="set-default-mode">' + selectOptions(PROTECTION_MODES, ob.vmMode || 'balanced') + '</select></div>' + toggleSetting('set-default-compression', 'Compress payload', 'Run the optional output size pass.', ob.compression !== false) + '</div></section>' +
       '<section class="settings-section"><div class="section-head"><div><h2>Notifications</h2><p>Only notifications implemented by this platform are shown.</p></div></div><div class="panel">' + toggleSetting('set-build-notification', 'Build completion toast', 'Show a browser toast after this tab receives a completed build.', notices.buildCompletion !== false) + '</div></section>' +
       '<section class="danger-panel"><div><h2>Danger zone</h2><p>Deleting your account revokes sessions and API keys and removes stored projects, builds, sources, and output blobs.</p></div><button class="btn danger" id="delete-account" type="button">Delete account</button></section><div class="form-actions sticky-save"><button class="btn primary" id="save-settings" type="button">Save settings</button></div>';
     setToggle($('#set-compact'), !!a.compact); setToggle($('#set-wrap'), !!ed.wordWrap); setToggle($('#set-line-numbers'), ed.lineNumbers !== false); setToggle($('#set-highlighting'), ed.highlighting !== false); setToggle($('#set-default-compression'), ob.compression !== false); setToggle($('#set-build-notification'), notices.buildCompletion !== false);
@@ -636,7 +647,7 @@
     $('#delete-account').addEventListener('click', showDeleteAccountDialog);
     $('#save-settings').addEventListener('click', async () => {
       try {
-        const next = { appearance: { theme: $('#set-theme').value, accent: $('#set-accent').value, compact: readToggle('#set-compact') }, editor: { fontSize: Number($('#set-font-size').value), tabSize: Number($('#set-tab-size').value), wordWrap: readToggle('#set-wrap'), lineNumbers: readToggle('#set-line-numbers'), highlighting: readToggle('#set-highlighting') }, obfuscationDefaults: { target: $('#set-default-target').value, preset: $('#set-default-preset').value, vmMode: $('#set-default-mode').value, compression: readToggle('#set-default-compression') }, notifications: { buildCompletion: readToggle('#set-build-notification') } };
+        const next = { appearance: { theme: $('#set-theme').value, accent: $('#set-accent').value, compact: readToggle('#set-compact') }, editor: { fontSize: Number($('#set-font-size').value), tabSize: Number($('#set-tab-size').value), wordWrap: readToggle('#set-wrap'), lineNumbers: readToggle('#set-line-numbers'), highlighting: readToggle('#set-highlighting') }, obfuscationDefaults: { target: $('#set-default-target').value, preset: $('#set-default-preset').value, ir: $('#set-default-ir').value, vmMode: $('#set-default-mode').value, compression: readToggle('#set-default-compression') }, notifications: { buildCompletion: readToggle('#set-build-notification') } };
         await saveSettings(next); applyAppearance(); notify('ok', 'Settings saved');
       } catch (error) { notify('bad', 'Could not save settings', error.message); }
     });

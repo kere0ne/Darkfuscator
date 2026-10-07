@@ -1,6 +1,6 @@
 # Darkfuscator
 
-Darkfuscator is a Luau protection platform and custom-VM engine. It transforms supported Luau through a real lexer, parser, semantic analysis, conservative AST/bytecode optimization, custom register bytecode compiler, build-specific serializer, and generated VM loader. It does not return renamed source or a canned payload.
+Darkfuscator is a Luau protection platform and custom-VM engine. It transforms supported Luau through a real lexer, parser and semantic analysis, a configurable source-level IR pass, conservative AST/bytecode optimization, custom register bytecode compilation, build-specific serialization, and a generated VM loader. It does not return renamed source or a canned payload.
 
 > Client-side obfuscation raises the cost of reverse engineering; it cannot make code impossible to inspect or change on a machine that executes it. Keep secrets and authoritative decisions on trusted server-side systems.
 
@@ -14,7 +14,7 @@ Generic Lua, unknown runtimes, and executor-specific environments are not advert
 ## What a build does
 
 - Parses Luau and resolves scope information before compilation.
-- Performs semantics-preserving literal and bytecode optimizations.
+- Re-emits a semantics-preserving source-level IR at selectable `fast`, `balanced`, or `secure` intensity before conservative literal and bytecode optimization; `none` opts out of that source pass.
 - Compiles the supported input to custom register bytecode rather than shipping readable source.
 - Uses fresh per-build randomization for generated names, opcode identifiers, handler ordering, byte layout, string encoding, and payload serialization. A supplied text or numeric seed makes this structure reproducible.
 - Supports FAST, BALANCED, and SECURE runtime layouts; optional RLE compression is a size pass, not a security claim.
@@ -42,6 +42,7 @@ bin/luau-obfuscator.js   CLI entry point
 site/                    platform shells, docs, local engine page, and browser engine
 site/js/luau-lexer.js    lexer
 site/js/luau-parser.js   parser and scope resolution
+site/js/ir.js            source-level IR lowering and control-flow transforms
 site/js/pipeline.js      conservative AST optimization
 site/js/vm-compile.js    AST to custom register bytecode
 site/js/vm-emit.js       bytecode serialization and generated VM loader
@@ -60,9 +61,9 @@ node bin/luau-obfuscator.js input.luau --seed release-2026 --integrity 2
 node bin/luau-obfuscator.js input.luau --config build-options.json
 ```
 
-Supported flags are `--seed`, `--junk 0-4`, `--guard 0-2`, `--integrity 0-2`, `--vm-layers 1-10`, `--vm-mode fast|balanced|secure`, `--name-style short|random|confuse`, `--compression`, `--no-compression`, `--no-minify`, `--no-watermark`, `--no-capture-globals`, `--lock-place`, `--lock-universe`, `--config`, and `--quiet`.
+Supported flags are `--seed`, `--ir none|fast|balanced|secure`, `--junk 0-4`, `--guard 0-2`, `--integrity 0-2`, `--vm-layers 1-10`, `--vm-mode fast|balanced|secure`, `--name-style short|random|confuse`, `--compression`, `--no-compression`, `--no-minify`, `--no-watermark`, `--no-capture-globals`, `--lock-place`, `--lock-universe`, `--config`, and `--quiet`.
 
-The JSON config uses the engine option names: `preset`, `seed`, `junk`, `guard`, `antiTamper` (integrity level), `vmLayers`, `vmMode`, `nameStyle`, `minify`, `watermark`, `captureGlobals`, `compression`, `lockPlace`, and `lockUniverse`. Unsupported keys are rejected by the CLI.
+The JSON config uses the engine option names: `preset`, `seed`, `ir`, `junk`, `guard`, `antiTamper` (integrity level), `vmLayers`, `vmMode`, `nameStyle`, `minify`, `watermark`, `captureGlobals`, `compression`, `lockPlace`, and `lockUniverse`. Unsupported keys are rejected by the CLI.
 
 ## Development and checks
 

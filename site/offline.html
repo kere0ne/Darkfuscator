@@ -51,6 +51,7 @@
       <p class="dim" style="margin-bottom:14px">Every setting below is passed directly to the local engine. The target-specific place and universe locks should only be used for Roblox Luau builds.</p>
       <div class="settings-grid">
         <div class="field"><label for="opt-preset">Preset</label><select id="opt-preset"><option value="lightweight">Lightweight</option><option value="balanced" selected>Balanced</option><option value="maximum">Maximum</option></select></div>
+        <div class="field"><label for="opt-ir">Source IR</label><select id="opt-ir"><option value="none">None</option><option value="fast">Fast</option><option value="balanced" selected>Balanced</option><option value="secure">Secure</option></select><div class="hint">A bounded semantic source pass before custom-bytecode compilation.</div></div>
         <div class="field"><label for="opt-vm-mode">VM mode</label><select id="opt-vm-mode"><option value="fast">Fast</option><option value="balanced" selected>Balanced</option><option value="secure">Secure</option></select></div>
         <div class="field"><label for="opt-vm-layers">VM layers</label><select id="opt-vm-layers"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select><div class="hint">More layers increase output size and processing cost.</div></div>
         <div class="field"><label for="opt-junk">Control-flow variation</label><select id="opt-junk"><option value="0">Minimal</option><option value="1" selected>Balanced</option><option value="2">Strong</option><option value="3">Heavy</option><option value="4">Maximum size</option></select></div>
@@ -71,6 +72,7 @@
 </div>
 <script src="/js/luau-lexer.js"></script>
 <script src="/js/luau-parser.js"></script>
+<script src="/js/ir.js"></script>
 <script src="/js/pipeline.js"></script>
 <script src="/js/vm-compile.js"></script>
 <script src="/js/vm-emit.js"></script>

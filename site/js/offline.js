@@ -18,7 +18,7 @@
   };
 
   var controls = {
-    preset: $('opt-preset'), vmMode: $('opt-vm-mode'), vmLayers: $('opt-vm-layers'),
+    preset: $('opt-preset'), ir: $('opt-ir'), vmMode: $('opt-vm-mode'), vmLayers: $('opt-vm-layers'),
     junk: $('opt-junk'), guard: $('opt-guard'), antiTamper: $('opt-integrity'),
     nameStyle: $('opt-name-style'), seed: $('opt-seed'), lockPlace: $('opt-lock-place'),
     lockUniverse: $('opt-lock-universe'), compression: $('opt-compression'),
@@ -26,9 +26,9 @@
   };
 
   var PRESETS = {
-    lightweight: { vmMode: 'fast', vmLayers: '1', junk: '0', guard: '0', antiTamper: '0', compression: false },
-    balanced: { vmMode: 'balanced', vmLayers: '2', junk: '1', guard: '1', antiTamper: '1', compression: true },
-    maximum: { vmMode: 'secure', vmLayers: '4', junk: '2', guard: '2', antiTamper: '2', compression: true }
+    lightweight: { ir: 'fast', vmMode: 'fast', vmLayers: '1', junk: '0', guard: '0', antiTamper: '0', compression: false },
+    balanced: { ir: 'balanced', vmMode: 'balanced', vmLayers: '2', junk: '1', guard: '1', antiTamper: '1', compression: true },
+    maximum: { ir: 'secure', vmMode: 'secure', vmLayers: '4', junk: '2', guard: '2', antiTamper: '2', compression: true }
   };
 
   function setStatus(text, kind) {
@@ -73,6 +73,7 @@
     var seed = controls.seed ? controls.seed.value.trim() : '';
     var opts = {
       preset: controls.preset ? controls.preset.value : 'balanced',
+      ir: controls.ir ? controls.ir.value : 'balanced',
       vmMode: controls.vmMode ? controls.vmMode.value : 'balanced',
       vmLayers: Math.max(1, Math.min(10, parseInt(controls.vmLayers && controls.vmLayers.value, 10) || 2)),
       junk: Math.max(0, Math.min(4, parseInt(controls.junk && controls.junk.value, 10) || 0)),

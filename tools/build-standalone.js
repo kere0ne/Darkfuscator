@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /*
  * Build one self-contained local-engine page. The result includes the real
- * parser, compiler, optimizer, VM emitter, and local workspace wiring, so it
+ * parser, source-level IR, compiler, optimizer, VM emitter, and local workspace wiring, so it
  * works from disk without a service, account, history, or API-key simulation.
  *
  *   node tools/build-standalone.js [output.html]
@@ -16,7 +16,7 @@ const DEFAULT_OUT = path.join(__dirname, '..', 'darkfuscator-standalone.html');
 const OUT = require.main === module && process.argv[2]
   ? path.resolve(process.argv[2]) : DEFAULT_OUT;
 const SCRIPTS = [
-  'js/luau-lexer.js', 'js/luau-parser.js', 'js/pipeline.js', 'js/vm-compile.js',
+  'js/luau-lexer.js', 'js/luau-parser.js', 'js/ir.js', 'js/pipeline.js', 'js/vm-compile.js',
   'js/vm-emit.js', 'js/obfuscate.js', 'js/offline.js'
 ];
 
