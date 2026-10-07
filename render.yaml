@@ -1,27 +1,10 @@
-# Render blueprint: Darkfuscator is a fully client-side static site,
-# so there is no build step; site/ is published as-is.
+# Render blueprint: the site and the REST API run in one zero-dependency
+# Node service (tools/serve.js serves site/ and /api/v1/*).
 services:
   - type: web
     name: darkfuscator
-    runtime: static
-    staticPublishPath: ./site
+    runtime: node
+    buildCommand: yarn install
+    startCommand: yarn start
+    healthCheckPath: /api/v1/health
     autoDeploy: true
-    headers:
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-      - path: /*
-        name: Permissions-Policy
-        value: geolocation=(), microphone=(), camera=()
-      - path: /*
-        name: Cross-Origin-Opener-Policy
-        value: same-origin
-      - path: /styles.css
-        name: Cache-Control
-        value: public, max-age=3600
-      - path: /js/*
-        name: Cache-Control
-        value: public, max-age=3600
