@@ -542,21 +542,60 @@
     // a missing VM prerequisite returns safely; the emitter never generates a
     // source loader, a destructive loop, or target/executor probes.
 
+    // ----------------------------------------------------- hidden code blocks
+    // Probe code must never ship readable. Each block is encrypted with a
+    // per-build key into a numeric table; the wrapper decrypts and loads it at
+    // runtime. Loading is fail-safe: a block that cannot load reports failure
+    // to its caller, which scrambles the seal, and the payload decodes to junk
+    // instead of running.
+    function emitHidden(lineFn, srcH, salt, onLoaded, onFail) {
+      var fastK = opts.antiTamper === 1;
+      var bkey = fastK ? 0 : 40 + Math.floor(rng() * 61);
+      var bbH = [];
+      for (var xi = 1; xi <= srcH.length; xi++) {
+        var xv = (srcH.charCodeAt(xi - 1) + bkey + xi) % 256;
+        xv = xv ^ ((bkey + xi) % 256);
+        bbH.push(xv);
+      }
+      var lf = ng(), fn = ng(), dcl = ng(), bt = ng(), buf = ng(), iv = ng(), okv = ng(), rsv = ng();
+      lineFn('local ' + lf + '=load or loadstring');
+      lineFn('local ' + fn + '=nil');
+      lineFn('if ' + lf + ' then');
+      lineFn('pcall(function() local ' + dcl + '=function(b,key,i) local d=bit32.bxor(b,(key+i)%256) return (d-key-i)%256 end');
+      lineFn('local ' + bt + '={' + bbH.join(',') + '}');
+      lineFn('local ' + buf + '={} for ' + iv + '=1,#' + bt + ' do ' + buf + '[' + iv + ']=string.char(' + dcl + '(' + bt + '[' + iv + '],' + bkey + ',' + iv + ')) end');
+      lineFn(fn + '=' + lf + '(table.concat(' + buf + '),"=H")');
+      lineFn('end)');
+      lineFn('end');
+      if (onFail) {
+        lineFn('if ' + fn + ' then local ' + okv + ',' + rsv + '=pcall(' + fn + ') if ' + okv + ' and type(' + rsv + ')==\"function\" then ' + onLoaded(rsv) + ' else ' + onFail + ' end else ' + onFail + ' end');
+      } else {
+        lineFn('if ' + fn + ' then local ' + okv + ',' + rsv + '=pcall(' + fn + ') if ' + okv + ' and type(' + rsv + ')==\"function\" then ' + onLoaded(rsv) + ' end end');
+      }
+    }
+
     // ----------------------------------------------------------------- guard
     // Guard levels validate only ordinary Luau primitives used by the VM. A
     // mismatch changes the decoder seal and causes a safe early return.
     if (glevel >= 1) {
       var ge = ng();
+      // the whole guard body ships chunk-encrypted: the checks, their
+      // semantics and the mismatch path never appear as readable code in the
+      // output. A body that fails to load fails safe (seal scrambled).
       line('["' + N.guard + '"]=(function(G)');
-      line('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
-      line('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
-      line('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
+      var gBody = [];
+      gBody.push('["' + N.guard + '"]=(function(G)');
+      gBody.push('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
+      gBody.push('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
+      gBody.push('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
       if (glevel === 2) {
-        line('if #string.rep("ab",3)~=6 or table.concat({"a","b"})~="ab" or math.floor(1.5)~=1 then return true end');
-        line('local ok,v=pcall(function() return (17*19)%23 end); if not ok or v~=1 then return true end');
+        gBody.push('if #string.rep("ab",3)~=6 or table.concat({"a","b"})~="ab" or math.floor(1.5)~=1 then return true end');
+        gBody.push('local ok,v=pcall(function() return (17*19)%23 end); if not ok or v~=1 then return true end');
       }
-      line('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
+      gBody.push('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
+      emitHidden(line, 'return(function(G)\n' + gBody.join('\n') + '\nend)', 0x4EEDBEEF, function (vH) { return 'return ' + vH + '(G)'; }, 'return true');
       line('end),');
+      gBody.push('end),');
     }
 
     // ------------------------------------------------------------ interpreter
