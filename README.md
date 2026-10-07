@@ -9,8 +9,10 @@ A Luau obfuscator that compiles readable Lua into **encrypted custom bytecode ru
 - **Per-request randomization** — opcodes, names and structure shuffle every run, so no two payloads match.
 - **Anti-tamper** — integrity checks detect and reject modified bytecode, with multi-layer encryption and a chunked encrypted loader.
 - **Decompiler resistance** — standard Lua decompilers output garbage: there is no Lua bytecode to read in the first place.
-- **Heavy junk** — up to 100k dead statements (about 900 KB) of dense arithmetic noise wrap every maximum build.
-- **Nested VM** — maximum builds compile again into a second, independently randomized VM (auto-off for payloads above 200 KB).
+- **Heavy junk** — up to 220k dead statements (about 2 MB) of dense arithmetic noise at junk level 4; 100k / 900 KB at level 3.
+- **Nested VM** — up to 10 stacked, independently randomized VMs; the stack auto-caps when the payload outgrows nesting.
+- **Hidden anti-tamper** — the 29-check battery ships obfuscated through Darkfuscator itself, so no check code, names or warn strings are readable.
+- **Accounts + saved keys** — sign up on the site and dk_live_ keys are saved to your account; create, list and revoke them on the Account page.
 - **Silent failure** — detection paths scramble the seal or wipe material quietly; there is no branded error string to grep for.
 
 ## Folder structure
@@ -48,7 +50,7 @@ luau-obfuscator input.luau output.luau --seed 1337
 luau-obfuscator input.luau output.luau --config cfg.json
 ```
 
-Presets: `lightweight`, `balanced`, `maximum` (default). Knobs: `--seed`, `--junk 0-3`, `--guard 0-2`, `--env-checks 0-2`, `--anti-tamper 0-2`, `--vm-layers 1-2`, `--name-style short|random|confuse`, `--lock-place`, `--lock-universe`, `--env-lock`, `--no-minify`, `--no-watermark`.
+Presets: `lightweight`, `balanced`, `maximum` (default). Knobs: `--seed`, `--junk 0-4`, `--guard 0-2`, `--env-checks 0-2`, `--anti-tamper 0-2`, `--vm-layers 1-10`, `--name-style short|random|confuse`, `--lock-place`, `--lock-universe`, `--env-lock`, `--no-minify`, `--no-watermark`.
 
 Full documentation, the VM architecture explanation, the bytecode format, and the runtime security model live at `docs.html` (and mirrored on the site sidebar).
 

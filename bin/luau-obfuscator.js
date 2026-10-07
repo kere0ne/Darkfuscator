@@ -34,7 +34,7 @@ function usage() {
   console.log('  --guard <0|1|2>       anti-environment audit strength');
   console.log('  --env-checks <0|1|2>  anti-env probes + environment-derived seal');
   console.log('  --anti-tamper <0|1|2> chunked encrypted loader: off | fast | full');
-  console.log('  --vm-layers <1|2>     2 = nested second VM (auto-off for big payloads)');
+  console.log('  --vm-layers <1-10>    stacked VMs (the stack auto-caps on huge payloads)');
   console.log('  --name-style <s>      short | random | confuse');
   console.log('  --no-minify           keep one slot per line');
   console.log('  --no-watermark        drop the leading comment');

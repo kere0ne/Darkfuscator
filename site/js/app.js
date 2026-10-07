@@ -66,7 +66,7 @@
   var PRESETS = {
     lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
     balanced: { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2 },
-    maximum: { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 5 }
+    maximum: { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 10 }
   };
 
   function applyPreset(name) {
@@ -89,7 +89,7 @@
       guard: intVal(levelSels.guard, 2),
       envChecks: intVal(levelSels.envChecks, 2),
       antiTamper: intVal(levelSels.antiTamper, 2),
-      vmLayers: Math.min(5, Math.max(1, intVal(levelSels.vmLayers, 5))),
+      vmLayers: Math.min(10, Math.max(1, intVal(levelSels.vmLayers, 10))),
       nameStyle: nameStyleSel ? nameStyleSel.value : 'random',
       minify: !switches.minify || switches.minify.classList.contains('on'),
       watermark: !switches.watermark || switches.watermark.classList.contains('on'),

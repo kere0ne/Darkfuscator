@@ -26,8 +26,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg>
         API
       </a>
+            <a class="side-btn" href="account.html" title="Account">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+        Account
+      </a>
       <div class="sidebar-foot">
-        <div class="ver-chip" id="ver-chip">v6.0.0</div>
+        <div class="ver-chip" id="ver-chip">v6.1.0</div>
         <div class="foot-note">REST API.<br>JSON in, protected payload out.</div>
       </div>
     </aside>
@@ -72,8 +76,8 @@
           <tbody>
             <tr><td>source</td><td>The Luau code to protect. Required. Max 200,000 chars.</td><td>string</td><td>&mdash;</td></tr>
             <tr><td>preset</td><td>Fills the levels below; explicit options win afterwards.</td><td>lightweight · balanced · maximum</td><td>&mdash;</td></tr>
-            <tr><td>options.vmLayers</td><td>Stacked proprietary VMs, outer to inner.</td><td>1&ndash;5</td><td>5</td></tr>
-            <tr><td>options.junk</td><td>Dead code wrapped around the build.</td><td>0&ndash;3 (3 is ~900 KB)</td><td>3</td></tr>
+            <tr><td>options.vmLayers</td><td>Stacked proprietary VMs, outer to inner.</td><td>1&ndash;10</td><td>5</td></tr>
+            <tr><td>options.junk</td><td>Dead code wrapped around the build.</td><td>0&ndash;4 (3 is ~900 KB, 4 is ~2 MB)</td><td>3</td></tr>
             <tr><td>options.guard</td><td>Silent checksum and integrity guards.</td><td>0&ndash;2</td><td>2</td></tr>
             <tr><td>options.envChecks</td><td>Detects environment-logging tools.</td><td>0&ndash;2</td><td>2</td></tr>
             <tr><td>options.antiTamper</td><td>Chunked loader wrapper.</td><td>0 off · 1 fast · 2 full</td><td>2</td></tr>
@@ -133,6 +137,26 @@ print(res.Body)</div>
       <section class="card" id="notes">
         <h2 class="card-title">5. Good to know</h2>
         <p class="page-desc" style="margin-top:6px">CORS is open, so your site can call the API directly. Keep the key on your server and proxy calls through it, so nobody lifts your key from view-source. Keys live on the service's disk; if the host rebuilds the service they reset, so keep yours backed up. Health check: <span class="code-inline">GET /api/v1/health</span>. Obfuscation makes scripts hard to reverse; it is not a security boundary.</p>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">6. Accounts and saved keys</h2>
+        <p class="page-desc" style="margin-top:6px">Sign up on the <a href="account.html">Account page</a> and every key you create is saved to your account instead of being shown once. Same keys, same API, same limits; the dashboard shows usage per key and lets you revoke.</p>
+        <div class="table-wrap">
+          <table class="key-table">
+            <thead><tr><th>Endpoint</th><th>Body</th><th>Returns</th></tr></thead>
+            <tbody>
+              <tr><td><span class="code-inline">POST /api/v1/signup</span></td><td>{username, password}</td><td>{ok, token, username}</td></tr>
+              <tr><td><span class="code-inline">POST /api/v1/login</span></td><td>{username, password}</td><td>{ok, token, username}</td></tr>
+              <tr><td><span class="code-inline">GET /api/v1/me</span></td><td>Bearer df_sess_ token</td><td>{ok, username, keys, totalUses}</td></tr>
+              <tr><td><span class="code-inline">GET /api/v1/keys</span></td><td>Bearer df_sess_ token</td><td>{ok, keys: [...]} your saved keys</td></tr>
+              <tr><td><span class="code-inline">POST /api/v1/keys</span></td><td>{name?}</td><td>signed in: saved to your account; anonymous: shown once</td></tr>
+              <tr><td><span class="code-inline">DELETE /api/v1/keys/&lt;key&gt;</span></td><td>Bearer df_sess_ token</td><td>{ok, revoked} owner only</td></tr>
+              <tr><td><span class="code-inline">POST /api/v1/logout</span></td><td>Bearer df_sess_ token</td><td>{ok}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="page-desc" style="margin-top:10px">Passwords are salted PBKDF2-SHA256, never stored in the clear. Sessions last 30 days. Up to 25 keys per account.</p>
       </section>
 
       <p class="foot-line">Darkfuscator · free API, rate limited, be kind to it.</p>
