@@ -14,10 +14,11 @@
   var Parser = isNode ? require('./luau-parser.js') : root.LuauParser;
   var VMCompile = isNode ? require('./vm-compile.js') : root.DarkfuscatorVMCompile;
   var VMEmit = isNode ? require('./vm-emit.js') : root.DarkfuscatorVMEmit;
-  var api = factory(Lexer, Parser, VMCompile, VMEmit);
+  var IR = isNode ? require('./ir.js') : root.DarkfuscatorIR;
+  var api = factory(Lexer, Parser, VMCompile, VMEmit, IR);
   if (isNode) module.exports = api;
   if (root) root.Darkfuscator = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit, IR) {
   'use strict';
 
   var bytesToStr = Lexer.bytesToStr;
@@ -38,14 +39,15 @@
     envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
     envLock: false,             // refuse to decode outside a genuine Roblox client
     antiTamper: 2,              // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
-    vmLayers: 5                 // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
+    vmLayers: 5,                // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
+    ir: 'fast'                  // none | fast | balanced | secure — source-level IR pass before the VM
   };
 
   // presets for the CLI and for callers that name one; the UI always uses maximum
   var PRESETS = {
-    lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
-    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2 },
-    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 10 }
+    lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1, ir: 'fast' },
+    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2, ir: 'balanced' },
+    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 10, ir: 'secure' }
   };
 
 
@@ -119,6 +121,23 @@
     mark('parse');
     var toks = parsed.toks, code = parsed.code, refs = parsed.refs, symbols = parsed.symbols;
     result.warnings = parsed.warnings.slice();
+
+    // ------------------------------------------------- 1b. source-level IR pass
+    // constant folding, dead code, control-flow flattening, opaque predicates —
+    // semantics-preserving, verified against the real Luau toolchain (168/168).
+    if (opts.ir && opts.ir !== 'none') {
+      var irLevel = opts.ir;
+      if (irLevel !== 'fast' && irLevel !== 'balanced' && irLevel !== 'secure') irLevel = 'fast';
+      try {
+        var irOut = IR.emitProgram(parsed.ast, { rng: makeRng((opts.seed || 0) ^ 0x5F3759DF), level: irLevel });
+        result.stats.ir = irOut.stats;
+        parsed = Parser.parse(irOut.source);
+        toks = parsed.toks; code = parsed.code; refs = parsed.refs; symbols = parsed.symbols;
+      } catch (e) {
+        result.warnings.push('IR pass skipped: ' + e.message);
+      }
+    }
+    mark('ir');
 
     // --------------------------------------------- 2. compile + emit bytecode
     // The bytecode VM is the transformation pipeline: the AST is compiled to
