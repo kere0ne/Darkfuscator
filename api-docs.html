@@ -63,11 +63,10 @@
       <section class="card" id="obfuscate">
         <h2 class="card-title">2. Obfuscate</h2>
         <p class="page-desc" style="margin-top:6px">Send Luau source, get back a self-contained encrypted custom-bytecode payload, the same build the website produces. Line 1 of every payload is the Darkfuscator banner.</p>
-        <div class="code-block"><span class="k">POST</span> /api/v1/obfuscate
-<span class="k">Authorization</span>: Bearer dk_live_YOUR_KEY
-<span class="k">Content-Type</span>: application/json
-
-{ "source": "print(\"hello\")", "preset": "maximum" }</div>
+        <div class="code-block">curl -X POST https://darkfuscator.onrender.com/api/v1/obfuscate \
+  -H <span class="k">"Authorization: Bearer dk_live_YOUR_KEY"</span> \
+  -H <span class="k">"Content-Type: application/json"</span> \
+  -d <span class="k">'{"source":"print(\"hello\")","preset":"maximum"}'</span></div>
         <table class="doc-table">
           <thead><tr><th>Body field</th><th>What it does</th><th>Values</th><th>Default</th></tr></thead>
           <tbody>
