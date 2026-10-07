@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#121212">
+<title>Darkfuscator — Enter your key</title>
+<link rel="stylesheet" href="/styles.css">
+<style>
+  body { background: #121212; }
+  .start-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .start-card { background: #181818; border: 1px solid #2c2c2c; border-radius: 16px; padding: 56px 32px; width: 100%; max-width: 560px; text-align: center; }
+  .start-card h1 { color: #ddaad4; font-size: 44px; margin: 0 0 18px; letter-spacing: -0.5px; }
+  .start-card p { color: #a89fa9; font-size: 17px; margin: 0 0 28px; }
+  .start-card input { width: 100%; background: #242424; border: 1px solid #2c2c2c; color: #f2eef3; border-radius: 10px; padding: 16px 18px; font-size: 16px; text-align: center; letter-spacing: 1px; }
+  .start-card button { width: 100%; margin-top: 14px; background: #ddaad4; color: #221019; border: 0; border-radius: 10px; padding: 16px 18px; font-size: 19px; font-weight: 600; cursor: pointer; }
+  .start-card button:hover { background: #e9c4e1; }
+  .start-back { display: inline-block; margin-top: 22px; color: #7c727c; font-size: 15px; }
+  .start-err { color: #fb7185; font-size: 14px; min-height: 18px; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="start-wrap">
+  <section class="start-card">
+    <h1>Enter Your Key</h1>
+    <p>Put your license key below to access the dashboard</p>
+    <form id="kf">
+      <input id="key" name="key" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXX" autocomplete="off" autofocus>
+      <button type="submit">Verify &amp; Access Dashboard</button>
+    </form>
+    <p class="start-err" id="err"></p>
+    <a class="start-back" href="/">&larr; Back to Home</a>
+  </section>
+</div>
+<script>
+document.getElementById('kf').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  var err = document.getElementById('err');
+  err.textContent = '';
+  var key = document.getElementById('key').value.trim();
+  if (!key) { err.textContent = 'Enter your key first.'; return; }
+  try {
+    var r = await fetch('/api/v1/auth/key-login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, remember: true })
+    });
+    var j = await r.json();
+    if (j && j.ok) { window.location.href = '/dashboard'; return; }
+    err.textContent = (j && j.error) || 'Key not recognized.';
+  } catch (ex) { err.textContent = 'Network error. Try again.'; }
+});
+</script>
+</body>
+</html>

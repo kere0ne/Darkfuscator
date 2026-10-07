@@ -10,12 +10,12 @@
  * Very dark charcoal base, orange primary, purple secondary. Thin borders,
  * small radii, no big gradients, no glow. Serious developer-tool aesthetic. */
 :root {
-  --bg: #0b0b10; --panel: #12121a; --panel2: #171722; --panel3: #1c1c29;
-  --border: #262633; --border-soft: #20202c; --border-strong: #33334a;
-  --text: #f4f4f8; --text-dim: #a2a2b5; --text-faint: #72728a;
-  --accent: #ff7918; --accent2: #ff8c3a; --accent-ink: #16100a;
-  --accent-soft: rgba(255, 121, 24, 0.12);
-  --purple: #8b5cf6; --purple2: #a78bfa; --purple-soft: rgba(139, 92, 246, 0.12);
+  --bg: #121212; --panel: #181818; --panel2: #1e1e1e; --panel3: #242424;
+  --border: #2c2c2c; --border-soft: #242424; --border-strong: #3a3a3a;
+  --text: #f2eef3; --text-dim: #a89fa9; --text-faint: #7c727c;
+  --accent: #ddaad4; --accent2: #e9c4e1; --accent-ink: #221019;
+  --accent-soft: rgba(221, 170, 212, 0.13);
+  --purple: #b57edc; --purple2: #d0a5e8; --purple-soft: rgba(181, 126, 220, 0.13);
   --green: #4ade80; --green-soft: rgba(74, 222, 128, 0.12);
   --red: #fb7185; --red-soft: rgba(251, 113, 133, 0.12);
   --yellow: #facc15; --yellow-soft: rgba(250, 204, 21, 0.12);
@@ -25,13 +25,13 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --sidebar-w: 216px; --sidebar-w-compact: 64px;
 }
-body[data-accent="purple"] { --accent: #8b5cf6; --accent2: #a78bfa; --accent-ink: #17111f; --accent-soft: rgba(139,92,246,0.14); }
+body[data-accent="purple"] { --accent: #b57edc; --accent2: #d0a5e8; --accent-ink: #1c1020; --accent-soft: rgba(181,126,220,0.14); }
 body[data-accent="green"] { --accent: #34d399; --accent2: #6ee7b7; --accent-ink: #0a1512; --accent-soft: rgba(52,211,153,0.14); }
 body[data-accent="red"] { --accent: #fb7185; --accent2: #fda4af; --accent-ink: #1a0a0e; --accent-soft: rgba(251,113,133,0.14); }
 body[data-theme="light"] {
-  --bg: #f6f6f9; --panel: #ffffff; --panel2: #f2f2f6; --panel3: #eaeaef;
-  --border: #d9d9e4; --border-soft: #e4e4ec; --border-strong: #c2c2d4;
-  --text: #17171f; --text-dim: #55556a; --text-faint: #8888a0;
+  --bg: #121212; --panel: #181818; --panel2: #1e1e1e; --panel3: #242424;
+  --border: #2c2c2c; --border-soft: #242424; --border-strong: #3a3a3a;
+  --text: #f2eef3; --text-dim: #a89fa9; --text-faint: #7c727c;
   --shadow: 0 8px 24px rgba(30,30,60,0.10);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -5883,9 +5883,25 @@ body.platform-body { overflow-x: hidden; }
       gBody.push('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
       gBody.push('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
       gBody.push('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
+      // deep battery: every probe is verified against a clean Luau VM and
+      // flags only positive evidence of tampering (an environment that lacks
+      // an API passes instead of tripping the seal), so executor sandboxes
+      // and plain interpreters both pass honest builds.
+      gBody.push('do local ok,v=pcall(function() return select("#",pcall(function(a,b,c) return a,b,c end,1,2,3)) end); if ok and v~=4 then return true end end');
+      gBody.push('do local mk={5,9,2} local ok,e=pcall(error,mk); if ok==true or e~=mk then return true end end');
+      gBody.push('do local ok,m=pcall(getmetatable,""); if ok and type(m)=="table" and m.__index~=nil and m.__index~=string then return true end end');
+      gBody.push('do local ok,m=pcall(getmetatable,""); if ok and type(m)=="table" and getmetatable("")~=m then return true end end');
+      gBody.push('if _G.__BREAKPOINT__~=nil or _G.__DEBUG__~=nil or _G.__ATTACHED__~=nil then return true end');
+      gBody.push('do if type(debug)=="table" and type(debug.info)=="function" then local ok,s=pcall(debug.info,1,"s"); if ok and type(s)~="string" then return true end end end');
+      gBody.push('do local ok,v=pcall(getfenv,1000000); if ok and type(v)=="table" then return true end end');
+      gBody.push('do if type(newproxy)=="function" then local ok,v=pcall(newproxy,true); if ok and type(v)=="userdata" then local ok2,m=pcall(getmetatable,v); if ok2 and type(m)~="table" then return true end end end end');
       if (glevel === 2) {
         gBody.push('if #string.rep("ab",3)~=6 or table.concat({"a","b"})~="ab" or math.floor(1.5)~=1 then return true end');
         gBody.push('local ok,v=pcall(function() return (17*19)%23 end); if not ok or v~=1 then return true end');
+        gBody.push('do local ok,v=pcall(function() return string.byte("A")==65 and string.char(65)=="A" and ("abc"):sub(2)=="bc" and ("ab"):rep(3)=="ababab" and #"abc"==3 and math.floor(1.5)==1 and math.max(2,5)==5 and table.concat({"a","b","c"},",")=="a,b,c" and tostring(123)=="123" and tonumber("255")==255 and select("#",1,2,3)==3 end); if ok and v~=true then return true end end');
+        gBody.push('do local ok,v=pcall(function() return string.sub==string["sub"] and table.concat==table["concat"] and (type(bit32)~="table" or bit32.bxor==bit32["bxor"]) end); if ok and v~=true then return true end end');
+        gBody.push('do local u=unpack or table.unpack; if type(u)=="function" then local ok,v=pcall(function() return select("#",u(1,2,3)) end); if ok and v~=3 then return true end end end');
+        gBody.push('do if type(os)=="table" and type(os.clock)=="function" then local a=os.clock() local b=os.clock() if b<a then return true end end end');
       }
       gBody.push('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
       emitHidden(line, 'return(function(G)\n' + gBody.join('\n') + '\nend)', 0x4EEDBEEF, function (vH) { return 'return ' + vH + '(G)'; }, 'return true');
@@ -6079,8 +6095,8 @@ body.platform-body { overflow-x: hidden; }
   // API expose the same bounded values rather than environment-specific probes.
   var PRESETS = {
     lightweight: { junk: 0, guard: 0, antiTamper: 0, vmMode: 'fast', compression: false, vmLayers: 1, ir: 'fast' },
-    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 2, ir: 'balanced' },
-    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 4, ir: 'secure' }
+    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 1, ir: 'balanced' },
+    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 1, ir: 'secure' }
   };
 
 
@@ -6149,7 +6165,7 @@ body.platform-body { overflow-x: hidden; }
     for (var k in DEFAULTS) opts[k] = DEFAULTS[k];
     // resolution order: defaults <- preset <- explicit options (explicit wins)
     var presetName = (options || {}).preset;
-    if (presetName && PRESETS[presetName]) {
+    if (PRESETS[presetName]) {
       var ps = PRESETS[presetName];
       for (var pk in ps) opts[pk] = ps[pk];
     }
@@ -6385,7 +6401,7 @@ body.platform-body { overflow-x: hidden; }
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '7.0.0'
+    version: '7.2.0'
   };
 });
 

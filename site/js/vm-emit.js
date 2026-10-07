@@ -587,9 +587,25 @@
       gBody.push('if type(G)~="table" or type(bit32)~="table" or type(bit32.bxor)~="function" then return true end');
       gBody.push('if type(string)~="table" or type(string.char)~="function" or type(string.sub)~="function" then return true end');
       gBody.push('if type(table)~="table" or type(table.concat)~="function" or type(setmetatable)~="function" then return true end');
+      // deep battery: every probe is verified against a clean Luau VM and
+      // flags only positive evidence of tampering (an environment that lacks
+      // an API passes instead of tripping the seal), so executor sandboxes
+      // and plain interpreters both pass honest builds.
+      gBody.push('do local ok,v=pcall(function() return select("#",pcall(function(a,b,c) return a,b,c end,1,2,3)) end); if ok and v~=4 then return true end end');
+      gBody.push('do local mk={5,9,2} local ok,e=pcall(error,mk); if ok==true or e~=mk then return true end end');
+      gBody.push('do local ok,m=pcall(getmetatable,""); if ok and type(m)=="table" and m.__index~=nil and m.__index~=string then return true end end');
+      gBody.push('do local ok,m=pcall(getmetatable,""); if ok and type(m)=="table" and getmetatable("")~=m then return true end end');
+      gBody.push('if _G.__BREAKPOINT__~=nil or _G.__DEBUG__~=nil or _G.__ATTACHED__~=nil then return true end');
+      gBody.push('do if type(debug)=="table" and type(debug.info)=="function" then local ok,s=pcall(debug.info,1,"s"); if ok and type(s)~="string" then return true end end end');
+      gBody.push('do local ok,v=pcall(getfenv,1000000); if ok and type(v)=="table" then return true end end');
+      gBody.push('do if type(newproxy)=="function" then local ok,v=pcall(newproxy,true); if ok and type(v)=="userdata" then local ok2,m=pcall(getmetatable,v); if ok2 and type(m)~="table" then return true end end end end');
       if (glevel === 2) {
         gBody.push('if #string.rep("ab",3)~=6 or table.concat({"a","b"})~="ab" or math.floor(1.5)~=1 then return true end');
         gBody.push('local ok,v=pcall(function() return (17*19)%23 end); if not ok or v~=1 then return true end');
+        gBody.push('do local ok,v=pcall(function() return string.byte("A")==65 and string.char(65)=="A" and ("abc"):sub(2)=="bc" and ("ab"):rep(3)=="ababab" and #"abc"==3 and math.floor(1.5)==1 and math.max(2,5)==5 and table.concat({"a","b","c"},",")=="a,b,c" and tostring(123)=="123" and tonumber("255")==255 and select("#",1,2,3)==3 end); if ok and v~=true then return true end end');
+        gBody.push('do local ok,v=pcall(function() return string.sub==string["sub"] and table.concat==table["concat"] and (type(bit32)~="table" or bit32.bxor==bit32["bxor"]) end); if ok and v~=true then return true end end');
+        gBody.push('do local u=unpack or table.unpack; if type(u)=="function" then local ok,v=pcall(function() return select("#",u(1,2,3)) end); if ok and v~=3 then return true end end end');
+        gBody.push('do if type(os)=="table" and type(os.clock)=="function" then local a=os.clock() local b=os.clock() if b<a then return true end end end');
       }
       gBody.push('G["' + N.seal + '"]=' + (blob.seal % 256) + '; return false');
       emitHidden(line, 'return(function(G)\n' + gBody.join('\n') + '\nend)', 0x4EEDBEEF, function (vH) { return 'return ' + vH + '(G)'; }, 'return true');

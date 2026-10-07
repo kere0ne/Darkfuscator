@@ -38,7 +38,7 @@
     return state.user.settings || {};
   }
   function defaults() {
-    return settings().obfuscationDefaults || { target: 'roblox', preset: 'balanced', ir: 'balanced', vmMode: 'balanced', compression: true };
+    return settings().obfuscationDefaults || { target: 'roblox', preset: 'maximum', ir: 'secure', vmMode: 'secure', compression: true };
   }
   function editorPrefs() {
     const fallback = { fontSize: 13, tabSize: 4, wordWrap: false, lineNumbers: true, highlighting: true };
@@ -287,7 +287,7 @@
     const projectOptions = project && project.options || {};
     const opts = Object.assign({
       target: project ? project.target : (d.target || 'roblox'),
-      preset: project ? project.preset : (d.preset || 'balanced'),
+      preset: project ? project.preset : (d.preset || 'maximum'),
       ir: projectOptions.ir || d.ir || 'balanced',
       vmMode: projectOptions.vmMode || d.vmMode || 'balanced',
       compression: projectOptions.compression !== undefined ? !!projectOptions.compression : d.compression !== false,

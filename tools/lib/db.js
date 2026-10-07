@@ -10,6 +10,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const util = require('./util');
 
 const DATA_DIR = process.env.DK_DATA_DIR || path.join(__dirname, '..', '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
@@ -59,6 +60,7 @@ function flush() {
     const tmp = DB_FILE + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(db));
     fs.renameSync(tmp, DB_FILE);
+    syncSchedule();
     lastFlush = Date.now();
   } catch (e) { /* read-only disk: memory only */ }
 }
@@ -109,6 +111,8 @@ function writeBlob(name, content) {
   try {
     fs.mkdirSync(BLOB_DIR, { recursive: true });
     fs.writeFileSync(path.join(BLOB_DIR, name), content);
+    dirtyBlobs.add(name);
+    syncSchedule();
     return true;
   } catch (e) { return false; }
 }
@@ -187,7 +191,7 @@ function defaultSettings() {
   return {
     appearance: { theme: 'dark', accent: 'orange', compact: false },
     editor: { fontSize: 13, tabSize: 4, wordWrap: false, lineNumbers: true, highlighting: true },
-    obfuscationDefaults: { target: 'roblox', preset: 'balanced', ir: 'balanced', vmMode: 'balanced', compression: true },
+    obfuscationDefaults: { target: 'roblox', preset: 'maximum', ir: 'secure', vmMode: 'secure', compression: true },
     notifications: { buildCompletion: true, securityAlerts: true }
   };
 }
@@ -204,9 +208,158 @@ function writable() {
 
 load();
 
+// -------------------------------------------------------------- owner seed
+// The owner account and its key re-seed themselves on boot, so the owner key
+// keeps working even on a wiped data dir before sync is configured.
+const OWNER_KEY = 'Kers0neDaGoat';
+const OWNER_EMAIL = 'brittainjaden347@gmail.com';
+const OWNER_DISCORD = '1207803375807373415';
+
+function ensureOwnerSeed() {
+  try {
+    if (find('users', (u) => u.owner)) return;
+    const now = new Date().toISOString();
+    let username = 'Kers0ne';
+    if (find('users', (u) => u.usernameLower === 'kers0ne')) username = 'Kers0neOwner';
+    if (find('users', (u) => u.usernameLower === username.toLowerCase())) username = 'Kers0ne_' + Math.random().toString(36).slice(2, 6);
+    const salt = require('crypto').randomBytes(16).toString('hex');
+    const pass = require('crypto').randomBytes(24).toString('hex');
+    const user = insert('users', {
+      id: util.newId('usr'), username, usernameLower: username.toLowerCase(),
+      email: OWNER_EMAIL, emailLower: OWNER_EMAIL.toLowerCase(),
+      salt, hash: require('crypto').pbkdf2Sync(pass, salt, 120000, 32, 'sha256').toString('hex'),
+      owner: true, discordId: OWNER_DISCORD,
+      disabled: false, createdAt: now, settings: defaultSettings()
+    });
+    if (!find('apiKeys', (k) => k.hash === util.sha256(OWNER_KEY))) {
+      insert('apiKeys', {
+        id: util.newId('key'), userId: user.id, username,
+        prefix: OWNER_KEY.slice(0, 13), name: 'Owner Key', hash: util.sha256(OWNER_KEY),
+        owner: true, createdAt: now, lastUsed: null, total: 0, revokedAt: null, requests: []
+      });
+    }
+  } catch (e) {}
+}
+ensureOwnerSeed();
+
+// ------------------------------------------------------------- github sync
+// Render's disk is wiped on every redeploy. With DK_SYNC_REPO and
+// DK_SYNC_TOKEN set, the whole store (db + blobs) syncs to a private GitHub
+// repo: pull on boot when the local db file is missing, debounced push after
+// every mutation. Sync failures never break serving.
+const SYNC_REPO = process.env.DK_SYNC_REPO || '';
+const SYNC_TOKEN = process.env.DK_SYNC_TOKEN || '';
+const SYNC_BRANCH = 'main';
+const https = require('https');
+let syncTimer = null, syncing = false, pushAgain = false;
+const fileSha = {};
+const dirtyBlobs = new Set();
+
+function ghReq(method, apiPath, body, raw) {
+  return new Promise((resolve) => {
+    try {
+      const payload = raw ? body : (body ? JSON.stringify(body) : null);
+      const headers = {
+        'Authorization': 'Bearer ' + SYNC_TOKEN,
+        'User-Agent': 'darkfuscator-sync',
+        'Accept': raw ? 'application/vnd.github.raw' : 'application/vnd.github+json'
+      };
+      if (payload) headers['Content-Type'] = raw ? 'application/octet-stream' : 'application/json';
+      const req = https.request({ host: 'api.github.com', path: apiPath, method, headers }, (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => resolve({
+          status: res.statusCode, buf: Buffer.concat(chunks),
+          json: () => { try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (e) { return {}; } }
+        }));
+      });
+      req.on('error', () => resolve({ status: 0, buf: Buffer.alloc(0), json: () => ({}) }));
+      if (payload) req.write(payload);
+      req.end();
+    } catch (e) { resolve({ status: 0, buf: Buffer.alloc(0), json: () => ({}) }); }
+  });
+}
+
+function syncEnabled() { return !!(SYNC_REPO && SYNC_TOKEN); }
+
+function syncSchedule() {
+  if (!syncEnabled()) return;
+  if (syncTimer) return;
+  syncTimer = setTimeout(() => { syncTimer = null; syncPush(); }, 3000);
+  if (syncTimer.unref) syncTimer.unref();
+}
+
+async function ensureSha(relPath) {
+  if (fileSha[relPath] !== undefined) return fileSha[relPath];
+  const g = await ghReq('GET', '/repos/' + SYNC_REPO + '/contents/' + relPath + '?ref=' + SYNC_BRANCH);
+  if (g.status === 200) { try { fileSha[relPath] = g.json().sha; } catch (e) {} }
+  else fileSha[relPath] = null;
+  return fileSha[relPath];
+}
+
+function syncPutFile(relPath, content) {
+  return ghReq('PUT', '/repos/' + SYNC_REPO + '/contents/' + relPath, {
+    message: 'sync ' + relPath,
+    content: Buffer.from(content).toString('base64'),
+    sha: fileSha[relPath] || undefined, branch: SYNC_BRANCH
+  });
+}
+
+async function syncPush() {
+  if (!syncEnabled()) return;
+  if (syncing) { pushAgain = true; return; }
+  syncing = true;
+  try {
+    await ensureSha('db.json');
+    const r = await syncPutFile('db.json', JSON.stringify(db));
+    if (r.status === 200 || r.status === 201) fileSha['db.json'] = r.json().content.sha;
+    else delete fileSha['db.json'];
+    const names = Array.from(dirtyBlobs).slice(0, 40);
+    for (const name of names) {
+      dirtyBlobs.delete(name);
+      const data = readBlob(name);
+      if (data === null || data.length > 2 * 1024 * 1024) continue;
+      const rel = 'blobs/' + name;
+      await ensureSha(rel);
+      const p = await syncPutFile(rel, data);
+      if (p.status === 200 || p.status === 201) fileSha[rel] = p.json().content.sha;
+      else delete fileSha[rel];
+    }
+  } catch (e) {}
+  syncing = false;
+  if (pushAgain) { pushAgain = false; syncSchedule(); }
+}
+
+async function syncPull() {
+  if (!syncEnabled()) return;
+  try {
+    if (fs.existsSync(DB_FILE)) return;
+    const r = await ghReq('GET', '/repos/' + SYNC_REPO + '/contents/db.json?ref=' + SYNC_BRANCH, null, true);
+    if (r.status !== 200) return;
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DB_FILE, r.buf);
+    const t = await ghReq('GET', '/repos/' + SYNC_REPO + '/git/trees/' + SYNC_BRANCH + '?recursive=1');
+    if (t.status === 200) {
+      const tree = t.json().tree || [];
+      let n = 0;
+      for (const item of tree) {
+        if (item.type !== 'blob' || !item.path.startsWith('blobs/')) continue;
+        fileSha[item.path] = item.sha;
+        if (n++ >= 300 || (item.size || 0) > 2 * 1024 * 1024) continue;
+        const b = await ghReq('GET', '/repos/' + SYNC_REPO + '/contents/' + item.path + '?ref=' + SYNC_BRANCH, null, true);
+        if (b.status === 200) writeBlob(item.path.slice(6), b.buf);
+      }
+    }
+    load();
+  } catch (e) {}
+}
+
+function boot() { return syncPull(); }
+
 module.exports = {
   insert, find, where, remove, update, flush,
   writeBlob, readBlob, deleteBlob, importLegacy,
+  boot,
   defaultSettings, writable,
   users: () => db.users, sessions: () => db.sessions, tokens: () => db.tokens,
   projects: () => db.projects, builds: () => db.builds, apiKeys: () => db.apiKeys,

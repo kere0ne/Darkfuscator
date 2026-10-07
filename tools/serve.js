@@ -29,7 +29,7 @@ const ROOT = path.join(__dirname, '..', 'site');
 const PORT = Number(process.env.PORT) || Number(process.argv[2]) || 3000;
 
 const ENGINE_VERSION = handlers.ENGINE_VERSION;
-const PLATFORM_VERSION = '7.0.0';
+const PLATFORM_VERSION = '7.2.0';
 const LIMITS = handlers.LIMITS;
 
 // ------------------------------------------------------------------- routing
@@ -80,6 +80,7 @@ function pageRoutes(req, res, pathname) {
   const parts = pathname.split('/').filter(Boolean);
 
   if (pathname === '/') { serveStaticFile(htmlFile('index'))(req, res); return true; }
+  if (pathname === '/start') { serveStaticFile(htmlFile('start'))(req, res); return true; }
   if (pathname === '/logout') {
     // GET logout: invalidate the cookie session and land on the login page
     const sess = handlers.sessionFromReq(req);
@@ -142,7 +143,7 @@ function handleApi(req, res, pathname) {
         ok: false, error: 'missing or invalid api key. Generate one: POST /api/v1/keys'
       }, util.corsHeaders(true));
     }
-    const rl = util.rateCheck('apik:' + k.id, LIMITS.perMinute, LIMITS.perDay);
+    const rl = k.owner ? { ok: true } : util.rateCheck('apik:' + k.id, LIMITS.perMinute, LIMITS.perDay);
     if (!rl.ok) {
       return util.sendJson(res, 429, {
         ok: false, error: 'rate limit exceeded (' + rl.scope + ')', retryAfter: rl.retryAfter
@@ -172,7 +173,7 @@ function handleApi(req, res, pathname) {
       if (preset && ['lightweight', 'balanced', 'maximum'].indexOf(preset) === -1) {
         return finish(400, { ok: false, error: 'unsupported preset' });
       }
-      if (preset) options.preset = preset;
+      options.preset = preset || 'maximum';
       const target = body && typeof body.target === 'string' ? body.target : 'luau';
       if (target !== 'luau' && target !== 'roblox') {
         return finish(400, { ok: false, error: 'unsupported target; supported targets are Luau and Roblox Luau' });
@@ -245,6 +246,8 @@ function flushSoon() {
 
 const imported = db.importLegacy();
 db.flush();
-server.listen(PORT, '0.0.0.0', () => {
-  console.log('Darkfuscator platform on http://0.0.0.0:' + PORT + ' (platform ' + PLATFORM_VERSION + ', engine ' + ENGINE_VERSION + ', ' + imported + ' legacy records imported)');
+db.boot().then(() => {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('Darkfuscator platform on http://0.0.0.0:' + PORT + ' (platform ' + PLATFORM_VERSION + ', engine ' + ENGINE_VERSION + ', ' + imported + ' legacy records imported)');
+  });
 });

@@ -53,7 +53,7 @@
       '<div class="field check"><input type="checkbox" id="a-remember"><label for="a-remember">Remember this device for 30 days</label></div>',
       '<button class="btn primary wide" id="a-go">Sign in</button>'
     ].join(''),
-      '<a class="link" href="/register">Create an account</a><span class="dim"> / </span><a class="link" href="/">Back to the landing page</a>');
+      '<a class="link" href="/register">Create an account</a><span class="dim"> / </span><a class="link" href="/start">Enter a key</a><span class="dim"> / </span><a class="link" href="/">Back to the landing page</a>');
     const go = async function () {
       const btn = $('#a-go');
       btn.disabled = true; btn.textContent = 'Signing in';

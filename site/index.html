@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0b0b10">
+<meta name="theme-color" content="#121212">
 <meta name="description" content="Darkfuscator is an authenticated Luau and Roblox Luau obfuscation platform with a custom bytecode VM pipeline.">
 <title>Darkfuscator — Luau protection platform</title>
 <script>try{var t=localStorage.getItem('dk_theme');document.documentElement.setAttribute('data-theme',t||'dark')}catch(e){}</script>
@@ -17,6 +17,7 @@
       <a class="link" href="#pipeline">Pipeline</a>
       <a class="link" href="#workflow">Workflow</a>
       <a class="link" href="/docs">Docs</a>
+      <a class="link" href="/start">Enter key</a>
       <a class="btn sm" href="/login">Sign in</a>
       <a class="btn sm primary" href="/register">Create account</a>
     </nav>
@@ -29,6 +30,7 @@
       <p class="land-sub">Darkfuscator parses source, applies a configurable semantics-preserving IR and conservative optimization, compiles custom bytecode, serializes a randomized protected payload, and emits a custom VM loader. Manage actual builds, projects, API keys, and account security in one authenticated platform.</p>
       <div class="land-cta">
         <a class="btn primary big" href="/register">Start a protected build</a>
+        <a class="btn big" href="/start">Enter your key</a>
         <a class="btn big" href="/docs">Read the docs</a>
       </div>
       <p class="land-footnote">Obfuscation raises the cost of reverse engineering. It is not a security boundary and cannot make client-side code impossible to analyze.</p>
@@ -69,7 +71,7 @@
       <pre class="code-block">curl -X POST https://YOUR-DOMAIN.example/api/v1/obfuscate \
   -H "Authorization: Bearer dk_live_YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"source":"print(1)","preset":"balanced","target":"luau"}'</pre>
+  -d '{"source":"print(1)","preset":"maximum","target":"luau"}'</pre>
       <a class="link" href="/docs/api/protect">Read the API reference</a>
     </section>
 

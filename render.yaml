@@ -8,3 +8,8 @@ services:
     startCommand: yarn start
     healthCheckPath: /api/v1/health
     autoDeploy: true
+    envVars:
+      - key: DK_SYNC_REPO
+        value: kere0ne/darkfuscator-data
+      - key: DK_SYNC_TOKEN
+        sync: false

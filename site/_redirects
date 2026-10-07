@@ -8,9 +8,7 @@
 /docs/* /docs.html 200
 /login /auth.html 200
 /register /auth.html 200
-/verify-email /auth.html 200
-/forgot-password /auth.html 200
-/reset-password /auth.html 200
+/start /start.html 200
 /dashboard /app.html 200
 /obfuscate /app.html 200
 /projects /app.html 200

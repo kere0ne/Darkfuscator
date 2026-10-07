@@ -97,7 +97,8 @@ function audit(userId, kind, detail, req) {
 
 function publicUser(u) {
   return {
-    id: u.id, username: u.username, createdAt: u.createdAt, disabled: !!u.disabled
+    id: u.id, username: u.username, createdAt: u.createdAt, disabled: !!u.disabled,
+    email: u.email || null, owner: !!u.owner, discordId: u.discordId || null
   };
 }
 
@@ -176,6 +177,21 @@ async function handleAuth(req, res, sub) {
     return sendJson(res, 200, { ok: true, user: publicUser(u) });
   }
 
+  if (req.method === 'POST' && sub === '/key-login') {
+    const ip = util.clientIp(req);
+    const rl = util.rateCheck('keylogin:' + ip, 10, 50);
+    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, slow down', retryAfter: rl.retryAfter });
+    const body = util.parseJson(await readBodyP(req)) || {};
+    const raw = String(body.key || '').trim();
+    if (!raw) return sendJson(res, 400, { ok: false, error: 'enter your key' });
+    const k = db.find('apiKeys', (x) => x.hash === util.sha256(raw) && !x.revokedAt);
+    if (!k) { audit(null, 'key_login_failed', raw.slice(0, 13), req); return sendJson(res, 401, { ok: false, error: 'key not recognized' }); }
+    const user = db.find('users', (u) => u.id === k.userId && !u.disabled);
+    if (!user) return sendJson(res, 401, { ok: false, error: 'key not recognized' });
+    createSession(res, user, body.remember !== false, req);
+    audit(user.id, 'key_login', k.prefix, req);
+    return sendJson(res, 200, { ok: true, user: publicUser(user) });
+  }
   if (req.method === 'POST' && sub === '/logout') {
     const sess = sessionFromReq(req);
     if (sess) { revokeSession(sess.session.id); audit(sess.user.id, 'logout', 'signed out', req); }
@@ -336,7 +352,7 @@ async function handlePlatform(req, res, pathname) {
     const name = String(body.name || '').trim();
     if (!name || name.length > 80) return sendJson(res, 400, { ok: false, error: 'project name is required (max 80 chars)' });
     const target = validTarget(body.target) ? body.target : 'roblox';
-    const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset : 'balanced';
+    const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset : 'maximum';
     const project = db.insert('projects', {
       id: util.newId('prj'), userId: sess.user.id, name, description: String(body.description || '').slice(0, 500),
       target, preset, options: sanitizeOptions(body.options),
@@ -653,7 +669,7 @@ function runBuild(req, res, sess, body, rebuildOf) {
   const requestOptions = sanitizeOptions(body.options);
   const preset = ['lightweight', 'balanced', 'maximum'].indexOf(body.preset) !== -1 ? body.preset
     : (project && ['lightweight', 'balanced', 'maximum'].indexOf(project.preset) !== -1 ? project.preset
-      : (['lightweight', 'balanced', 'maximum'].indexOf(d.preset) !== -1 ? d.preset : 'balanced'));
+      : (['lightweight', 'balanced', 'maximum'].indexOf(d.preset) !== -1 ? d.preset : 'maximum'));
   const target = validTarget(body.target) ? body.target
     : (project && validTarget(project.target) ? project.target : (validTarget(d.target) ? d.target : 'roblox'));
   const options = Object.assign({}, projectOptions, requestOptions);
@@ -744,7 +760,7 @@ function keyFromReq(req) {
   const h = String(req.headers['authorization'] || '');
   const m = h.match(/^Bearer\s+(\S+)$/i);
   candidate = (m && m[1]) || String(req.headers['x-api-key'] || '').trim();
-  if (!candidate || !candidate.startsWith('dk_live_')) return null;
+  if (!candidate || candidate.startsWith('df_sess_')) return null;
   const hash = util.sha256(candidate);
   const k = db.find('apiKeys', (x) => x.hash === hash);
   return k && !k.revokedAt ? k : null;

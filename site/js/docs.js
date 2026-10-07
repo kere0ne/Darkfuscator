@@ -8,7 +8,7 @@
       title: 'Getting started',
       body: [
         '<p>Darkfuscator is a Luau obfuscation platform. A successful build is produced by the real compiler pipeline: lexer and parser, semantic analysis, a configurable source-level IR pass, AST and bytecode optimization, protected serialization, and a generated custom VM loader.</p>',
-        '<p>Start by creating an account, verifying its email, and opening the <a class="link" href="/obfuscate">protection workspace</a>. The workspace validates source before it calls the authenticated backend; build output and history are returned by that backend, not manufactured in the browser.</p>',
+        '<p>Start by creating an account and opening the <a class="link" href="/obfuscate">protection workspace</a>. The workspace validates source before it calls the authenticated backend; build output and history are returned by that backend, not manufactured in the browser.</p>',
         '<h2>Choose a preset</h2>',
         '<ul><li><b>Lightweight</b> uses FAST source IR and VM layouts and keeps runtime overhead lower.</li><li><b>Balanced</b> selects BALANCED source IR, adds payload compression when it reduces size, register remapping, dispatch variation, and standard integrity verification.</li><li><b>Maximum</b> selects SECURE source IR and VM layouts, stronger standard variation, and full integrity verification.</li></ul>',
         '<p>Use a deterministic seed only when you need reproducible build structure. Otherwise each build receives a fresh build-specific seed.</p>'
@@ -34,7 +34,7 @@
         '<h2>History</h2>',
         '<p>History lists real stored build metadata. You can filter entries, download output, rebuild only when source was retained, or delete a build. Deleting an output removes its stored data rather than presenting a fake success state.</p>',
         '<h2>Account safety</h2>',
-        '<p>Email verification, password reset, sessions, API key creation/revocation, profile changes, and security events are server-backed. Email delivery is only reported as successful when the configured server-side mail transport accepts it.</p>'
+        '<p>Sessions, password changes, API key creation/revocation, profile changes, and security events are server-backed. There is no email auth anywhere in the platform; accounts are username and password, and the key page at /start accepts any saved key.</p>'
       ].join('')
     },
     'api/protect': {
@@ -84,7 +84,7 @@
         '<table class="platform-table"><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody>',
         '<tr><td>400</td><td>Invalid request, unsupported target/preset, invalid source, or engine-reported build failure.</td></tr>',
         '<tr><td>401</td><td>Missing or invalid session/API key.</td></tr>',
-        '<tr><td>403</td><td>Email verification, account status, or origin policy prevents the request.</td></tr>',
+        '<tr><td>403</td><td>Account status, session state, or origin policy prevents the request.</td></tr>',
         '<tr><td>404</td><td>The requested build, project, or API key does not exist for the account.</td></tr>',
         '<tr><td>409</td><td>A conflicting value exists, or a rebuild was requested without retained source.</td></tr>',
         '<tr><td>429</td><td>A route rate limit was reached. The response may include a retry interval.</td></tr>',

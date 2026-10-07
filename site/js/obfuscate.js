@@ -118,7 +118,7 @@
     for (var k in DEFAULTS) opts[k] = DEFAULTS[k];
     // resolution order: defaults <- preset <- explicit options (explicit wins)
     var presetName = (options || {}).preset;
-    if (presetName && PRESETS[presetName]) {
+    if (PRESETS[presetName]) {
       var ps = PRESETS[presetName];
       for (var pk in ps) opts[pk] = ps[pk];
     }
@@ -354,6 +354,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '7.0.0'
+    version: '7.2.0'
   };
 });
