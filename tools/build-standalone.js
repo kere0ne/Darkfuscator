@@ -21,7 +21,7 @@ const SCRIPTS = ['js/luau-lexer.js', 'js/luau-parser.js', 'js/vm-compile.js',
   'js/vm-emit.js', 'js/obfuscate.js'];
 
 function main() {
-let html = fs.readFileSync(path.join(SITE, 'obfuscate.html'), 'utf8');
+let html = fs.readFileSync(path.join(SITE, 'offline.html'), 'utf8');
 const css = fs.readFileSync(path.join(SITE, 'styles.css'), 'utf8');
 
 // the standalone build is one file: point the sidebar links at itself
@@ -35,7 +35,7 @@ html = html.replace(/<link rel="stylesheet" href="styles\.css">/,
 
 // 2. inline the engine + app scripts
 let js = '';
-for (const rel of SCRIPTS.concat(['js/app.js'])) {
+for (const rel of SCRIPTS.concat(['js/examples.js', 'js/offline.js'])) {
   // a literal </script (or <!--) inside the sources would end the tag early and
   // leave a blank page, so neutralise both
   const src = fs.readFileSync(path.join(SITE, rel), 'utf8')

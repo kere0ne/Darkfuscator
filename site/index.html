@@ -1,90 +1,89 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Darkfuscator</title>
-  <meta name="description" content="Darkfuscator: encrypt Luau scripts into randomized custom bytecode with layered anti-tamper and anti-dump protection. Runs entirely in your browser.">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Darkfuscator - Luau protection platform</title>
+<script>try{var t=localStorage.getItem('dk_theme');document.documentElement.setAttribute('data-theme',t||'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
+<link rel="stylesheet" href="/styles.css">
 </head>
-<body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="brand-mark" title="Darkfuscator">DF</div>
-      <a class="side-btn active" href="index.html" title="Home">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
-        Home
-      </a>
-      <a class="side-btn" href="obfuscate.html" title="Obfuscate">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
-        Obfuscate
-      </a>
-      <a class="side-btn" href="api-docs.html" title="API">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg>
-        API
-      </a>
-            <a class="side-btn" href="account.html" title="Account">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
-        Account
-      </a>
-      <div class="sidebar-foot">
-        <div class="ver-chip" id="ver-chip">v6.1.0</div>
-        <div class="foot-note">Everything runs in your browser.<br>Nothing leaves this page.</div>
-      </div>
-    </aside>
+<body class="landing-body">
+<div class="landing">
+  <header class="land-head">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt="Darkfuscator"><span>Darkfuscator</span></a>
+    <nav class="land-nav">
+      <a class="link" href="#features">Protection</a>
+      <a class="link" href="#how">How it works</a>
+      <a class="link" href="#api">API</a>
+      <a class="link" href="/docs">Docs</a>
+      <a class="btn sm" href="/login">Sign in</a>
+      <a class="btn sm primary" href="/register">Create account</a>
+    </nav>
+  </header>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">DARKFUSCATOR WORKSPACE</p>
-          <h1 class="page-title">Home</h1>
-          <p class="page-desc">Protect your Luau with randomized custom bytecode, layered encryption and anti-tamper that stays silent until something touches it.</p>
-        </div>
-        <div class="top-right">
-          <span class="pill">halloween build</span>
-          <a class="btn primary big" href="obfuscate.html">GET STARTED</a>
-        </div>
-      </header>
+  <section class="land-hero">
+    <p class="land-eyebrow">SPOOKY SEASON BUILD / ENGINE 6.1.0</p>
+    <h1>Your Luau, wrapped in ten layers of protection.</h1>
+    <p class="land-sub">Darkfuscator compiles your Luau into a proprietary bytecode VM, buries it under three layers of encryption, floods the neighborhood with junk and ships a silent anti-tamper battery. Parse-verified on every build.</p>
+    <div class="land-cta">
+      <a class="btn primary" href="/register">Start protecting</a>
+      <a class="btn" href="/login">Sign in</a>
+      <a class="btn ghost" href="/docs">API docs</a>
+    </div>
+    <p class="land-footnote">Free, all features, no key system. Sign up with email, build in the browser or from curl.</p>
+  </section>
 
-      <section class="card hero">
-        <h2>Protect your Luau.</h2>
-        <p>Paste a script, press Obfuscate, and get back a self-contained payload: encrypted custom bytecode running on a proprietary VM, wrapped in junk, sealed against tampering and environment logging. No loadstring, nothing for decompilers to read.</p>
-        <a class="btn primary big" href="obfuscate.html">Open the obfuscator &rarr;</a>
-      </section>
+  <section class="land-stats" id="features">
+    <div class="ls"><span class="ls-v">10</span><span class="ls-k">stacked VM layers</span></div>
+    <div class="ls"><span class="ls-v">29</span><span class="ls-k">anti-tamper checks</span></div>
+    <div class="ls"><span class="ls-v">3</span><span class="ls-k">encryption layers</span></div>
+    <div class="ls"><span class="ls-v">200k</span><span class="ls-k">max source chars</span></div>
+    <div class="ls"><span class="ls-v">0</span><span class="ls-k">fake security claims</span></div>
+  </section>
 
-      <div class="stat-row">
-        <div class="bignum"><b>10</b><span>stacked VM layers</span></div>
-        <div class="bignum"><b>29</b><span>anti-tamper checks</span></div>
-        <div class="bignum"><b>~2 MB</b><span>junk at level 4</span></div>
-        <div class="bignum"><b>100%</b><span>client-side, always</span></div>
-      </div>
+  <section class="land-section">
+    <h2>What wraps your script</h2>
+    <div class="land-grid">
+      <div class="card"><h3>Bytecode VM</h3><p class="dim">Your script is compiled to Darkfuscator's own VM bytecode and re-emitted as a loader. Nothing readable ships.</p></div>
+      <div class="card"><h3>Layered encryption</h3><p class="dim">Three layers: an add-cipher, an XOR stream and a rotation pass, keyed per build.</p></div>
+      <div class="card"><h3>Heavy junk</h3><p class="dim">Up to about 2 MB of dense dead statements across five junk levels. Levels 1 to 5.</p></div>
+      <div class="card"><h3>Silent guards</h3><p class="dim">Checksum and integrity guards fail closed, with no readable warning strings in the output.</p></div>
+      <div class="card"><h3>Environment probes</h3><p class="dim">29 checks: environment loggers, executor globals, string.dump sanity, math and clock consistency and more. The battery ships self-obfuscated through Darkfuscator itself.</p></div>
+      <div class="card"><h3>Parse-verified</h3><p class="dim">Every build is re-parsed byte-for-byte before it is handed back. A build that cannot re-parse reports failed with the real error.</p></div>
+    </div>
+  </section>
 
-      <section class="card feature">
-        <h2 class="card-title">What every build gets</h2>
-        <div class="grid">
-          <div class="cell"><h3>VM compiler</h3><p>Readable Lua is compiled to custom bytecode that runs inside a proprietary VM. No loadstring, nothing to hook.</p></div>
-          <div class="cell"><h3>Obfuscator</h3><p>Variable and function renaming, string encryption, control-flow flattening, dead code injection.</p></div>
-          <div class="cell"><h3>Per-request randomization</h3><p>Opcodes, names and structure shuffle on every run, so no two payloads match.</p></div>
-          <div class="cell"><h3>Anti-tamper</h3><p>29 integrity checks detect and reject modified bytecode, and the whole check battery ships obfuscated inside its own encrypted chunk.</p></div>
-          <div class="cell"><h3>Decompiler resistance</h3><p>Standard Lua decompilers output garbage: there is no Lua bytecode to read in the first place.</p></div>
-          <div class="cell"><h3>Heavy junk</h3><p>Up to 220k dead statements (about 2 MB) of arithmetic noise at junk level 4, 900 KB at level 3.</p></div>
-        </div>
-      </section>
+  <section class="land-section" id="how">
+    <h2>How it works</h2>
+    <div class="land-grid">
+      <div class="card"><h3>01 / Paste</h3><p class="dim">Paste your Luau into the platform editor, load a file, or drop one in. Syntax is checked locally before anything leaves your browser.</p></div>
+      <div class="card"><h3>02 / Build</h3><p class="dim">Pick target, preset and protection levels. The platform build is stored to your history; API builds come straight back.</p></div>
+      <div class="card"><h3>03 / Ship</h3><p class="dim">Download the protected file, rebuild with the same seed any time, keep projects and settings together.</p></div>
+    </div>
+  </section>
 
-      <section class="card">
-        <h2 class="card-title">How it works</h2>
-        <div class="steps">
-          <div class="step"><div class="n">1</div><p>Paste your Luau or load a file on the Obfuscate page. Validate catches syntax errors with line and column.</p></div>
-          <div class="step"><div class="n">2</div><p>Pick a preset or tune the settings: VM layers, junk, anti-tamper, environment locks.</p></div>
-          <div class="step"><div class="n">3</div><p>Obfuscate, then copy or download the payload. Every run reshuffles the whole structure.</p></div>
-        </div>
-      </section>
+  <section class="land-section" id="api">
+    <h2>One endpoint, real output</h2>
+    <p class="land-sub">Generate a key on your account, then call from curl or your own code. CORS is open for key callers.</p>
+    <pre class="code-block">curl -X POST https://darkfuscator.onrender.com/api/v1/obfuscate \
+  -H "Authorization: Bearer dk_live_YOURKEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source": "print(1)", "preset": "maximum", "target": "roblox"}'</pre>
+    <a class="link" href="/docs">Full API documentation</a>
+  </section>
 
-      <p class="foot-line"><span class="spooky">Happy halloween.</span> Obfuscation makes scripts hard to reverse; it is not a security boundary. Protecting a script does not make it safe to run.</p>
-    </main>
-  </div>
+  <section class="land-section">
+    <h2>Questions</h2>
+    <details class="faq"><summary>Is it really free?</summary><p class="dim">Yes. Every feature, no tiers, no key system. Sign up with email and build.</p></details>
+    <details class="faq"><summary>Full preset with 10 VMs is slow</summary><p class="dim">Ten VM layers plus heavy junk produce multi-MB outputs and take seconds to minutes. Lean builds (VM 5, junk 2) are much faster; the engine caps honestly when the payload outgrows the nesting.</p></details>
+    <details class="faq"><summary>My key stopped working</summary><p class="dim">Keys can be revoked on the API keys page, and any build from a revoked key was never saved. Generate a new one.</p></details>
+    <details class="faq"><summary>Is this a security boundary?</summary><p class="dim">No. Obfuscation makes scripts hard to read and change; it is not protection against a determined runtime attacker.</p></details>
+  </section>
+
+  <footer class="land-foot">
+    <p class="dim">Darkfuscator / engine 6.1.0 / obfuscation is not a security boundary.</p>
+    <nav><a class="link" href="/login">Sign in</a><a class="link" href="/register">Create account</a><a class="link" href="/docs">Docs</a><a class="link" href="/offline">Offline build</a></nav>
+  </footer>
+</div>
 </body>
 </html>

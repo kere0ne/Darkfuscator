@@ -1,1 +1,5 @@
-# Darkfuscator is a static site — Pages serves the files as-is.
+/dashboard.html /dashboard 301
+/obfuscate.html /obfuscate 301
+/account.html /account 301
+/api-docs.html /docs 301
+/index.html / 301
