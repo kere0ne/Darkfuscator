@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API — Darkfuscator</title>
+  <meta name="description" content="Darkfuscator REST API: generate a key and obfuscate Luau from your own site, bot or tool.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand-mark" title="Darkfuscator">DF</div>
+      <a class="side-btn" href="index.html" title="Home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        Home
+      </a>
+      <a class="side-btn" href="obfuscate.html" title="Obfuscate">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg>
+        Obfuscate
+      </a>
+      <a class="side-btn active" href="api-docs.html" title="API">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1"/><path d="M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/></svg>
+        API
+      </a>
+      <div class="sidebar-foot">
+        <div class="ver-chip" id="ver-chip">v6.0.0</div>
+        <div class="foot-note">REST API.<br>JSON in, protected payload out.</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">DARKFUSCATOR WORKSPACE</p>
+          <h1 class="page-title">API</h1>
+          <p class="page-desc">Generate a key and obfuscate Luau from your own site, bot or tool. Base URL: <span class="code-inline">https://darkfuscator.onrender.com</span></p>
+        </div>
+        <div class="top-right">
+          <span class="pill">REST · JSON · CORS open</span>
+        </div>
+      </header>
+
+      <section class="card" id="keys">
+        <h2 class="card-title">1. Generate a key</h2>
+        <p class="page-desc" style="margin-top:6px">Key generation is open, no signup. One POST and you own a key. Keys are free and rate limited per key, so anyone can add Darkfuscator to their project.</p>
+        <div class="code-block">curl -X POST https://darkfuscator.onrender.com/api/v1/keys
+
+<span class="c"># -> { "ok": true, "key": "dk_live_...", "limits": { "perMinute": 30, "perDay": 1000 } }</span></div>
+        <div class="action-row">
+          <button class="btn primary" id="gen-key">Generate key</button>
+          <span class="status" id="gen-status">The key is shown once. Store it somewhere safe.</span>
+        </div>
+        <div class="key-out" id="key-out" hidden>
+          <code id="key-value"></code>
+          <button class="btn" id="copy-key">Copy</button>
+        </div>
+      </section>
+
+      <section class="card" id="obfuscate">
+        <h2 class="card-title">2. Obfuscate</h2>
+        <p class="page-desc" style="margin-top:6px">Send Luau source, get back a self-contained encrypted custom-bytecode payload, the same build the website produces. Line 1 of every payload is the Darkfuscator banner.</p>
+        <div class="code-block"><span class="k">POST</span> /api/v1/obfuscate
+<span class="k">Authorization</span>: Bearer dk_live_YOUR_KEY
+<span class="k">Content-Type</span>: application/json
+
+{ "source": "print(\"hello\")", "preset": "maximum" }</div>
+        <table class="doc-table">
+          <thead><tr><th>Body field</th><th>What it does</th><th>Values</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td>source</td><td>The Luau code to protect. Required. Max 200,000 chars.</td><td>string</td><td>&mdash;</td></tr>
+            <tr><td>preset</td><td>Fills the levels below; explicit options win afterwards.</td><td>lightweight · balanced · maximum</td><td>&mdash;</td></tr>
+            <tr><td>options.vmLayers</td><td>Stacked proprietary VMs, outer to inner.</td><td>1&ndash;5</td><td>5</td></tr>
+            <tr><td>options.junk</td><td>Dead code wrapped around the build.</td><td>0&ndash;3 (3 is ~900 KB)</td><td>3</td></tr>
+            <tr><td>options.guard</td><td>Silent checksum and integrity guards.</td><td>0&ndash;2</td><td>2</td></tr>
+            <tr><td>options.envChecks</td><td>Detects environment-logging tools.</td><td>0&ndash;2</td><td>2</td></tr>
+            <tr><td>options.antiTamper</td><td>Chunked loader wrapper.</td><td>0 off · 1 fast · 2 full</td><td>2</td></tr>
+            <tr><td>options.nameStyle</td><td>Generated identifier style.</td><td>short · random · confuse</td><td>random</td></tr>
+            <tr><td>options.seed</td><td>Fixed number reproduces the same build.</td><td>number</td><td>random</td></tr>
+            <tr><td>options.minify</td><td>Ships the build as one line.</td><td>true / false</td><td>true</td></tr>
+            <tr><td>options.watermark</td><td>Darkfuscator banner above the build.</td><td>true / false</td><td>true</td></tr>
+            <tr><td>options.captureGlobals</td><td>Binds globals at build time.</td><td>true / false</td><td>true</td></tr>
+            <tr><td>options.envLock</td><td>Refuses odd executor environments.</td><td>true / false</td><td>false</td></tr>
+            <tr><td>options.lockPlace</td><td>Locks the build to a Roblox place id.</td><td>string</td><td>&mdash;</td></tr>
+            <tr><td>options.lockUniverse</td><td>Locks the build to a Roblox universe id.</td><td>string</td><td>&mdash;</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card" id="responses">
+        <h2 class="card-title">3. Responses and limits</h2>
+        <table class="doc-table">
+          <thead><tr><th>Status</th><th>When</th><th>Body</th></tr></thead>
+          <tbody>
+            <tr><td>200</td><td>Build succeeded</td><td><span class="code-inline">{ok, output, stats, warnings, version}</span></td></tr>
+            <tr><td>400</td><td>Bad input or Luau syntax error</td><td><span class="code-inline">{ok:false, error:{message, line, col, name}}</span></td></tr>
+            <tr><td>401</td><td>Missing or unknown key</td><td><span class="code-inline">{ok:false, error}</span></td></tr>
+            <tr><td>429</td><td>Rate limit hit</td><td><span class="code-inline">{ok:false, error, retryAfter}</span> + Retry-After header</td></tr>
+          </tbody>
+        </table>
+        <p class="page-desc" style="margin-top:12px">Limits per key: 30 requests per minute, 1,000 per day. The first request after the service has been idle can take about 30 seconds to wake up on free hosting; keep a retry with a timeout in your code.</p>
+      </section>
+
+      <section class="card" id="examples">
+        <h2 class="card-title">4. Examples</h2>
+        <p class="page-desc" style="margin-top:6px">JavaScript (run on your own server, never in browser code where visitors could read the key):</p>
+        <div class="code-block">const res = await fetch("https://darkfuscator.onrender.com/api/v1/obfuscate", {
+  method: "POST",
+  headers: {
+    "Authorization": "Bearer dk_live_YOUR_KEY",
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({ source: 'print("hello")', preset: "balanced" })
+});
+const data = await res.json();
+if (data.ok) console.log(data.output);</div>
+        <p class="page-desc" style="margin-top:14px">Lua (Roblox server script):</p>
+        <div class="code-block">local HttpService = game:GetService("HttpService")
+local res = HttpService:RequestAsync({
+  Url = "https://darkfuscator.onrender.com/api/v1/obfuscate",
+  Method = "POST",
+  Headers = {
+    ["Authorization"] = "Bearer dk_live_YOUR_KEY",
+    ["Content-Type"] = "application/json"
+  },
+  Body = HttpService:JSONEncode({ source = 'print("hello")', preset = "balanced" })
+})
+print(res.Body)</div>
+      </section>
+
+      <section class="card" id="notes">
+        <h2 class="card-title">5. Good to know</h2>
+        <p class="page-desc" style="margin-top:6px">CORS is open, so your site can call the API directly. Keep the key on your server and proxy calls through it, so nobody lifts your key from view-source. Keys live on the service's disk; if the host rebuilds the service they reset, so keep yours backed up. Health check: <span class="code-inline">GET /api/v1/health</span>. Obfuscation makes scripts hard to reverse; it is not a security boundary.</p>
+      </section>
+
+      <p class="foot-line">Darkfuscator · free API, rate limited, be kind to it.</p>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var btn = document.getElementById('gen-key');
+      var status = document.getElementById('gen-status');
+      var out = document.getElementById('key-out');
+      var val = document.getElementById('key-value');
+      var copy = document.getElementById('copy-key');
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        status.textContent = 'Generating…';
+        fetch('/api/v1/keys', { method: 'POST' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (!d || !d.ok) throw new Error((d && d.error) || 'key generation failed');
+            val.textContent = d.key;
+            out.hidden = false;
+            status.textContent = 'Limits: ' + d.limits.perMinute + '/min, ' + d.limits.perDay + '/day. Shown once: store it now.';
+          })
+          .catch(function (e) {
+            status.textContent = 'Failed: ' + e.message + '. The API lives at darkfuscator.onrender.com; its curl example always works.';
+          })
+          .finally(function () { btn.disabled = false; });
+      });
+      copy.addEventListener('click', function () {
+        if (navigator.clipboard) navigator.clipboard.writeText(val.textContent);
+        copy.textContent = 'Copied';
+        setTimeout(function () { copy.textContent = 'Copy'; }, 1500);
+      });
+    })();
+  </script>
+</body>
+</html>
