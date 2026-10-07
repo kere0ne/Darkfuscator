@@ -1,12 +1,11 @@
 'use strict';
 /* handlers.js — every platform route: auth, sessions, projects, builds,
- * API keys, stats, system. All state lives in tools/lib/db.js; all email
- * goes through tools/lib/mailer.js; the obfuscation engine is the real one.
+ * API keys, stats, system. All state lives in tools/lib/db.js. Auth is
+ * username + password only (no email auth); the obfuscation engine is real.
  */
 const crypto = require('crypto');
 const db = require('./db');
 const util = require('./util');
-const mailer = require('./mailer');
 const sendJson = util.sendJson;
 
 const path_ = require('path');
@@ -23,7 +22,6 @@ const SHORT_DAYS = 1;
 // A verification/reset link is only returned for an explicitly enabled local
 // development flow; production never leaks one in an API response.
 const DEV_MODE = process.env.EMAIL_DEV_MODE === 'true';
-const BASE = mailer.BASE_URL;
 const LIMITS = { perMinute: 30, perDay: 1000 };
 
 const MAX_USER_PROJECTS = 50;
@@ -97,63 +95,9 @@ function audit(userId, kind, detail, req) {
   });
 }
 
-// ------------------------------------------------------------------- tokens
-const TOKEN_TTL = { verify_email: 24, verify_email_change: 24, reset_password: 1 };
-function createToken(kind, userId, email) {
-  const raw = crypto.randomBytes(24).toString('hex');
-  db.insert('tokens', {
-    id: util.newId('tok'),
-    kind: kind,
-    userId: userId || null,
-    email: email ? email.toLowerCase() : '',
-    tokenHash: util.sha256(raw),
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + (TOKEN_TTL[kind] || 1) * 3600000).toISOString(),
-    usedAt: null
-  });
-  return raw;
-}
-function consumeToken(kind, raw) {
-  const tokenHash = util.sha256(String(raw || ''));
-  const t = db.find('tokens', (x) => x.kind === kind && x.tokenHash === tokenHash && !x.usedAt);
-  if (!t || Date.parse(t.expiresAt) <= Date.now()) return null;
-  db.update('tokens', (x) => x.id === t.id, { usedAt: new Date().toISOString() });
-  return t;
-}
-
-// ----------------------------------------------------------- send with truth
-async function sendTemplate(kind, to, args) {
-  const t = templatesFor(kind, args);
-  const result = await mailer.deliver(to, t.subject, t.html);
-  if (!result.sent) console.log('[mail not sent: ' + result.reason + '] to=' + to + ' subject=' + t.subject);
-  return result;
-}
-function templatesFor(kind, args) {
-  const T = mailer.templates;
-  switch (kind) {
-    case 'verify_email': return T.verifyEmail(BASE + '/verify-email?token=' + args.token);
-    case 'verify_email_change': return T.verifyEmailChange(BASE + '/verify-email?token=' + args.token + '&change=1');
-    case 'reset_password': return T.resetPassword(BASE + '/reset-password?token=' + args.token);
-    case 'welcome': return T.welcome();
-    case 'password_changed': return T.passwordChanged();
-    case 'email_changed': return T.emailChanged(args.oldEmail);
-    case 'security_alert': return T.securityAlert(args.detail);
-  }
-}
-
-function devLink(result, kind, token) {
-  // dev fallback: the link IS real and works; only the send is missing
-  const link = kind === 'verify_email' ? BASE + '/verify-email?token=' + token
-    : kind === 'verify_email_change' ? BASE + '/verify-email?token=' + token + '&change=1'
-    : kind === 'reset_password' ? BASE + '/reset-password?token=' + token : null;
-  if (!result.sent && DEV_MODE && link) return { emailSent: false, emailNote: result.reason, devLink: link };
-  return { emailSent: !!result.sent, emailNote: result.sent ? null : result.reason };
-}
-
 function publicUser(u) {
   return {
-    id: u.id, username: u.username, email: u.email, verified: !!u.verified,
-    pendingEmail: u.pendingEmail || null, createdAt: u.createdAt, disabled: !!u.disabled
+    id: u.id, username: u.username, createdAt: u.createdAt, disabled: !!u.disabled
   };
 }
 
@@ -194,28 +138,23 @@ async function handleAuth(req, res, sub) {
     if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many registration attempts, try again later', retryAfter: rl.retryAfter });
     const body = util.parseJson(await readBodyP(req)) || {};
     const username = String(body.username || '').trim();
-    const email = String(body.email || '').trim();
     const password = String(body.password || '');
     const confirm = String(body.confirmPassword !== undefined ? body.confirmPassword : password);
     if (!util.USERNAME_RE.test(username)) return sendJson(res, 400, { ok: false, error: 'username must be 3-24 characters: letters, numbers, underscore' });
-    if (!util.validateEmail(email)) return sendJson(res, 400, { ok: false, error: 'enter a valid email address' });
     const pw = util.passwordProblem(password);
     if (pw) return sendJson(res, 400, { ok: false, error: pw });
     if (confirm !== password) return sendJson(res, 400, { ok: false, error: 'passwords do not match' });
-    const lk = username.toLowerCase(), el = email.toLowerCase();
+    const lk = username.toLowerCase();
     if (db.find('users', (u) => u.usernameLower === lk)) return sendJson(res, 409, { ok: false, error: 'that username is taken' });
-    if (el && db.find('users', (u) => u.emailLower === el)) return sendJson(res, 409, { ok: false, error: 'that email is already registered' });
     if (db.users().length >= 50000) return sendJson(res, 503, { ok: false, error: 'signup quota reached' });
     const salt = crypto.randomBytes(16).toString('hex');
     const user = db.insert('users', {
-      id: util.newId('usr'), username, usernameLower: lk, email, emailLower: el,
-      salt, hash: hashPassword(password, salt), verified: false, pendingEmail: null,
+      id: util.newId('usr'), username, usernameLower: lk,
+      salt, hash: hashPassword(password, salt),
       disabled: false, createdAt: new Date().toISOString(), settings: db.defaultSettings()
     });
-    const raw = createToken('verify_email', user.id, el);
-    const result = await sendTemplate('verify_email', email, { token: raw });
     audit(user.id, 'register', 'account created', req);
-    return sendJson(res, 201, Object.assign({ ok: true, username, email, needsVerification: true }, devLink(result, 'verify_email', raw)));
+    return sendJson(res, 201, { ok: true, username });
   }
 
   if (req.method === 'POST' && sub === '/login') {
@@ -223,131 +162,18 @@ async function handleAuth(req, res, sub) {
     const rl = util.rateCheck('login:' + ip, 10, 100);
     if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, slow down', retryAfter: rl.retryAfter });
     const body = util.parseJson(await readBodyP(req)) || {};
-    const identifier = String(body.identifier || body.email || body.username || '').trim().toLowerCase();
+    const identifier = String(body.username || body.identifier || '').trim().toLowerCase();
     const password = String(body.password || '');
     const remember = !!body.remember;
-    const u = db.find('users', (x) => x.usernameLower === identifier || (x.emailLower && x.emailLower === identifier));
+    const u = db.find('users', (x) => x.usernameLower === identifier);
     if (!u || !verifyPassword(u, password)) {
       if (u) audit(u.id, 'login_failed', 'wrong credentials', req);
       return sendJson(res, 401, { ok: false, error: 'invalid username or password' });
     }
     if (u.disabled) return sendJson(res, 403, { ok: false, error: 'this account is disabled' });
-    if (!u.verified) {
-      return sendJson(res, 403, { ok: false, error: 'verify your email before logging in', code: 'account_not_verified', email: u.email });
-    }
     createSession(res, u, remember, req);
     audit(u.id, 'login', 'signed in', req);
     return sendJson(res, 200, { ok: true, user: publicUser(u) });
-  }
-
-  if (req.method === 'POST' && sub === '/verify-email') {
-    const rl = util.rateCheck('verify:' + util.clientIp(req), 10, 60);
-    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, slow down' });
-    const body = util.parseJson(await readBodyP(req)) || {};
-    const kind = body.change ? 'verify_email_change' : 'verify_email';
-    const t = consumeToken(kind, body.token);
-    if (!t) return sendJson(res, 400, { ok: false, error: 'this verification link is invalid or expired' });
-    if (kind === 'verify_email') {
-      const u = db.find('users', (x) => x.id === t.userId);
-      if (!u) return sendJson(res, 400, { ok: false, error: 'this verification link is invalid or expired' });
-      if (!u.verified) {
-        db.update('users', (x) => x.id === u.id, { verified: true });
-        audit(u.id, 'verify_email', 'email verified', req);
-        const w = await sendTemplate('welcome', u.email, {});
-        if (!w.sent) console.log('[mail not sent: ' + w.reason + '] welcome skipped');
-      }
-      return sendJson(res, 200, { ok: true, verified: true, username: u.username });
-    }
-    // email change
-    const u = db.find('users', (x) => x.id === t.userId);
-    if (!u) return sendJson(res, 400, { ok: false, error: 'this verification link is invalid or expired' });
-    const oldEmail = u.email;
-    db.update('users', (x) => x.id === u.id, { email: u.pendingEmail || u.email, emailLower: (u.pendingEmail || u.email).toLowerCase(), pendingEmail: null });
-    audit(u.id, 'email_changed', 'email verified and applied', req);
-    await sendTemplate('email_changed', oldEmail, { oldEmail });
-    return sendJson(res, 200, { ok: true, change: true, email: u.pendingEmail || u.email });
-  }
-
-  if (req.method === 'POST' && sub === '/resend-verification') {
-    const ip = util.clientIp(req);
-    const rl = util.rateCheck('resend:' + ip, 10, 30);
-    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, try again later', retryAfter: rl.retryAfter });
-    const body = util.parseJson(await readBodyP(req)) || {};
-    const email = String(body.email || '').trim().toLowerCase();
-    if (!email) return sendJson(res, 400, { ok: false, error: 'enter your email' });
-    const u = db.find('users', (x) => x.emailLower === email);
-    const cooldown = 60000;
-    if (u && !u.verified) {
-      const last = db.find('tokens', (t) => t.kind === 'verify_email' && t.userId === u.id);
-      if (last && Date.now() - Date.parse(last.createdAt) < cooldown && !last.usedAt) {
-        return sendJson(res, 429, { ok: false, error: 'a verification email was just sent, wait a minute', retryAfter: 60 });
-      }
-      const raw = createToken('verify_email', u.id, email);
-      const result = await sendTemplate('verify_email', u.email, { token: raw });
-      return sendJson(res, 200, Object.assign({ ok: true }, devLink(result, 'verify_email', raw)));
-    }
-    // never reveal whether the account exists
-    return sendJson(res, 200, { ok: true, emailSent: false });
-  }
-
-  if (req.method === 'POST' && sub === '/update-pending-email') {
-    const ip = util.clientIp(req);
-    const rl = util.rateCheck('pending-email:' + ip, 5, 20);
-    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, try again later', retryAfter: rl.retryAfter });
-    const body = util.parseJson(await readBodyP(req)) || {};
-    const username = String(body.username || '').trim().toLowerCase();
-    const password = String(body.password || '');
-    const email = String(body.email || '').trim();
-    const u = db.find('users', (x) => x.usernameLower === username && !x.disabled);
-    if (!u || !verifyPassword(u, password)) return sendJson(res, 401, { ok: false, error: 'invalid account details' });
-    if (u.verified) return sendJson(res, 409, { ok: false, error: 'this email is already verified; change it from account settings' });
-    if (!util.validateEmail(email)) return sendJson(res, 400, { ok: false, error: 'enter a valid email address' });
-    const lower = email.toLowerCase();
-    if (db.find('users', (x) => x.emailLower === lower && x.id !== u.id)) {
-      return sendJson(res, 409, { ok: false, error: 'that email is already registered' });
-    }
-    db.update('users', (x) => x.id === u.id, { email, emailLower: lower });
-    db.update('tokens', (t) => t.userId === u.id && t.kind === 'verify_email' && !t.usedAt, { usedAt: new Date().toISOString() });
-    const raw = createToken('verify_email', u.id, lower);
-    const result = await sendTemplate('verify_email', email, { token: raw });
-    audit(u.id, 'verification_email_changed', 'changed pending verification email', req);
-    return sendJson(res, 200, Object.assign({ ok: true, email, needsVerification: true }, devLink(result, 'verify_email', raw)));
-  }
-
-  if (req.method === 'POST' && sub === '/forgot-password') {
-    const ip = util.clientIp(req);
-    const rl = util.rateCheck('forgot:' + ip, 5, 20);
-    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, try again later', retryAfter: rl.retryAfter });
-    const body = util.parseJson(await readBodyP(req)) || {};
-    const email = String(body.email || '').trim().toLowerCase();
-    if (!email) return sendJson(res, 400, { ok: false, error: 'enter your email' });
-    const u = db.find('users', (x) => x.emailLower === email && x.verified && !x.disabled);
-    if (u) {
-      const raw = createToken('reset_password', u.id, email);
-      const result = await sendTemplate('reset_password', u.email, { token: raw });
-      audit(u.id, 'forgot_password', 'reset requested', req);
-      return sendJson(res, 200, Object.assign({ ok: true }, devLink(result, 'reset_password', raw)));
-    }
-    return sendJson(res, 200, { ok: true }); // same shape either way
-  }
-
-  if (req.method === 'POST' && sub === '/reset-password') {
-    const ip = util.clientIp(req);
-    const rl = util.rateCheck('reset:' + ip, 10, 30);
-    if (!rl.ok) return sendJson(res, 429, { ok: false, error: 'too many attempts, slow down' });
-    const body = util.parseJson(await readBodyP(req)) || {};
-    const pw = util.passwordProblem(body.password);
-    if (pw) return sendJson(res, 400, { ok: false, error: pw });
-    const t = consumeToken('reset_password', body.token);
-    if (!t) return sendJson(res, 400, { ok: false, error: 'this reset link is invalid or expired' });
-    const u = db.find('users', (x) => x.id === t.userId);
-    if (!u) return sendJson(res, 400, { ok: false, error: 'this reset link is invalid or expired' });
-    const salt = crypto.randomBytes(16).toString('hex');
-    db.update('users', (x) => x.id === u.id, { salt, hash: hashPassword(body.password, salt) });
-    for (const s of db.where('sessions', (s) => s.userId === u.id && !s.revokedAt)) revokeSession(s.id);
-    audit(u.id, 'reset_password', 'password reset, all sessions signed out', req);
-    await sendTemplate('password_changed', u.email, {});
-    return sendJson(res, 200, { ok: true });
   }
 
   if (req.method === 'POST' && sub === '/logout') {
@@ -428,25 +254,7 @@ async function handlePlatform(req, res, pathname) {
     let n = 0;
     for (const s of db.where('sessions', (s) => s.userId === sess.user.id && !s.revokedAt && s.id !== sess.session.id)) { revokeSession(s.id); n++; }
     audit(sess.user.id, 'password_changed', 'password changed, other sessions signed out', req);
-    await sendTemplate('password_changed', sess.user.email, {});
     return sendJson(res, 200, { ok: true, otherSessionsRevoked: n }), true;
-  }
-
-  if (pathname === '/api/v1/me/email' && req.method === 'POST') {
-    const sess = sessionFromReq(req);
-    if (!sess) return sendJson(res, 401, { ok: false, error: 'not signed in' }), true;
-    const body = util.parseJson(await readBodyP(req)) || {};
-    if (!verifyPassword(sess.user, String(body.password || ''))) return sendJson(res, 401, { ok: false, error: 'current password is wrong' }), true;
-    const newEmail = String(body.newEmail || '').trim();
-    if (!util.validateEmail(newEmail)) return sendJson(res, 400, { ok: false, error: 'enter a valid email address' }), true;
-    if (db.find('users', (u) => u.emailLower === newEmail.toLowerCase() && u.id !== sess.user.id)) {
-      return sendJson(res, 409, { ok: false, error: 'that email is already registered' }), true;
-    }
-    db.update('users', (u) => u.id === sess.user.id, { pendingEmail: newEmail });
-    const raw = createToken('verify_email_change', sess.user.id, newEmail);
-    const result = await sendTemplate('verify_email_change', newEmail, { token: raw });
-    audit(sess.user.id, 'email_change_requested', 'change to ' + newEmail, req);
-    return sendJson(res, 200, Object.assign({ ok: true, pendingEmail: newEmail }, devLink(result, 'verify_email_change', raw))), true;
   }
 
   if (pathname === '/api/v1/me/sessions' && req.method === 'GET') {
@@ -814,7 +622,7 @@ function sanitizeSettings(next, cur) {
   }
   if (next.notifications) {
     out.notifications = Object.assign({}, out.notifications);
-    for (const k of ['buildCompletion', 'securityAlerts', 'emailNotifications']) {
+    for (const k of ['buildCompletion', 'securityAlerts']) {
       if (next.notifications[k] !== undefined) out.notifications[k] = !!next.notifications[k];
     }
   }

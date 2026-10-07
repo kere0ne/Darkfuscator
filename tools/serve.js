@@ -5,12 +5,11 @@
  *
  *   node tools/serve.js [port]      (PORT env wins; default 3000)
  *   DK_DATA_DIR=/some/dir           override data dir
- *   RESEND_API_KEY=...              real email sends (see tools/lib/mailer.js)
  *
  * Frontend routes (SPA shells served by this server, so every route works on
  * refresh; Cloudflare Pages gets the same map in site/_redirects):
  *   /                       landing
- *   /login /register /verify-email /forgot-password /reset-password   auth
+ *   /login /register   auth (username + password; no email auth)
  *   /logout                 invalidates the session, redirects to /login
  *   /dashboard /obfuscate /projects /projects/new /projects/:id /history /api /settings /account
  *   /docs and /docs/*       documentation
@@ -34,7 +33,7 @@ const PLATFORM_VERSION = '7.0.0';
 const LIMITS = handlers.LIMITS;
 
 // ------------------------------------------------------------------- routing
-const AUTH_ROUTES = ['login', 'register', 'verify-email', 'forgot-password', 'reset-password'];
+const AUTH_ROUTES = ['login', 'register'];
 const APP_ROUTES = ['dashboard', 'obfuscate', 'projects', 'history', 'api', 'api-keys', 'settings', 'account'];
 
 function htmlFile(name) { return path.join(ROOT, name + '.html'); }

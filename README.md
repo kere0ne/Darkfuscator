@@ -25,7 +25,7 @@ The serializer uses build-specific encoding and integrity checks to increase ana
 
 ## Platform
 
-The hosted platform in `site/` includes server-backed registration, email verification, password reset, sessions, projects, source-retention choices, build history, API keys, usage logs, documentation, and account/security controls. The backend invokes the same engine and validates accepted options; interface controls are sent to real endpoints rather than simulated in the browser.
+The hosted platform in `site/` includes server-backed registration (username + password, no email), sessions, projects, source-retention choices, build history, API keys, usage logs, documentation, and account/security controls. The backend invokes the same engine and validates accepted options; interface controls are sent to real endpoints rather than simulated in the browser.
 
 `/offline` is deliberately different: it is a local-engine workspace with no account, server storage, history, email, or API-key behavior. Build a single-file local version with:
 
