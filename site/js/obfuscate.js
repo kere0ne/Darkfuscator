@@ -48,8 +48,8 @@
   // API expose the same bounded values rather than environment-specific probes.
   var PRESETS = {
     lightweight: { junk: 0, guard: 0, antiTamper: 0, vmMode: 'fast', compression: false, vmLayers: 1, ir: 'fast' },
-    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 2, ir: 'balanced' },
-    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 4, ir: 'secure' }
+    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 1, ir: 'balanced' },
+    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 1, ir: 'secure' }
   };
 
 
