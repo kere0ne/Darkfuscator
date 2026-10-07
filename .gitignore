@@ -5,3 +5,4 @@ out-*.zip
 darkfuscator*.zip
 darkfuscator-final.zip
 data/
+.gh-pages-work/
