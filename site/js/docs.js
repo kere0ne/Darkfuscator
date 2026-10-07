@@ -1,151 +1,120 @@
-/* docs.js — API documentation site: sidebar + content. */
+/* docs.js — Darkfuscator product and API documentation. */
 (function () {
   'use strict';
   const DFx = window.DF;
+  const apiBase = () => location.origin;
   const CONTENT = {
     'getting-started': {
       title: 'Getting started',
       body: [
-        '<p>Darkfuscator protects Luau scripts with a proprietary bytecode VM, layered encryption, heavy junk, silent integrity guards and environment probes.</p>',
-        '<p>Two ways to use it:</p>',
-        '<ul><li><b>Platform</b> (this site): sign in, build in the browser, keep projects and build history, manage API keys.</li>',
-        '<li><b>API</b>: call <span class="mono">POST /api/v1/obfuscate</span> from curl or your own code with a <span class="mono">dk_live_</span> key.</li></ul>',
-        '<p>Sign in on <a class="link" href="/register">/register</a>, then open <a class="link" href="/obfuscate">/obfuscate</a> and build your first protected script.</p>'
+        '<p>Darkfuscator is a Luau obfuscation platform. A successful build is produced by the real compiler pipeline: lexer and parser, AST optimization, custom bytecode compilation, protected serialization, and a generated custom VM loader.</p>',
+        '<p>Start by creating an account, verifying its email, and opening the <a class="link" href="/obfuscate">protection workspace</a>. The workspace validates source before it calls the authenticated backend; build output and history are returned by that backend, not manufactured in the browser.</p>',
+        '<h2>Choose a preset</h2>',
+        '<ul><li><b>Lightweight</b> uses the FAST VM layout and keeps runtime overhead lower.</li><li><b>Balanced</b> adds payload compression when it reduces size, register remapping, dispatch variation, and standard integrity verification.</li><li><b>Maximum</b> uses the SECURE VM layout, stronger standard variation, and full integrity verification.</li></ul>',
+        '<p>Use a deterministic seed only when you need reproducible build structure. Otherwise each build receives a fresh build-specific seed.</p>'
       ].join('')
     },
-    'api': {
-      title: 'REST API',
+    pipeline: {
+      title: 'Protection pipeline',
       body: [
-        '<p>Base URL on this deployment: <span class="mono">' + location.origin + '</span></p>',
-        '<p>Every request body and response is JSON. Builds and history use a session cookie or a Bearer API key; the health endpoint needs nothing.</p>',
-        '<h3>POST /api/v1/obfuscate</h3>',
-        '<p>The main build endpoint. Key auth only.</p>',
-        '<pre class="code-block">curl -X POST ' + location.origin + '/api/v1/obfuscate \\\n' +
-        '  -H "Authorization: Bearer dk_live_YOURKEY" \\\n' +
-        '  -H "Content-Type: application/json" \\\n' +
-        '  -d \'{"source": "print(1)", "preset": "maximum", "target": "roblox"}\'</pre>',
-        '<h3>POST /api/v1/builds</h3>',
-        '<p>Session (cookie) auth: same build engine, plus the build is stored in your history.</p>',
-        '<h3>Request fields</h3>',
-        '<ul>' +
-        '<li><span class="mono">source</span> (required): the Luau source, max 200,000 characters.</li>',
-        '<li><span class="mono">filename</span>: label shown in history.</li>',
-        '<li><span class="mono">preset</span>: <span class="mono">lightweight</span>, <span class="mono">balanced</span> or <span class="mono">maximum</span>.</li>',
-        '<li><span class="mono">target</span>: <span class="mono">roblox</span> or <span class="mono">luau</span>.</li>',
-        '<li><span class="mono">options</span>: <span class="mono">vmLayers</span> (1-10), <span class="mono">junk</span> (0-4), <span class="mono">guard</span> (0-2), <span class="mono">envChecks</span> (0-2), <span class="mono">antiTamper</span> (0-2), <span class="mono">nameStyle</span> (short/random/confuse), <span class="mono">minify</span>, <span class="mono">watermark</span>, <span class="mono">captureGlobals</span>, <span class="mono">envLock</span>, <span class="mono">lockPlace</span>, <span class="mono">lockUniverse</span>, <span class="mono">seed</span>.</li></ul>',
-        '<h3>Response</h3>',
-        '<pre class="code-block">{\n' +
-        '  "ok": true,\n' +
-        '  "build": {\n' +
-        '    "id": "dfb_...", "filename": "script.luau", "status": "success",\n' +
-        '    "preset": "maximum", "target": "roblox",\n' +
-        '    "outSize": 358178, "durationMs": 18568, "payloadChars": 312000,\n' +
-        '    "vmCount": 10, "seed": "12345", "reparsed": true\n' +
-        '  }\n' +
-        '}</pre>',
-        '<p>The protected output itself comes from <span class="mono">GET /api/v1/builds/:id/output</span> (session) or is embedded in the obfuscate response for key callers.</p>'
+        '<p>Darkfuscator does not turn source into renamed source and call that protection. The supported pipeline is:</p>',
+        '<ol><li><b>Lex and parse</b> Luau into syntax and scope information.</li><li><b>Optimize conservatively</b> with semantics-preserving AST literal folding and bytecode optimizations.</li><li><b>Compile</b> supported source to custom register bytecode.</li><li><b>Serialize</b> bytecode with per-build layout, opcode, string, and payload variation.</li><li><b>Verify and decode</b> in a generated custom VM loader.</li></ol>',
+        '<h2>Payload protection</h2>',
+        '<p>Each emitted payload receives a randomized alphabet, keyed byte transformations, encoded string constants, shuffled opcode identifiers, and generated handler layout. Optional RLE compression is only retained when it makes the serialized payload smaller.</p>',
+        '<h2>Integrity verification</h2>',
+        '<p>The <span class="mono">antiTamper</span> compatibility option represents integrity verification: level 0 is off, level 1 validates the decoded payload with FNV, and level 2 adds independent bytecode checksums. A failed verification returns before reconstructed bytecode runs; it does not intentionally hang or damage the runtime.</p>'
+      ].join('')
+    },
+    workspace: {
+      title: 'Workspace and history',
+      body: [
+        '<p>The authenticated workspace exposes only controls that are sent to the backend engine. It supports file input, local syntax validation, copy/download actions, deterministic seeds, project defaults, and opt-in source retention for rebuilds.</p>',
+        '<h2>Projects</h2>',
+        '<p>Projects store a name, target, preset, and optional engine defaults. They do not retain source by themselves. On each build, choose whether source should be retained to allow the server-side Rebuild action later.</p>',
+        '<h2>History</h2>',
+        '<p>History lists real stored build metadata. You can filter entries, download output, rebuild only when source was retained, or delete a build. Deleting an output removes its stored data rather than presenting a fake success state.</p>',
+        '<h2>Account safety</h2>',
+        '<p>Email verification, password reset, sessions, API key creation/revocation, profile changes, and security events are server-backed. Email delivery is only reported as successful when the configured server-side mail transport accepts it.</p>'
+      ].join('')
+    },
+    'api/protect': {
+      title: 'Protect API',
+      body: [
+        '<p>Use a key created in the authenticated API dashboard. Send it in an Authorization Bearer header. The complete key is shown once when it is created and is stored server-side as a hash.</p>',
+        '<h2>POST /api/v1/obfuscate</h2>',
+        '<pre class="code-block">curl -X POST ' + apiBase() + '/api/v1/obfuscate \\\n  -H "Authorization: Bearer dk_live_YOUR_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d \'{"source":"print(1)","preset":"balanced","target":"luau"}\'</pre>',
+        '<h2>Request body</h2>',
+        '<ul><li><span class="mono">source</span> is required Luau source (up to 200,000 characters).</li><li><span class="mono">preset</span> is <span class="mono">lightweight</span>, <span class="mono">balanced</span>, or <span class="mono">maximum</span>.</li><li><span class="mono">target</span> is <span class="mono">luau</span> or <span class="mono">roblox</span>.</li><li><span class="mono">options</span> may include <span class="mono">vmLayers</span> (1–10), <span class="mono">junk</span> (0–4), <span class="mono">guard</span> (0–2), <span class="mono">antiTamper</span> / integrity verification (0–2), <span class="mono">vmMode</span>, <span class="mono">compression</span>, <span class="mono">seed</span>, and documented loader options.</li></ul>',
+        '<h2>Response</h2>',
+        '<pre class="code-block">{\n  "ok": true,\n  "output": "-- Protected by Darkfuscator...",\n  "stats": { "vms": 2, "seed": 12345, "vmMode": "balanced" },\n  "warnings": [],\n  "target": "luau"\n}</pre>',
+        '<p>The API returns actual engine output directly. It does not create a build-history entry; use the cookie-authenticated workspace build endpoint when you need stored history.</p>'
       ].join('')
     },
     'api/authentication': {
-      title: 'Authentication',
+      title: 'API authentication',
       body: [
-        '<p>Two kinds of routes:</p>',
-        '<ul><li><b>Cookie routes</b> (sign in, builds, keys, settings): the browser session is an <span class="mono">HttpOnly</span> cookie. CORS is deliberately open only to this origin for these.</li>',
-        '<li><b>Key routes</b> (obfuscate): send <span class="mono">Authorization: Bearer dk_live_...</span>. CORS is open so third-party apps can call it.</li></ul>',
-        '<p>Generate keys on <a class="link" href="/api-keys">/api-keys</a> or <span class="mono">POST /api/v1/keys</span>. The full key shows once; store it safely. Keys are stored hashed, so they cannot be recovered later.</p>',
-        '<p>Limits: 25 keys per account. Key requests show up per key under recent requests.</p>'
+        '<p>The public protection endpoint accepts a Bearer API key. Account, history, project, and key-management routes use an HttpOnly browser session cookie instead.</p>',
+        '<ul><li>Create and revoke keys from the authenticated <a class="link" href="/api">API dashboard</a>.</li><li>Use a descriptive key name for each integration.</li><li>Store the full secret outside source control. It cannot be recovered after its one-time display.</li><li>Revoked keys are rejected immediately; request usage and last-used data are recorded on the server.</li></ul>',
+        '<p>The health endpoint, <span class="mono">GET /api/v1/health</span>, does not require a session or API key.</p>'
       ].join('')
     },
-    'errors': {
+    compatibility: {
+      title: 'Compatibility and limits',
+      body: [
+        '<h2>Implemented targets</h2>',
+        '<ul><li><span class="mono">luau</span>: Luau environments with the ordinary primitives used by the generated VM, including <span class="mono">bit32</span>.</li><li><span class="mono">roblox</span>: Roblox Luau. Optional place and universe ID bindings are emitted only when explicitly configured.</li></ul>',
+        '<p>Darkfuscator does not claim generic Lua, executor-specific environments, or unknown runtimes as supported targets. Test protected builds in the same environment where you intend to run them.</p>',
+        '<h2>Runtime trade-offs</h2>',
+        '<p>VM execution and stronger layout variation increase output size and runtime overhead. Use FAST or LIGHTWEIGHT for more overhead-sensitive code, and measure realistic workloads before choosing a profile for production.</p>',
+        '<h2>Source support</h2>',
+        '<p>The engine accepts the Luau syntax covered by its parser and compiler. It re-parses emitted output before returning it, but parse validity is not a substitute for application-level testing of every script and target environment.</p>'
+      ].join('')
+    },
+    security: {
+      title: 'Security model',
+      body: [
+        '<p>Obfuscation is a cost-increase measure, not a trust boundary. Anyone controlling a client runtime can observe or alter client-side behavior. Keep secrets, authoritative decisions, and irreversible business logic on trusted server-side systems.</p>',
+        '<ul><li>Passwords are derived server-side with PBKDF2-SHA256 and a per-user salt.</li><li>Browser sessions use HttpOnly cookies with production-aware Secure settings and SameSite protection.</li><li>API key secrets are hashed server-side and only displayed once at creation.</li><li>Verification and reset tokens are one-time, time-limited server records.</li><li>Integrity verification in protected output safely returns before bytecode execution when a verification check fails.</li></ul>',
+        '<p>Darkfuscator deliberately does not generate destructive failure loops, executor-specific bypasses, debug/timing probes, or game-client probe batteries.</p>'
+      ].join('')
+    },
+    errors: {
       title: 'Errors and status codes',
       body: [
-        '<table class="data-table"><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody>' +
-        '<tr><td>400</td><td>Bad request: invalid syntax, missing source, bad token or password</td></tr>' +
-        '<tr><td>401</td><td>Not signed in, or missing/invalid API key</td></tr>' +
-        '<tr><td>403</td><td>Cross-site request blocked, or email not verified (account_not_verified)</td></tr>' +
-        '<tr><td>404</td><td>No such build, project or key</td></tr>' +
-        '<tr><td>409</td><td>Username/email taken, or source was not stored for rebuild</td></tr>' +
-        '<tr><td>410</td><td>Output no longer stored for that build</td></tr>' +
-        '<tr><td>429</td><td>Rate limit hit, response includes retryAfter seconds</td></tr>' +
-        '<tr><td>500</td><td>Engine or server crashed, error message included</td></tr>' +
-        '<tr><td>503</td><td>Limits reached (keys, projects, builds, signup quota)</td></tr>' +
+        '<table class="platform-table"><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody>',
+        '<tr><td>400</td><td>Invalid request, unsupported target/preset, invalid source, or engine-reported build failure.</td></tr>',
+        '<tr><td>401</td><td>Missing or invalid session/API key.</td></tr>',
+        '<tr><td>403</td><td>Email verification, account status, or origin policy prevents the request.</td></tr>',
+        '<tr><td>404</td><td>The requested build, project, or API key does not exist for the account.</td></tr>',
+        '<tr><td>409</td><td>A conflicting value exists, or a rebuild was requested without retained source.</td></tr>',
+        '<tr><td>429</td><td>A route rate limit was reached. The response may include a retry interval.</td></tr>',
+        '<tr><td>500</td><td>An unexpected server/engine error occurred.</td></tr>',
         '</tbody></table>'
-      ].join('')
-    },
-    'rate-limits': {
-      title: 'Rate limits',
-      body: [
-        '<ul>' +
-        '<li>Builds: 10 per minute, 300 per day per account</li>',
-        '<li>Login: 10 per minute per IP</li>',
-        '<li>Register: 5 per minute, 20 per day per IP</li>',
-        '<li>Key creation: 10 per minute</li>',
-        '<li>Source size: 200,000 characters; request body 512 KB</li>' +
-        '</ul>'
-      ].join('')
-    },
-    'compatibility': {
-      title: 'Compatibility',
-      body: [
-        '<p>Targets:</p>',
-        '<ul><li><span class="mono">roblox</span>: Roblox Luau runtime. Default; anti-tamper defaults to Full.</li>',
-        '<li><span class="mono">luau</span>: plain Luau (standalone interpreters, other Luau hosts).</li></ul>',
-        '<p>The engine re-parses every build byte-for-byte before handing it back, so a successful build is a parse-verified build. A build that cannot re-parse is reported failed with the real error, never silently shipped.</p>',
-        '<p>Settings note: full preset with 10 VM layers and heavy junk produces multi-MB outputs and takes seconds to minutes in the browser; lean builds (VM 5, junk 2) are much faster.</p>'
-      ].join('')
-    },
-    'security': {
-      title: 'Security notes',
-      body: [
-        '<ul>' +
-        '<li>Passwords: PBKDF2-SHA256 with a per-user salt.</li>',
-        '<li>Sessions: HttpOnly, SameSite cookie. Remember device: 30 days, otherwise 1 day.</li>',
-        '<li>API keys: stored as SHA-256 hashes, shown once at creation.</li>',
-        '<li>Email verification required before first sign in.</li>',
-        '<li>Cross-site browser mutations are blocked by origin checks.</li>',
-        '<li>The anti-tamper battery ships self-obfuscated through Darkfuscator itself.</li>' +
-        '</ul>',
-        '<p class="dim">Obfuscation makes scripts hard to read and change. It is not a security boundary against a determined runtime attacker; nothing leaving the runtime should be trusted blindly.</p>'
       ].join('')
     }
   };
 
-  const SIDEBAR = ['getting-started', 'api', 'api/authentication', 'errors', 'rate-limits', 'compatibility', 'security'];
+  const SIDEBAR = ['getting-started', 'pipeline', 'workspace', 'api/protect', 'api/authentication', 'compatibility', 'security', 'errors'];
+  const $ = (selector) => document.querySelector(selector);
   function route() {
-    const path = location.pathname.replace(/^\/docs\/?/, '');
+    const path = location.pathname.replace(/^\/docs\/?/, '').replace(/\/$/, '');
     const key = CONTENT[path] ? path : 'getting-started';
     $('#docs-content').innerHTML = '<h1>' + CONTENT[key].title + '</h1>' + CONTENT[key].body;
-    document.title = CONTENT[key].title + ' - Darkfuscator API docs';
-    document.querySelectorAll('#docs-nav a[data-doc]').forEach(function (a) {
-      a.classList.toggle('active', a.getAttribute('data-doc') === key);
-    });
-    window.DF_NAV(key);
+    document.title = CONTENT[key].title + ' — Darkfuscator docs';
+    document.querySelectorAll('#docs-nav a[data-doc]').forEach((a) => a.classList.toggle('active', a.getAttribute('data-doc') === key));
+    if (window.DF_NAV) window.DF_NAV(key);
   }
   document.addEventListener('DOMContentLoaded', function () {
     const nav = $('#docs-nav');
-    if (nav) {
-      nav.innerHTML = SIDEBAR.map(function (k) {
-        return '<a data-doc="' + k + '" href="/docs/' + k + '">' + CONTENT[k].title + '</a>';
-      }).join('');
-      nav.addEventListener('click', function (e) {
-        const a = e.target.closest('a[data-doc]');
-        if (!a) return;
-        e.preventDefault();
-        history.pushState(null, '', a.getAttribute('href'));
-        route();
-      });
-    }
+    nav.innerHTML = SIDEBAR.map((key) => '<a data-doc="' + key + '" href="/docs/' + key + '">' + CONTENT[key].title + '</a>').join('');
+    nav.addEventListener('click', (event) => {
+      const link = event.target.closest('a[data-doc]');
+      if (!link) return;
+      event.preventDefault();
+      history.pushState(null, '', link.getAttribute('href'));
+      route();
+    });
     window.addEventListener('popstate', route);
     route();
-    document.querySelectorAll('.copyable pre').forEach(function (pre) {
-      const btn = document.createElement('button');
-      btn.className = 'btn sm';
-      btn.textContent = 'Copy';
-      pre.parentElement.appendChild(btn);
-      btn.addEventListener('click', async function () {
-        try { await navigator.clipboard.writeText(pre.textContent); DFx.toast('Copied', '', 'ok'); }
-        catch (e) { DFx.toast('Copy blocked by the browser', '', 'warn'); }
-      });
-    });
   });
 })();

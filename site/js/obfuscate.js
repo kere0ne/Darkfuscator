@@ -14,10 +14,11 @@
   var Parser = isNode ? require('./luau-parser.js') : root.LuauParser;
   var VMCompile = isNode ? require('./vm-compile.js') : root.DarkfuscatorVMCompile;
   var VMEmit = isNode ? require('./vm-emit.js') : root.DarkfuscatorVMEmit;
-  var api = factory(Lexer, Parser, VMCompile, VMEmit);
+  var Pipeline = isNode ? require('./pipeline.js') : root.DarkfuscatorPipeline;
+  var api = factory(Lexer, Parser, VMCompile, VMEmit, Pipeline);
   if (isNode) module.exports = api;
   if (root) root.Darkfuscator = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit) {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function (Lexer, Parser, VMCompile, VMEmit, Pipeline) {
   'use strict';
 
   var bytesToStr = Lexer.bytesToStr;
@@ -30,22 +31,22 @@
     nameStyle: 'random',        // short | random | confuse — generated identifiers
     minify: true,               // one-line output (off = one slot per line)
     junk: 3,                    // 0 | 1 | 2 | 3 | 4 — decoys, dead handlers, heavy junk, insane (~2 MB)
-    guard: 2,                   // 0 | 1 | 2 — anti-environment audit strength
+    guard: 2,                   // 0 | 1 | 2 — ordinary VM-prerequisite validation
     captureGlobals: true,       // grab the caller's environment with getfenv()
-    watermark: true,            // leading "protected by" comment
+    watermark: true,            // leading protection notice
     lockPlace: '',              // optional Roblox place id the build is bound to
     lockUniverse: '',           // optional Roblox universe id the build is bound to
-    envChecks: 2,               // 0 | 1 | 2 — anti-env probes + environment-derived seal
-    envLock: false,             // refuse to decode outside a genuine Roblox client
-    antiTamper: 2,              // 0 | 1 | 2 — chunked loader wrapper: off | fast | full
+    antiTamper: 2,              // 0 | 1 | 2 — decoder integrity: off | fast | full
+    vmMode: 'balanced',         // fast | balanced | secure runtime layout
+    compression: false,         // optional RLE payload size pass
     vmLayers: 5                 // 1..10 — the build runs inside stacked VMs (auto-degrades on huge payloads)
   };
 
   // presets for the CLI and for callers that name one; the UI always uses maximum
   var PRESETS = {
-    lightweight: { junk: 1, guard: 1, envChecks: 1, antiTamper: 0, vmLayers: 1 },
-    balanced:    { junk: 2, guard: 2, envChecks: 2, antiTamper: 1, vmLayers: 2 },
-    maximum:     { junk: 3, guard: 2, envChecks: 2, antiTamper: 2, vmLayers: 10 }
+    lightweight: { junk: 0, guard: 0, antiTamper: 0, vmMode: 'fast', compression: false, vmLayers: 1 },
+    balanced:    { junk: 1, guard: 1, antiTamper: 1, vmMode: 'balanced', compression: true, vmLayers: 2 },
+    maximum:     { junk: 2, guard: 2, antiTamper: 2, vmMode: 'secure', compression: true, vmLayers: 4 }
   };
 
 
@@ -62,10 +63,34 @@
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
   }
+  function freshSeed() {
+    // Build identity comes from a cryptographically strong source when the
+    // host provides one. The deterministic PRNG below is then seeded with it
+    // so a supplied seed remains reproducible.
+    try {
+      if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+        var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] >>> 0;
+      }
+    } catch (e) {}
+    try {
+      if (typeof require === 'function') return require('crypto').randomBytes(4).readUInt32LE(0) >>> 0;
+    } catch (e2) {}
+    return (Math.random() * 0xFFFFFFFF) >>> 0;
+  }
+  function seedNumber(seed) {
+    if (typeof seed === 'number' && isFinite(seed)) return seed >>> 0;
+    var text = String(seed == null ? '' : seed);
+    if (/^\d+$/.test(text)) return Number(text) >>> 0;
+    // FNV-1a gives named seeds stable, explicit deterministic behavior.
+    var h = 2166136261;
+    for (var i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
   function makeRng(seed) {
-    if (seed === null || seed === undefined || seed === '') seed = (Math.random() * 0xFFFFFFFF) >>> 0;
-    var rnd = mulberry32(seed >>> 0);
-    rnd.seed = seed >>> 0;
+    if (seed === null || seed === undefined || seed === '') seed = freshSeed();
+    seed = seedNumber(seed);
+    var rnd = mulberry32(seed);
+    rnd.seed = seed;
     return rnd;
   }
 
@@ -96,8 +121,10 @@
     }
     for (var ok in (options || {})) if (options[ok] !== undefined && ok !== 'preset') opts[ok] = options[ok];
     opts.junk = Math.max(0, Math.min(4, parseInt(opts.junk, 10) || 0));
-    opts.envChecks = opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2;
-    opts.antiTamper = opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0;
+    opts.guard = opts.guard === 2 || opts.guard === '2' ? 2 : opts.guard === 0 || opts.guard === '0' ? 0 : 1;
+    opts.antiTamper = opts.antiTamper === 1 || opts.antiTamper === '1' ? 1 : opts.antiTamper === 2 || opts.antiTamper === '2' ? 2 : 0;
+    opts.vmMode = opts.vmMode === 'fast' || opts.vmMode === 'secure' ? opts.vmMode : 'balanced';
+    opts.compression = opts.compression === true || opts.compression === 'true';
     opts.vmLayers = parseInt(opts.vmLayers, 10);
     if (!(opts.vmLayers >= 1)) opts.vmLayers = 5;
     if (opts.vmLayers > 10) opts.vmLayers = 10;
@@ -122,11 +149,14 @@
 
     // --------------------------------------------- 2. compile + emit bytecode
     // The bytecode VM is the transformation pipeline: the AST is compiled to
-    // register bytecode and shipped inside an encrypted interpreter build.
-    var vmErr = null, vmOut = null;
+    // register bytecode and shipped inside a build-specific encoded interpreter build.
+    var vmErr = null, vmOut = null, pipelineStats = null, bytecodeStats = null;
     try {
-      var prog = VMCompile.compile(parsed.ast, refs);
       var vmRng = makeRng(opts.seed);
+      pipelineStats = Pipeline && Pipeline.optimizeAst ? Pipeline.optimizeAst(parsed.ast) : { folded: 0, passes: [] };
+      mark('optimize');
+      var prog = VMCompile.compile(parsed.ast, refs);
+      bytecodeStats = VMCompile.optimize ? VMCompile.optimize(prog, { rng: vmRng, scrambleConstants: true }) : null;
       vmOut = VMEmit.emit(prog, {
         rng: vmRng,
         junk: opts.junk >= 2 ? 2 : opts.junk === 1 ? 1 : 0,
@@ -137,9 +167,9 @@
         watermark: opts.watermark !== false,
         lockPlace: opts.lockPlace || '',
         lockUniverse: opts.lockUniverse || '',
-        envChecks: opts.envChecks === 0 ? 0 : opts.envChecks === 1 ? 1 : 2,
-        envLock: opts.envLock === true,
-        antiTamper: opts.antiTamper === 1 ? 1 : opts.antiTamper === 2 ? 2 : 0,
+        antiTamper: opts.antiTamper,
+        vmMode: opts.vmMode,
+        compression: opts.compression,
         wrapReturn: opts.junk >= 3,
         noTiming: (opts.vmLayers || 1) > 1
       });
@@ -151,12 +181,11 @@
       if (!/\n$/.test(vmSrc)) vmSrc += '\n';
       var engineName = 'vm';
       // stacked VM layers: each layer compiles the previous build's source
-      // AGAIN into a freshly-randomised VM whose encrypted payload carries
-      // the whole previous build. Every layer has its own opcode map, its
-      // own cipher keys and its own seal, so a dumper has to peel all of
-      // them, one environment audit at a time. Layers stop on their own
-      // when the payload outgrows sensible nesting, which keeps huge
-      // scripts on the strongest stack that still builds.
+      // AGAIN into a freshly-randomised VM whose encoded payload carries
+      // the whole previous build. Every layer has its own opcode map, byte
+      // transformations, and integrity seal, so analysis must peel each layer.
+      // Layers stop on their own when the payload outgrows sensible nesting,
+      // which keeps large scripts on the strongest stack that still builds.
       var layerRng = vmRng, vms = 1;
       // nesting budget: a layer is only added while the previous build still
       // fits, which keeps the final output under ~4.5 MB even at 10 layers
@@ -170,18 +199,19 @@
           var parsedN = Parser.parse(vmSrc);
           var progN = VMCompile.compile(parsedN.ast, parsedN.refs);
           layerRng = makeRng((layerRng.seed ^ (0x9E3779B9 + LN * 0x85EBCA6B)) >>> 0);
+          if (VMCompile.optimize) VMCompile.optimize(progN, { rng: layerRng, scrambleConstants: true });
           var vmOutN = VMEmit.emit(progN, {
             rng: layerRng,
             junk: LN <= 3 ? (opts.junk >= 1 ? 1 : 0) : 0,
             minify: true,
             nameStyle: opts.nameStyle || 'random',
-            guard: 1,             // the outer build runs the full battery;
-            captureGlobals: true, // inner layers only seal their own payload
+            guard: 1,             // inner layers validate VM prerequisites
+            captureGlobals: true,
             watermark: false,
             lockPlace: '', lockUniverse: '',
-            envChecks: 1,
-            envLock: false,
-            antiTamper: 0,
+            antiTamper: opts.antiTamper,
+            vmMode: opts.vmMode,
+            compression: opts.compression,
             wrapReturn: opts.junk >= 3
           });
           Parser.parse(vmOutN.source);
@@ -197,8 +227,9 @@
       }
       // the outermost layer always re-emits with its own header off, so
       // stamp the banner on top of the final source ourselves
-      if (opts.watermark !== false && vmSrc.indexOf('-- This file is protected by Darkfuscator') !== 0) {
-        vmSrc = '-- This file is protected by Darkfuscator and obfuscated by anti tamper so it dont get stolen\n' + vmSrc;
+      var banner = '-- Protected by Darkfuscator. Obfuscation raises reverse-engineering cost; it is not impossible to defeat.';
+      if (opts.watermark !== false && vmSrc.indexOf(banner) !== 0) {
+        vmSrc = banner + '\n' + vmSrc;
       }
       result.stats.vms = vms;
       // heavy junk (junk 3, junk 4): dead `if false` statements appended to the final
@@ -221,9 +252,14 @@
         result.stats.locals = symbols.length;
         result.stats.ratio = result.stats.inputChars ? vmSrc.length / result.stats.inputChars : 0;
         result.stats.bytecodeBytes = vmOut.stats.bytes;
+        result.stats.packedBytecodeBytes = vmOut.stats.packedBytes || vmOut.stats.bytes;
+        result.stats.compressed = !!vmOut.stats.compressed;
+        result.stats.integrity = vmOut.stats.integrity || 0;
+        result.stats.vmMode = vmOut.stats.vmMode || opts.vmMode;
         result.stats.payloadChars = vmOut.stats.payload;
         result.stats.opcodes = vmOut.stats.opcodes;
         result.stats.protos = countProtos(prog);
+        result.stats.pipeline = { ast: pipelineStats || { folded: 0, passes: [] }, bytecode: bytecodeStats || { passes: [] } };
         result.ok = true;
         result.output = vmSrc;
         result.raw = vmSrc;
@@ -295,6 +331,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '6.1.0'
+    version: '7.0.0'
   };
 });

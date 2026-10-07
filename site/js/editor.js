@@ -27,6 +27,13 @@
         '<span class="em-note"></span>' +
       '</div>';
 
+    // The editor owns the contents of its mount point.  Keeping the mount step
+    // here (rather than in every caller) ensures a newly-created workspace is
+    // immediately usable instead of leaving an empty source-editor container.
+    if (!mount || typeof mount.appendChild !== 'function') throw new Error('editor mount is unavailable');
+    mount.innerHTML = '';
+    mount.appendChild(shell);
+
     const area = shell.querySelector('.editor-area');
     const gutter = shell.querySelector('.editor-gutter');
     const hl = shell.querySelector('.editor-hl-layer');

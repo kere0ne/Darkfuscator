@@ -1,66 +1,79 @@
-# Darkfuscator v6
+# Darkfuscator
 
-A Luau obfuscator that compiles readable Lua into **encrypted custom bytecode running inside a proprietary VM**. The output contains no Lua source and no Lua bytecode for a decompiler to read: it is a serialized, encrypted instruction stream decoded at runtime by an interpreter whose handlers live one table slot each.
+Darkfuscator is a Luau protection platform and custom-VM engine. It transforms supported Luau through a real lexer, parser, semantic analysis, conservative AST/bytecode optimization, custom register bytecode compiler, build-specific serializer, and generated VM loader. It does not return renamed source or a canned payload.
 
-## What every build gets
+> Client-side obfuscation raises the cost of reverse engineering; it cannot make code impossible to inspect or change on a machine that executes it. Keep secrets and authoritative decisions on trusted server-side systems.
 
-- **VM compiler** — readable Lua is compiled to custom bytecode that runs inside a proprietary VM. No loadstring in the core, nothing to hook.
-- **Obfuscator** — variable/function renaming, string encryption, control-flow flattening, dead code injection.
-- **Per-request randomization** — opcodes, names and structure shuffle every run, so no two payloads match.
-- **Anti-tamper** — integrity checks detect and reject modified bytecode, with multi-layer encryption and a chunked encrypted loader.
-- **Decompiler resistance** — standard Lua decompilers output garbage: there is no Lua bytecode to read in the first place.
-- **Heavy junk** — up to 220k dead statements (about 2 MB) of dense arithmetic noise at junk level 4; 100k / 900 KB at level 3.
-- **Nested VM** — up to 10 stacked, independently randomized VMs; the stack auto-caps when the payload outgrows nesting.
-- **Hidden anti-tamper** — the 29-check battery ships obfuscated through Darkfuscator itself, so no check code, names or warn strings are readable.
-- **Accounts + saved keys** — sign up on the site and dk_live_ keys are saved to your account; create, list and revoke them on the Account page.
-- **Silent failure** — detection paths scramble the seal or wipe material quietly; there is no branded error string to grep for.
+## Implemented compatibility
 
-## Folder structure
+- **Luau** environments that provide the ordinary primitives used by the generated VM, including `bit32`.
+- **Roblox Luau**, with optional numeric place and universe bindings when explicitly selected.
 
+Generic Lua, unknown runtimes, and executor-specific environments are not advertised as supported. Parse-verified output is still not a replacement for testing protected scripts in their intended runtime.
+
+## What a build does
+
+- Parses Luau and resolves scope information before compilation.
+- Performs semantics-preserving literal and bytecode optimizations.
+- Compiles the supported input to custom register bytecode rather than shipping readable source.
+- Uses fresh per-build randomization for generated names, opcode identifiers, handler ordering, byte layout, string encoding, and payload serialization. A supplied text or numeric seed makes this structure reproducible.
+- Supports FAST, BALANCED, and SECURE runtime layouts; optional RLE compression is a size pass, not a security claim.
+- Can add payload integrity verification. A failed check returns before bytecode runs; it does not generate destructive loops or runtime probes.
+- Re-parses generated output before returning it.
+
+The serializer uses build-specific encoding and integrity checks to increase analysis cost. It is not presented as a cryptographic secrecy boundary.
+
+## Platform
+
+The hosted platform in `site/` includes server-backed registration, email verification, password reset, sessions, projects, source-retention choices, build history, API keys, usage logs, documentation, and account/security controls. The backend invokes the same engine and validates accepted options; interface controls are sent to real endpoints rather than simulated in the browser.
+
+`/offline` is deliberately different: it is a local-engine workspace with no account, server storage, history, email, or API-key behavior. Build a single-file local version with:
+
+```bash
+node tools/build-standalone.js
 ```
+
+This regenerates `darkfuscator-standalone.html` from the current local page and engine.
+
+## Repository layout
+
+```text
 bin/luau-obfuscator.js   CLI entry point
-site/                    web UI (index.html, docs.html, styles.css, js/*)
+site/                    platform shells, docs, local engine page, and browser engine
 site/js/luau-lexer.js    lexer
-site/js/luau-parser.js   parser + scope resolution
-site/js/vm-compile.js    AST -> register bytecode compiler
-site/js/vm-emit.js       bytecode -> encrypted self-contained build
-site/js/app.js           UI wiring (always maximum)
-tests/run.js             differential execution tests vs the real Luau VM
-tests/fuzz.js            randomised option soak
-tools/                   packaging + standalone builder + luau runtime
+site/js/luau-parser.js   parser and scope resolution
+site/js/pipeline.js      conservative AST optimization
+site/js/vm-compile.js    AST to custom register bytecode
+site/js/vm-emit.js       bytecode serialization and generated VM loader
+tools/serve.js           development platform server
+tests/                   parser, differential, fuzz, and UI regression tests
 ```
 
-## Installation
+## CLI
 
-Dependency-free JavaScript; the CLI needs Node 18+.
+The CLI requires Node.js 18 or later and runs the real engine:
 
 ```bash
-git clone https://github.com/kere0ne/Darkfuscator
-cd Darkfuscator
 node bin/luau-obfuscator.js --help
+node bin/luau-obfuscator.js input.luau output.luau --preset maximum
+node bin/luau-obfuscator.js input.luau --seed release-2026 --integrity 2
+node bin/luau-obfuscator.js input.luau --config build-options.json
 ```
 
-The web UI needs nothing installed: open `site/index.html`, or host `site/` on any static host (Cloudflare Pages: no build command, output directory `site`).
+Supported flags are `--seed`, `--junk 0-4`, `--guard 0-2`, `--integrity 0-2`, `--vm-layers 1-10`, `--vm-mode fast|balanced|secure`, `--name-style short|random|confuse`, `--compression`, `--no-compression`, `--no-minify`, `--no-watermark`, `--no-capture-globals`, `--lock-place`, `--lock-universe`, `--config`, and `--quiet`.
 
-## Usage
+The JSON config uses the engine option names: `preset`, `seed`, `junk`, `guard`, `antiTamper` (integrity level), `vmLayers`, `vmMode`, `nameStyle`, `minify`, `watermark`, `captureGlobals`, `compression`, `lockPlace`, and `lockUniverse`. Unsupported keys are rejected by the CLI.
+
+## Development and checks
 
 ```bash
-luau-obfuscator input.luau output.luau --preset maximum
-luau-obfuscator input.luau output.luau --seed 1337
-luau-obfuscator input.luau output.luau --config cfg.json
+npm install
+npm start
+node tests/run.js
+node tests/fuzz.js 20
+node tests/ui-test.js
+node tests/run-antitamper.js
+node tools/build-standalone.js
 ```
 
-Presets: `lightweight`, `balanced`, `maximum` (default). Knobs: `--seed`, `--junk 0-4`, `--guard 0-2`, `--env-checks 0-2`, `--anti-tamper 0-2`, `--vm-layers 1-10`, `--name-style short|random|confuse`, `--lock-place`, `--lock-universe`, `--env-lock`, `--no-minify`, `--no-watermark`.
-
-Full documentation, the VM architecture explanation, the bytecode format, and the runtime security model live at `docs.html` (and mirrored on the site sidebar).
-
-## Tests
-
-```bash
-node tests/run.js      # 243 checks: parse agreement + differential execution
-node tests/fuzz.js 20  # randomised configs stay valid
-```
-
-## Limits
-
-Client-side protection raises the cost of analysis sharply; it does not make a client-side payload impossible to inspect on the machine that runs it.
+For the full browser platform, use the local server rather than opening an authenticated route from disk. The Cloudflare Pages redirect rules in `site/_redirects` map deep app and documentation routes to their appropriate shells.
