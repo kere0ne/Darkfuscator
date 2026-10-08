@@ -1,13 +1,13 @@
 /* Darkfuscator — platform design system.
- * Very dark charcoal base, orange primary, purple secondary. Thin borders,
+ * Pure black-and-white monochrome: near-black base, white primary, gray secondary.
  * small radii, no big gradients, no glow. Serious developer-tool aesthetic. */
 :root {
   --bg: #121212; --panel: #181818; --panel2: #1e1e1e; --panel3: #242424;
   --border: #2c2c2c; --border-soft: #242424; --border-strong: #3a3a3a;
-  --text: #f2eef3; --text-dim: #a89fa9; --text-faint: #7c727c;
-  --accent: #ddaad4; --accent2: #e9c4e1; --accent-ink: #221019;
-  --accent-soft: rgba(221, 170, 212, 0.13);
-  --purple: #b57edc; --purple2: #d0a5e8; --purple-soft: rgba(181, 126, 220, 0.13);
+  --text: #f5f5f5; --text-dim: #a3a3a3; --text-faint: #747474;
+  --accent: #ffffff; --accent2: #e6e6e6; --accent-ink: #0a0a0a;
+  --accent-soft: rgba(255, 255, 255, 0.12);
+  --purple: #d4d4d4; --purple2: #bdbdbd; --purple-soft: rgba(255, 255, 255, 0.08);
   --green: #4ade80; --green-soft: rgba(74, 222, 128, 0.12);
   --red: #fb7185; --red-soft: rgba(251, 113, 133, 0.12);
   --yellow: #facc15; --yellow-soft: rgba(250, 204, 21, 0.12);
@@ -17,13 +17,13 @@
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --sidebar-w: 216px; --sidebar-w-compact: 64px;
 }
-body[data-accent="purple"] { --accent: #b57edc; --accent2: #d0a5e8; --accent-ink: #1c1020; --accent-soft: rgba(181,126,220,0.14); }
-body[data-accent="green"] { --accent: #34d399; --accent2: #6ee7b7; --accent-ink: #0a1512; --accent-soft: rgba(52,211,153,0.14); }
-body[data-accent="red"] { --accent: #fb7185; --accent2: #fda4af; --accent-ink: #1a0a0e; --accent-soft: rgba(251,113,133,0.14); }
+body[data-accent="purple"] { --accent: #e6e6e6; --accent2: #d4d4d4; --accent-ink: #0a0a0a; --accent-soft: rgba(255,255,255,0.10); }
+body[data-accent="green"] { --accent: #c9c9c9; --accent2: #b5b5b5; --accent-ink: #0a0a0a; --accent-soft: rgba(255,255,255,0.09); }
+body[data-accent="red"] { --accent: #adadad; --accent2: #9a9a9a; --accent-ink: #0a0a0a; --accent-soft: rgba(255,255,255,0.08); }
 body[data-theme="light"] {
   --bg: #121212; --panel: #181818; --panel2: #1e1e1e; --panel3: #242424;
   --border: #2c2c2c; --border-soft: #242424; --border-strong: #3a3a3a;
-  --text: #f2eef3; --text-dim: #a89fa9; --text-faint: #7c727c;
+  --text: #f5f5f5; --text-dim: #a3a3a3; --text-faint: #747474;
   --shadow: 0 8px 24px rgba(30,30,60,0.10);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -56,7 +56,7 @@ body[data-compact="1"] .card { padding: 14px 16px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 14px; overflow: hidden; }
 .brand-mark {
   flex: 0 0 auto; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center;
-  background: linear-gradient(135deg, var(--accent), var(--purple)); color: #14060a;
+  background: linear-gradient(135deg, #ffffff, #9a9a9a); color: #0a0a0a;
   font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
 }
 .brand-name { font-weight: 700; font-size: 15px; white-space: nowrap; }

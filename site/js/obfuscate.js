@@ -283,6 +283,8 @@
         result.stats.payloadChars = vmOut.stats.payload;
         result.stats.watermark = vmOut.stats.watermark || null;
         result.stats.opcodes = vmOut.stats.opcodes;
+        result.stats.opEnc = vmOut.stats.opEnc;
+        result.stats.kSplit = vmOut.stats.kSplit;
         result.stats.protos = countProtos(prog);
         result.stats.pipeline = { ast: pipelineStats || { folded: 0, passes: [] }, bytecode: bytecodeStats || { passes: [] } };
         result.ok = true;
@@ -356,6 +358,6 @@
     validate: validate,
     parse: function (s) { return Parser.parse(s); },
     tokenize: function (s) { return Lexer.tokenize(s); },
-    version: '7.3.0'
+    version: '7.4.0'
   };
 });

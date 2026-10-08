@@ -617,7 +617,7 @@ function sanitizeSettings(next, cur) {
   if (next.appearance) {
     out.appearance = Object.assign({}, out.appearance);
     if (['dark', 'light'].indexOf(next.appearance.theme) !== -1) out.appearance.theme = next.appearance.theme;
-    if (['orange', 'purple', 'green', 'red'].indexOf(next.appearance.accent) !== -1) out.appearance.accent = next.appearance.accent;
+    if (['white', 'orange', 'purple', 'green', 'red'].indexOf(next.appearance.accent) !== -1) out.appearance.accent = next.appearance.accent;
     if (next.appearance.compact !== undefined) out.appearance.compact = !!next.appearance.compact;
   }
   if (next.editor) {

@@ -128,6 +128,12 @@
     var xk = 1 + Math.floor(rng() * 254);
     var osalt = (key * 733 + xk * 911 + (seal % 256)) % 65536;
     var pidx = 0;
+    // v7.4 per-build variation: operand masking variant (0 = xor mask, 1 = add
+    // mask, derived from the build key) and integer-constant splitting
+    // (0 = xor halves, 1 = add halves) with a per-mode application rate
+    var opEnc = (key + xk) % 2;
+    var kSplit = Math.floor(rng() * 2);
+    var kSplitP = vmMode === 'secure' ? 0.75 : vmMode === 'balanced' ? 0.5 : 0.25;
     // zigzag varint: operands are signed (jump offsets are negative when the
     // target precedes the instruction, e.g. FORLOOP/loop-back JMP/TFORCALL)
     function vi(v) {
@@ -142,6 +148,19 @@
       bytes.push(e);
     }
     function zz(v) { return v < 0 ? -2 * Math.ceil(v) - 1 : 2 * Math.floor(v); }
+    // mask an already-zigzagged operand: xor against the positional mask, or
+    // add it mod 65536 on builds that picked the add variant (v7.4)
+    // add variant must use a modulus ABOVE the largest zigzagged operand
+    // (RK-encoded constants start at 100000, so 65536 would wrap); 2^26 gives
+    // every register, constant and jump operand headroom
+    function wo(z, m) { return opEnc === 1 ? (z + m) % 67108864 : z ^ m; }
+    // which numeric constants can be split this build without losing exactness
+    function kSplitEligible(v) {
+      if (typeof v !== 'number' || !isFinite(v) || Math.floor(v) !== v) return false;
+      if (v === 0 && 1 / v < 0) return false; // negative zero must keep its sign
+      if (kSplit === 0) return v >= 0 && v <= 2147483647;
+      return Math.abs(v) <= 2147483647;
+    }
     function b(v) { bytes.push(v & 255); }
     function str(s) { var a = utf8Bytes(s); vi(a.length); for (var i = 0; i < a.length; i++) b(a[i]); }
     function proto(p) {
@@ -158,6 +177,7 @@
         var k = p.k[i];
         if (k.t === 'z') b(0);
         else if (k.t === 'b') { b(1); b(k.v ? 1 : 0); }
+        else if (k.t === 'n' && kSplitEligible(k.v) && rng() < kSplitP) { b(4); var rr2; if (kSplit === 0) { rr2 = Math.floor(rng() * 2147483647); vi((k.v ^ rr2) >>> 0); vi(rr2); } else { rr2 = Math.floor(rng() * 1073741824); vi(k.v - rr2); vi(rr2); } }
         else if (k.t === 'n') { b(2); str(numText(k.v)); }
         else if (k.b) { b(3); vi(k.b.length); for (var qb = 0; qb < k.b.length; qb++) b(k.b[qb]); }
         else { b(3); str(k.v); }
@@ -170,10 +190,10 @@
       for (var j = 0; j < p.code.length; j++) {
         var ins = p.code[j];
         vi(ins[0]);
-        vx(zz(ins[1]) ^ ((ps + (j + 1) * 7919 + 104729) % 65536));
-        vx(zz(ins[2]) ^ ((ps + (j + 1) * 7919 + 209458) % 65536));
-        vx(zz(ins[3]) ^ ((ps + (j + 1) * 7919 + 314187) % 65536));
-        if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vx(zz(ins.x[q]) ^ ((ps + (j + 1) * 7919 + (4 + q) * 104729) % 65536)); }
+        vx(wo(zz(ins[1]), (ps + (j + 1) * 7919 + 104729) % 65536));
+        vx(wo(zz(ins[2]), (ps + (j + 1) * 7919 + 209458) % 65536));
+        vx(wo(zz(ins[3]), (ps + (j + 1) * 7919 + 314187) % 65536));
+        if (ins.x && ins.x.length) { vi(ins.x.length); for (var q = 0; q < ins.x.length; q++) vx(wo(zz(ins.x[q]), (ps + (j + 1) * 7919 + (4 + q) * 104729) % 65536)); }
         else vi(0);
       }
       if (chunkOn) {
@@ -251,7 +271,7 @@
     if (nb > 0) out.push(alpha[acc % 64]);
     return { payload: out.join(''), alphabet: alpha.join(''), key: key, xk: xk, seal: seal,
       bytes: plainBytes.length, packedBytes: packedBytes.length, compressed: compressed,
-      check1: c1, check2: c2, fnv: fnv };
+      check1: c1, check2: c2, fnv: fnv, opEnc: opEnc, kSplit: kSplit };
   }
 
   // ----------------------------------------------------------------- handlers
@@ -482,7 +502,7 @@
     // reads are zigzag encoded (see `vi`) so that jump offsets can go backwards
     line('local function vr() local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
     // masked-operand read: unmask with the per-proto positional mask, then unzigzag
-    line('local function vrm(m) local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end v=bit32.bxor(v,m) if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
+    line('local function vrm(m) local v,s=0,1 while true do local b=' + L.c + '[' + PS + '.p]; ' + PS + '.p=' + PS + '.p+1; v=v+(b%128)*s if b<128 then break end s=s*128 end v=' + (blob.opEnc === 1 ? '(v-m)%67108864' : 'bit32.bxor(v,m)') + ' if v%2==1 then v=-(v+1)/2 else v=v/2 end return v end');
     line('local function st() local n=vr(); if n==0 then return "" end; local t={}; local q=1; while q<=n do');
     line('local len=n-q+1; if len>2000 then len=2000 end; local u={}');
     line('for j=1,len do u[j]=' + L.c + '[' + PS + '.p+j-1] end; ' + PS + '.p=' + PS + '.p+len; t[#t+1]=string.char((unpack or table.unpack)(u)); q=q+len end');
@@ -499,7 +519,7 @@
     line('local np=vr(); local va=by()==1; local ms=vr(); local rs=vr(); local nu=vr()');
     line('local nk=vr(); local k={}');
     line('for i=1,nk do local t=by()');
-    line('if t==0 then k[i]=nil elseif t==1 then k[i]=by()==1 elseif t==2 then k[i]=tonumber(st()) else local sv=st(); local eb={} for j=1,#sv do eb[j]=bit32.bxor(sv:byte(j),(' + strMask + '+j*29)%256) end k[i]={["' + N.strmark + '"]=true,b=eb} end end');
+    line('if t==0 then k[i]=nil elseif t==1 then k[i]=by()==1 elseif t==4 then local a1=vr() local b1=vr() k[i]=' + (blob.kSplit === 0 ? 'bit32.bxor(a1,b1)' : '(a1+b1)') + ' elseif t==2 then k[i]=tonumber(st()) else local sv=st(); local eb={} for j=1,#sv do eb[j]=bit32.bxor(sv:byte(j),(' + strMask + '+j*29)%256) end k[i]={["' + N.strmark + '"]=true,b=eb} end end');
     line('local nc=vr(); local c={}');
     line('for i=1,nc do local o=OPC[vr()+1]; local A=vrm((ps+i*7919+104729)%65536); local B=vrm((ps+i*7919+209458)%65536); local C=vrm((ps+i*7919+314187)%65536); local nx=vr()');
     line('if nx>0 then local x={} for j=1,nx do x[j]=vrm((ps+i*7919+(3+j)*104729)%65536) end c[i]={o,A,B,C,x} else c[i]={o,A,B,C} end end');
@@ -682,7 +702,7 @@
     // alias ids that trigger the identical handler, so the same operation
     // arrives under several numeric values and a pattern-matching
     // deobfuscator cannot pin an opcode by its id alone
-    var nAlias = opts.junk === 0 ? 1 : (opts.junk >= 2 ? 3 : 2) + Math.floor(rng() * 2);
+    var nAlias = opts.junk === 0 ? 1 : (opts.junk >= 2 ? 3 : 2) + Math.floor(rng() * 2) + (vmMode === 'secure' ? 1 : 0);
     for (i = 0; i < OPS.length; i++) {
       if (!usedOps[i]) continue;
       for (var ai = 0; ai < nAlias; ai++) {
@@ -771,7 +791,7 @@
     line('end)');
 
     // decoy slots, as in the reference build
-    var decoys = opts.junk === 2 ? 24 : opts.junk === 1 ? 8 : 0;
+    var decoys = opts.junk === 2 ? (vmMode === 'secure' ? 32 : 24) : opts.junk === 1 ? (vmMode === 'secure' ? 12 : 8) : 0;
     for (i = 0; i < decoys; i++) {
       line(',["' + ng() + '"]=(function(' + ng() + ',' + ng() + ',' + ng() + ')end)');
     }
@@ -785,7 +805,7 @@
       source: src,
       ids: ids,
       stats: { bytes: blob.bytes, packedBytes: blob.packedBytes, compressed: blob.compressed,
-        integrity: integrityLevel, vmMode: vmMode, payload: blob.payload.length, opcodes: Object.keys(usedOps).length, watermark: wmId }
+        integrity: integrityLevel, vmMode: vmMode, payload: blob.payload.length, opcodes: Object.keys(usedOps).length, watermark: wmId, opEnc: blob.opEnc, kSplit: blob.kSplit }
     };
   }
 

@@ -189,7 +189,7 @@ function importLegacy() {
 
 function defaultSettings() {
   return {
-    appearance: { theme: 'dark', accent: 'orange', compact: false },
+    appearance: { theme: 'dark', accent: 'white', compact: false },
     editor: { fontSize: 13, tabSize: 4, wordWrap: false, lineNumbers: true, highlighting: true },
     obfuscationDefaults: { target: 'roblox', preset: 'maximum', ir: 'secure', vmMode: 'secure', compression: true },
     notifications: { buildCompletion: true, securityAlerts: true }
