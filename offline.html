@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0b10">
+<title>Local engine — Darkfuscator</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="landing-body">
+<div class="landing">
+  <header class="land-head">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt=""><span>Darkfuscator</span></a>
+    <nav class="land-nav"><a class="link" href="/docs">Docs</a><a class="btn sm" href="/login">Platform sign in</a></nav>
+  </header>
+  <main class="offline-main">
+    <section class="land-section">
+      <p class="land-eyebrow">LOCAL ENGINE</p>
+      <h1>Run the supported engine in this browser.</h1>
+      <p class="land-sub">This page invokes the same client-side parser and custom-VM emitter loaded by the site. It does not create an account, deliver email, store history, create API keys, or pretend to send anything to a backend.</p>
+      <p class="land-footnote">A successful result is parse-verified output. Test it in your intended Luau environment; obfuscation is not impossible to reverse.</p>
+    </section>
+
+    <section class="card offline-workspace">
+      <div class="panes">
+        <div class="pane" id="pane-in">
+          <div class="pane-head"><span class="pane-title">Luau source</span><span class="meta" id="inmeta">0 chars · 0 lines</span></div>
+          <textarea id="input" spellcheck="false" placeholder="-- paste Luau source here"></textarea>
+          <div class="pane-foot"><label class="file-btn">Load file<input type="file" id="file" accept=".lua,.luau,.txt"></label><button class="btn" id="validate" type="button">Validate</button><button class="btn" id="clear" type="button">Clear</button></div>
+        </div>
+        <div class="pane" id="pane-out">
+          <div class="pane-head"><span class="pane-title">Protected output</span><span class="meta" id="outmeta">No build yet</span></div>
+          <textarea id="output" spellcheck="false" readonly aria-label="Protected output"></textarea>
+          <div class="pane-foot"><button class="btn" id="copy" type="button">Copy</button><button class="btn" id="download" type="button">Download</button><span class="verified" id="verified-badge" hidden>Parse-verified output</span></div>
+        </div>
+      </div>
+      <div class="action-row"><button class="btn primary" id="protect" type="button">Protect locally</button><span class="status" id="status">Ready. This local page has no build history.</span></div>
+      <div class="error" id="error" hidden></div>
+      <div class="stats" id="stats" hidden>
+        <div class="stat"><span class="stat-k">VM layers</span><span class="stat-v" id="st-vms">0</span></div>
+        <div class="stat"><span class="stat-k">Bytecode bytes</span><span class="stat-v" id="st-bytes">0</span></div>
+        <div class="stat"><span class="stat-k">Payload chars</span><span class="stat-v" id="st-payload">0</span></div>
+        <div class="stat"><span class="stat-k">Output size</span><span class="stat-v" id="st-size">0</span></div>
+        <div class="stat"><span class="stat-k">Processing</span><span class="stat-v" id="st-time">0</span></div>
+        <div class="stat"><span class="stat-k">Seed</span><span class="stat-v" id="st-seed">—</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="local-settings-title">
+      <h2 class="card-title" id="local-settings-title">Engine settings</h2>
+      <p class="dim" style="margin-bottom:14px">Every setting below is passed directly to the local engine. The target-specific place and universe locks should only be used for Roblox Luau builds.</p>
+      <div class="settings-grid">
+        <div class="field"><label for="opt-preset">Preset</label><select id="opt-preset"><option value="lightweight">Lightweight</option><option value="balanced" selected>Balanced</option><option value="maximum">Maximum</option></select></div>
+        <div class="field"><label for="opt-ir">Source IR</label><select id="opt-ir"><option value="none">None</option><option value="fast">Fast</option><option value="balanced" selected>Balanced</option><option value="secure">Secure</option></select><div class="hint">A bounded semantic source pass before custom-bytecode compilation.</div></div>
+        <div class="field"><label for="opt-vm-mode">VM mode</label><select id="opt-vm-mode"><option value="fast">Fast</option><option value="balanced" selected>Balanced</option><option value="secure">Secure</option></select></div>
+        <div class="field"><label for="opt-vm-layers">VM layers</label><select id="opt-vm-layers"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select><div class="hint">More layers increase output size and processing cost.</div></div>
+        <div class="field"><label for="opt-junk">Control-flow variation</label><select id="opt-junk"><option value="0">Minimal</option><option value="1" selected>Balanced</option><option value="2">Strong</option><option value="3">Heavy</option><option value="4">Maximum size</option></select></div>
+        <div class="field"><label for="opt-guard">Runtime guard</label><select id="opt-guard"><option value="0">Off</option><option value="1" selected>Standard</option><option value="2">Strict</option></select><div class="hint">Validates ordinary runtime primitives used by the VM; it does not probe executors or debuggers.</div></div>
+        <div class="field"><label for="opt-integrity">Integrity verification</label><select id="opt-integrity"><option value="0">Off</option><option value="1" selected>Fast</option><option value="2">Full</option></select><div class="hint">Failed verification safely returns before bytecode runs.</div></div>
+        <div class="field"><label for="opt-name-style">Identifier style</label><select id="opt-name-style"><option value="short">Short</option><option value="random" selected>Random</option><option value="confuse">Confuse</option></select></div>
+        <div class="field"><label for="opt-seed">Build seed</label><input type="text" id="opt-seed" placeholder="Fresh random seed"><div class="hint">Use text or a number for repeatable structure.</div></div>
+        <div class="field"><label for="opt-lock-place">Roblox place ID</label><input type="text" inputmode="numeric" id="opt-lock-place" placeholder="Optional"></div>
+        <div class="field"><label for="opt-lock-universe">Roblox universe ID</label><input type="text" inputmode="numeric" id="opt-lock-universe" placeholder="Optional"></div>
+        <div class="field"><label class="check"><input type="checkbox" id="opt-compression" checked> Compress payload when RLE makes it smaller</label></div>
+        <div class="field"><label class="check"><input type="checkbox" id="opt-minify" checked> Minify generated output</label></div>
+        <div class="field"><label class="check"><input type="checkbox" id="opt-watermark" checked> Include an honest protection notice</label></div>
+        <div class="field"><label class="check"><input type="checkbox" id="opt-capture-globals" checked> Capture caller globals for the VM</label></div>
+      </div>
+    </section>
+  </main>
+  <footer class="land-foot"><p class="dim">Need projects, history, API keys, or account controls? Use the authenticated platform.</p><a class="btn" href="/obfuscate">Open platform workspace</a></footer>
+</div>
+<script src="/js/luau-lexer.js"></script>
+<script src="/js/luau-parser.js"></script>
+<script src="/js/ir.js"></script>
+<script src="/js/pipeline.js"></script>
+<script src="/js/vm-compile.js"></script>
+<script src="/js/vm-emit.js"></script>
+<script src="/js/obfuscate.js"></script>
+<script src="/js/offline.js"></script>
+</body>
+</html>

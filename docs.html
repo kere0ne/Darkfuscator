@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API docs - Darkfuscator</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="docs-body">
+<div class="docs-shell">
+  <aside class="docs-side">
+    <a class="brand" href="/"><img src="/assets/logo.png" alt="Darkfuscator"><span>Darkfuscator</span></a>
+    <p class="docs-eyebrow">API DOCS</p>
+    <nav id="docs-nav"></nav>
+    <div class="docs-foot"><a class="link" href="/dashboard">Back to app</a><span class="dim"> / </span><a class="link" href="/register">Create account</a></div>
+  </aside>
+  <main class="docs-main"><div id="docs-content"></div></main>
+</div>
+<script src="/js/ui.js"></script>
+<script>window.DF_NAV = function (k) { if (history.replaceState) history.replaceState(null, '', '/docs/' + k); };</script>
+<script src="/js/docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-accent="white">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0b10">
+<title>Darkfuscator</title>
+<script>try{var t=localStorage.getItem('dk_theme');document.documentElement.setAttribute('data-theme',t||'dark')}catch(e){}</script>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body class="platform-body pre-boot">
+<div class="platform-shell" id="platform-shell">
+  <div class="nav-scrim" id="nav-scrim" hidden></div>
+  <aside class="platform-sidebar" id="platform-sidebar" aria-label="Primary navigation">
+    <div class="side-brand-row">
+      <a class="platform-brand" href="/dashboard" data-route="/dashboard" aria-label="Darkfuscator dashboard">
+        <img src="/assets/logo.png" alt=""><span>Darkfuscator</span>
+      </a>
+      <button class="icon-button side-collapse" id="side-collapse" type="button" aria-label="Collapse navigation" title="Collapse sidebar">‹</button>
+    </div>
+    <nav class="platform-nav" id="platform-nav">
+      <a href="/dashboard" data-route="/dashboard"><span class="nav-icon" aria-hidden="true">▦</span><span>Dashboard</span></a>
+      <a href="/obfuscate" data-route="/obfuscate"><span class="nav-icon" aria-hidden="true">⌘</span><span>Obfuscate</span></a>
+      <a href="/projects" data-route="/projects"><span class="nav-icon" aria-hidden="true">◇</span><span>Projects</span></a>
+      <a href="/history" data-route="/history"><span class="nav-icon" aria-hidden="true">◷</span><span>Build History</span></a>
+      <a href="/api" data-route="/api"><span class="nav-icon" aria-hidden="true">{ }</span><span>API</span></a>
+      <a href="/docs"><span class="nav-icon" aria-hidden="true">?</span><span>Documentation</span></a>
+      <a href="/settings" data-route="/settings"><span class="nav-icon" aria-hidden="true">⚙</span><span>Settings</span></a>
+    </nav>
+    <div class="platform-side-bottom">
+      <div class="side-status" id="side-status" title="Checking system status"><span class="status-dot" id="side-status-dot"></span><span id="side-status-label">Checking status</span></div>
+      <a class="side-account" href="/account" data-route="/account"><span class="mini-avatar" id="side-avatar">D</span><span id="side-account-name">Account</span></a>
+      <div class="side-bottom-actions">
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle theme">◐</button>
+        <a class="icon-button" href="/logout" aria-label="Sign out" title="Sign out">↪</a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="platform-main">
+    <header class="platform-topbar">
+      <div class="topbar-leading">
+        <button class="icon-button mobile-menu" id="mobile-menu" type="button" aria-label="Open navigation">☰</button>
+        <div>
+          <p class="page-kicker" id="page-kicker">DARKFUSCATOR</p>
+          <h1 id="view-title">Dashboard</h1>
+          <p class="page-description" id="view-description"></p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="command-button" id="palette-btn" type="button" aria-label="Open search"><span>Search</span><kbd>⌘ K</kbd></button>
+        <div class="account-menu-wrap">
+          <button class="account-trigger" id="account-trigger" type="button" aria-haspopup="menu" aria-expanded="false">
+            <span class="mini-avatar" id="top-avatar">D</span><span id="top-account-name">Account</span><span aria-hidden="true">⌄</span>
+          </button>
+          <div class="account-popover" id="account-popover" role="menu" hidden>
+            <div class="account-popover-head"><strong id="menu-username"></strong></div>
+            <a href="/account" data-route="/account" role="menuitem">Account</a>
+            <a href="/settings" data-route="/settings" role="menuitem">Settings</a>
+            <a href="/api" data-route="/api" role="menuitem">API</a>
+            <a href="/logout" role="menuitem">Sign out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+    <div class="platform-view" id="view-root" aria-live="polite"><div class="view-loading">Loading your workspace…</div></div>
+  </main>
+</div>
+<nav class="mobile-bottom-nav" aria-label="Mobile navigation">
+  <a href="/dashboard" data-route="/dashboard">Home</a>
+  <a href="/obfuscate" data-route="/obfuscate">Protect</a>
+  <a href="/projects" data-route="/projects">Projects</a>
+  <a href="/history" data-route="/history">History</a>
+  <a href="/settings" data-route="/settings">Settings</a>
+</nav>
+<script src="/js/luau-lexer.js"></script>
+<script src="/js/luau-parser.js"></script>
+<script src="/js/examples.js"></script>
+<script src="/js/ui.js"></script>
+<script src="/js/editor.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>
